@@ -1,34 +1,46 @@
 #!/usr/bin/env python3
 """
 p8png_extract.py — convert a folder of .p8.png cart files into
-plain .p8 text carts plus matching 128×128 .bmp label images
-suitable for uploading to the ThumbyP8 device.
+plain .p8 text carts (in shrinko8-unminified form) plus matching
+128×128 .bmp label images, suitable for uploading to the ThumbyP8
+device.
 
 Usage:
     p8png_extract.py <input_dir> <output_dir>
 
 For every <name>.p8.png in input_dir, writes:
-    <output_dir>/<name>.p8     plain text cart (PICO-8 format)
+    <output_dir>/<name>.p8     plain text cart, dialect-friendly
     <output_dir>/<name>.bmp    128×128 16-bit RGB565 BMP label
 
-The on-device runtime then loads the .p8 directly (no PNG decode)
-and reads the BMP for the picker thumbnail (also no PNG decode).
-This sidesteps the slow stb_image PNG decoder on the device.
+Heavy lifting (PNG decode, PXA decompression, full Lua tokenize/
+parse/unminify) is delegated to vendored shrinko8
+(https://github.com/thisismypassport/shrinko8, MIT license — see
+tools/shrinko8/LICENSE). Trying to reimplement shrinko8's parser
+in this script is a bottomless rabbit hole; shrinko8 already
+handles every PICO-8 dialect quirk we kept tripping over.
 
-PNG decoding here uses PIL; PXA Lua decompression is implemented
-inline from the publicly-documented PICO-8 cart format.
+The .bmp label is built from the visible PNG via PIL — that part
+we don't need shrinko8 for.
 """
 
 import os
+import re
 import struct
+import subprocess
 import sys
 from pathlib import Path
+
+SHRINKO8 = Path(__file__).resolve().parent / "shrinko8" / "shrinko8.py"
 
 try:
     from PIL import Image
 except ImportError:
     print("This script needs Pillow: pip install Pillow", file=sys.stderr)
     sys.exit(1)
+
+# Token-based PICO-8 → vanilla Lua 5.4 rewriter, in this same dir.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pico8_lua import rewrite_pico8_to_lua
 
 
 # -----------------------------------------------------------------------
@@ -337,8 +349,201 @@ def write_label_bmp(out_path: Path, png_path: Path):
 
 
 # -----------------------------------------------------------------------
-# 5. Driver
+# 5. Post-process shrinko8's unminified output for the leftover quirks
+#    it doesn't translate (rare in practice but real).
 # -----------------------------------------------------------------------
+_IF_DO_RE = re.compile(r'^(\s*if\b.*\S)\s+do(\s*)$', re.MULTILINE)
+
+# `?expr1,expr2,...` at the start of a line is PICO-8 shorthand
+# for `print(expr1,expr2,...)`. shrinko8 -U leaves it as-is.
+_PRINT_SHORTHAND_RE = re.compile(r'^(\s*)\?(.+)$', re.MULTILINE)
+
+# PICO-8 source uses Unicode arrow / button glyphs as identifiers
+# for button constants. Standard Lua's identifier rules forbid
+# non-ASCII bytes, so substitute each glyph (UTF-8 encoded) with
+# its numeric button index. Stripping any U+FE0F variation
+# selector that may follow.
+_GLYPH_SUBS = [
+    # arrows
+    (b'\xe2\xac\x85', b'0'),                            # ⬅  (U+2B05)
+    (b'\xe2\x9e\xa1', b'1'),                            # ➡  (U+27A1)
+    (b'\xe2\xac\x86', b'2'),                            # ⬆  (U+2B06)
+    (b'\xe2\xac\x87', b'3'),                            # ⬇  (U+2B07)
+    # buttons
+    (b'\xf0\x9f\x85\xbe', b'4'),                        # 🅾  (U+1F17E)
+    (b'\xe2\x9d\x8e',     b'5'),                        # ❎  (U+274E)
+    # strip the variation selector that often follows the glyph
+    (b'\xef\xb8\x8f', b''),                             # ︎  (U+FE0F)
+]
+
+def _translate_dialect_operators(src: str) -> str:
+    """
+    Walk source character by character with a string/comment state
+    machine and translate PICO-8-only operators to their Lua 5.4
+    equivalents:
+      - `\\`     PICO-8 integer divide   → `//`
+      - `^^`    PICO-8 binary XOR        → `~`  (Lua 5.4 bitwise XOR)
+      - `@addr` PICO-8 peek shorthand    → `peek(addr)`
+      - `%addr` PICO-8 peek2 shorthand   → `peek2(addr)`
+      - `$addr` PICO-8 peek4 shorthand   → `peek4(addr)`
+    Substitutions are skipped inside string literals (`'...'`,
+    `"..."`, `[[...]]`) and comments (`--...`, `--[[...]]`).
+    """
+    out = []
+    i = 0
+    n = len(src)
+    while i < n:
+        c = src[i]
+
+        # Line comment
+        if c == '-' and i + 1 < n and src[i + 1] == '-':
+            # Maybe block comment --[[
+            if i + 3 < n and src[i + 2] == '[' and src[i + 3] == '[':
+                end = src.find(']]', i + 4)
+                if end < 0:
+                    out.append(src[i:])
+                    break
+                out.append(src[i:end + 2])
+                i = end + 2
+                continue
+            # Line comment to end of line
+            end = src.find('\n', i)
+            if end < 0:
+                out.append(src[i:])
+                break
+            out.append(src[i:end])
+            i = end
+            continue
+
+        # Long-bracket string [[ ... ]]
+        if c == '[' and i + 1 < n and src[i + 1] == '[':
+            end = src.find(']]', i + 2)
+            if end < 0:
+                out.append(src[i:])
+                break
+            out.append(src[i:end + 2])
+            i = end + 2
+            continue
+
+        # Quoted strings — preserve verbatim, including escapes
+        if c == '"' or c == "'":
+            quote = c
+            j = i + 1
+            while j < n:
+                if src[j] == '\\' and j + 1 < n:
+                    j += 2
+                    continue
+                if src[j] == quote:
+                    j += 1
+                    break
+                if src[j] == '\n':
+                    break
+                j += 1
+            out.append(src[i:j])
+            i = j
+            continue
+
+        # Code-state substitutions
+        # 1. `\` integer divide → `//`. Make sure we don't grab a
+        #    backslash that's part of an unrecognised escape inside a
+        #    string — but we already handled strings above, so any
+        #    backslash here is in code.
+        if c == '\\':
+            out.append('//')
+            i += 1
+            continue
+
+        # 2. `^^` XOR → `~` (Lua 5.4 bitwise XOR)
+        if c == '^' and i + 1 < n and src[i + 1] == '^':
+            out.append('~')
+            i += 2
+            continue
+
+        # 3. `@expr` peek shorthand → `peek(expr)` for one byte. The
+        #    expression is a simple primary: identifier, number, or
+        #    parenthesised group. We grab the smallest expression
+        #    that makes sense.
+        if c == '@' or c == '%' or c == '$':
+            # Skip standalone uses of @ in invalid contexts — only
+            # rewrite when followed by identifier/number/(.
+            if i + 1 < n and (src[i + 1].isalnum() or src[i + 1] in '_('):
+                func = {'@': 'peek', '%': 'peek2', '$': 'peek4'}[c]
+                out.append(f'{func}(')
+                # Find end of primary expression
+                j = i + 1
+                if src[j] == '(':
+                    # Balanced paren group
+                    depth = 1
+                    j += 1
+                    while j < n and depth > 0:
+                        if src[j] == '(': depth += 1
+                        elif src[j] == ')': depth -= 1
+                        if depth > 0: j += 1
+                    out.append(src[i + 2:j])  # inside the parens
+                    out.append(')')
+                    i = j + 1
+                else:
+                    # Identifier / number / dotted chain
+                    while j < n and (src[j].isalnum() or src[j] in '_.'):
+                        j += 1
+                    out.append(src[i + 1:j])
+                    out.append(')')
+                    i = j
+                continue
+
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+
+def post_fix_lua(text: str) -> str:
+    """
+    Translate the PICO-8 dialect bits that shrinko8 -U leaves
+    behind:
+      - `if cond do ... end` → `if cond then ... end`
+      - `?expr` print shorthand → `print(expr)`
+      - PICO-8 operators (\\ ^^ @ % $) → Lua equivalents
+      - Unicode button glyph identifiers → numeric button indices
+    """
+    # 1. if cond do → if cond then
+    def _if_do_sub(m):
+        return f"{m.group(1)} then{m.group(2)}"
+    text = _IF_DO_RE.sub(_if_do_sub, text)
+
+    # 2. `?expr` → `print(expr)`
+    def _print_sub(m):
+        return f"{m.group(1)}print({m.group(2)})"
+    text = _PRINT_SHORTHAND_RE.sub(_print_sub, text)
+
+    # 3. PICO-8-only operators → Lua equivalents
+    text = _translate_dialect_operators(text)
+
+    # 4. UTF-8 button glyphs → numeric indices
+    raw = text.encode('latin-1', errors='replace')
+    for needle, replacement in _GLYPH_SUBS:
+        raw = raw.replace(needle, replacement)
+    text = raw.decode('latin-1')
+
+    return text
+
+
+# -----------------------------------------------------------------------
+# 6. Driver
+# -----------------------------------------------------------------------
+def shrinko8_unminify(png_path: Path, out_p8: Path) -> None:
+    """Run shrinko8 -U on the .p8.png and write the unminified .p8."""
+    if not SHRINKO8.exists():
+        raise FileNotFoundError(
+            f"vendored shrinko8 not found at {SHRINKO8}. "
+            "tools/shrinko8/ should contain the MIT-licensed sources.")
+    result = subprocess.run(
+        [sys.executable, str(SHRINKO8), "-U", str(png_path), str(out_p8)],
+        capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"shrinko8 failed: {result.stderr.strip() or result.stdout.strip()}")
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: p8png_extract.py <input_dir> <output_dir>",
@@ -352,12 +557,23 @@ def main():
     n_ok = n_fail = 0
     for png in sorted(src_dir.glob("*.p8.png")):
         stem = png.name[:-len(".p8.png")]
+        out_p8 = dst_dir / f"{stem}.p8"
+        out_bmp = dst_dir / f"{stem}.bmp"
         try:
-            cart = png_to_cart_bytes(png)
-            lua  = extract_lua(cart)
-            write_p8_text(dst_dir / f"{stem}.p8", cart, lua)
-            write_label_bmp(dst_dir / f"{stem}.bmp", png)
-            print(f"  ok  {png.name}  ({len(lua)} lua chars)")
+            # 1. shrinko8 unminify → .p8 (handles PNG decode + PXA
+            #    decompression + tokenize + parse + emit-unminified
+            #    in one shot).
+            shrinko8_unminify(png, out_p8)
+
+            # 2. Light post-fix for the rare leftovers.
+            text = out_p8.read_text(encoding="latin-1")
+            text = post_fix_lua(text)
+            out_p8.write_text(text, encoding="latin-1")
+
+            # 3. Build the BMP label thumbnail from the visible PNG.
+            write_label_bmp(out_bmp, png)
+
+            print(f"  ok  {png.name}")
             n_ok += 1
         except Exception as e:
             print(f"  ERR {png.name}: {e}", file=sys.stderr)

@@ -40,12 +40,22 @@ static p8_input *get_input(lua_State *L) {
     return in;
 }
 
-/* PICO-8 numbers are 16.16 fixed point in real PICO-8; here they're
- * lua_Number. Floor-cast for coordinate args. */
+/* PICO-8 is far more permissive than Lua about nil-as-number.
+ * Real carts pass nil/missing where the API expects numbers and
+ * PICO-8 just treats it as 0. Match that.  argi/argn return the
+ * default (or 0) if the arg is nil, missing, or not coercible. */
 static int argi(lua_State *L, int idx, int dflt) {
     if (lua_isnoneornil(L, idx)) return dflt;
-    lua_Number n = luaL_checknumber(L, idx);
+    int isnum = 0;
+    lua_Number n = lua_tonumberx(L, idx, &isnum);
+    if (!isnum) return dflt;
     return (int)floor((double)n);
+}
+static lua_Number argn0(lua_State *L, int idx) {
+    if (lua_isnoneornil(L, idx)) return 0;
+    int isnum = 0;
+    lua_Number n = lua_tonumberx(L, idx, &isnum);
+    return isnum ? n : 0;
 }
 /* (argn helper removed — unused after Phase 2 binding pass.) */
 
@@ -252,18 +262,16 @@ static int l_btnp(lua_State *L) {
  * libm. atan2 also returns turns and is anticlockwise in screenspace. */
 
 static int l_p8_sin(lua_State *L) {
-    lua_Number a = luaL_checknumber(L, 1);
-    lua_pushnumber(L, -sin(a * 2.0 * M_PI));
+    lua_pushnumber(L, -sin(argn0(L, 1) * 2.0 * M_PI));
     return 1;
 }
 static int l_p8_cos(lua_State *L) {
-    lua_Number a = luaL_checknumber(L, 1);
-    lua_pushnumber(L, cos(a * 2.0 * M_PI));
+    lua_pushnumber(L, cos(argn0(L, 1) * 2.0 * M_PI));
     return 1;
 }
 static int l_p8_atan2(lua_State *L) {
-    lua_Number dx = luaL_checknumber(L, 1);
-    lua_Number dy = luaL_checknumber(L, 2);
+    lua_Number dx = argn0(L, 1);
+    lua_Number dy = argn0(L, 2);
     if (dx == 0 && dy == 0) { lua_pushnumber(L, 0.25); return 1; }
     /* PICO-8 anticlockwise screenspace: atan2(0,-1) -> 0.25 */
     lua_Number a = 1.0 - atan2(dy, dx) / (2.0 * M_PI);
@@ -271,25 +279,25 @@ static int l_p8_atan2(lua_State *L) {
     lua_pushnumber(L, a);
     return 1;
 }
-static int l_p8_flr(lua_State *L) { lua_pushnumber(L, floor(luaL_checknumber(L, 1))); return 1; }
-static int l_p8_ceil(lua_State *L){ lua_pushnumber(L, ceil(luaL_checknumber(L, 1)));  return 1; }
-static int l_p8_abs(lua_State *L) { lua_pushnumber(L, fabs(luaL_checknumber(L, 1)));  return 1; }
+static int l_p8_flr(lua_State *L)  { lua_pushnumber(L, floor(argn0(L, 1))); return 1; }
+static int l_p8_ceil(lua_State *L) { lua_pushnumber(L, ceil(argn0(L, 1)));  return 1; }
+static int l_p8_abs(lua_State *L)  { lua_pushnumber(L, fabs(argn0(L, 1)));  return 1; }
 static int l_p8_min(lua_State *L) {
-    lua_Number a = luaL_checknumber(L, 1);
-    lua_Number b = luaL_checknumber(L, 2);
+    lua_Number a = argn0(L, 1);
+    lua_Number b = argn0(L, 2);
     lua_pushnumber(L, a < b ? a : b);
     return 1;
 }
 static int l_p8_max(lua_State *L) {
-    lua_Number a = luaL_checknumber(L, 1);
-    lua_Number b = luaL_checknumber(L, 2);
+    lua_Number a = argn0(L, 1);
+    lua_Number b = argn0(L, 2);
     lua_pushnumber(L, a > b ? a : b);
     return 1;
 }
 static int l_p8_mid(lua_State *L) {
-    lua_Number a = luaL_checknumber(L, 1);
-    lua_Number b = luaL_checknumber(L, 2);
-    lua_Number c = luaL_checknumber(L, 3);
+    lua_Number a = argn0(L, 1);
+    lua_Number b = argn0(L, 2);
+    lua_Number c = argn0(L, 3);
     lua_Number lo = a < b ? a : b;
     lua_Number hi = a > b ? a : b;
     if (c < lo) c = lo;
@@ -317,6 +325,80 @@ static int l_p8_rnd(lua_State *L) {
 static int l_p8_srand(lua_State *L) {
     srand((unsigned)luaL_checknumber(L, 1));
     return 0;
+}
+
+/* sgn(x) → -1 if x<0, +1 otherwise (PICO-8: sgn(0) = 1). */
+static int l_p8_sgn(lua_State *L) {
+    lua_Number x = argn0(L, 1);
+    lua_pushnumber(L, x < 0 ? -1 : 1);
+    return 1;
+}
+
+static int l_p8_sqrt(lua_State *L) {
+    lua_Number x = argn0(L, 1);
+    lua_pushnumber(L, x < 0 ? 0 : sqrt(x));
+    return 1;
+}
+
+/* PICO-8 pre-0.2 bitwise functions (now usually expressed as << >>
+ * & | ~ in newer carts, but old carts still call these by name). */
+static int l_p8_shl(lua_State *L) {
+    int x = (int)argn0(L, 1);
+    int n = (int)argn0(L, 2);
+    lua_pushinteger(L, ((unsigned)x) << (n & 31));
+    return 1;
+}
+static int l_p8_shr(lua_State *L) {
+    int x = (int)argn0(L, 1);
+    int n = (int)argn0(L, 2);
+    /* Arithmetic right shift to match PICO-8's signed semantics. */
+    lua_pushinteger(L, x >> (n & 31));
+    return 1;
+}
+static int l_p8_lshr(lua_State *L) {
+    unsigned x = (unsigned)argn0(L, 1);
+    int n = (int)argn0(L, 2);
+    lua_pushinteger(L, x >> (n & 31));
+    return 1;
+}
+static int l_p8_band(lua_State *L) {
+    int a = (int)argn0(L, 1);
+    int b = (int)argn0(L, 2);
+    lua_pushinteger(L, a & b);
+    return 1;
+}
+static int l_p8_bor(lua_State *L) {
+    int a = (int)argn0(L, 1);
+    int b = (int)argn0(L, 2);
+    lua_pushinteger(L, a | b);
+    return 1;
+}
+static int l_p8_bxor(lua_State *L) {
+    int a = (int)argn0(L, 1);
+    int b = (int)argn0(L, 2);
+    lua_pushinteger(L, a ^ b);
+    return 1;
+}
+static int l_p8_bnot(lua_State *L) {
+    int a = (int)argn0(L, 1);
+    lua_pushinteger(L, ~a);
+    return 1;
+}
+
+/* ord(s, [i]) → byte value of s[i] (1-indexed). chr(n) → 1-byte string. */
+static int l_p8_ord(lua_State *L) {
+    size_t L_str = 0;
+    const char *s = luaL_checklstring(L, 1, &L_str);
+    int i = lua_isnoneornil(L, 2) ? 1 : (int)luaL_checknumber(L, 2);
+    if (i < 1 || (size_t)i > L_str) { lua_pushnil(L); return 1; }
+    lua_pushinteger(L, (unsigned char)s[i - 1]);
+    return 1;
+}
+static int l_p8_chr(lua_State *L) {
+    int n = (int)luaL_checknumber(L, 1);
+    char buf[2] = { (char)(n & 0xff), 0 };
+    lua_pushlstring(L, buf, 1);
+    return 1;
 }
 
 /* --- memory peek/poke ------------------------------------------------- */
@@ -499,6 +581,49 @@ static int l_p8_cartdata(lua_State *L) { (void)L; return 0; }
 static int l_p8_dget(lua_State *L)     { lua_pushinteger(L, 0); return 1; }
 static int l_p8_dset(lua_State *L)     { (void)L; return 0; }
 
+/* reload(dest_addr, src_addr, len, [filename]) — copy bytes from
+ * the cart's read-only ROM image into runtime memory. Real PICO-8
+ * keeps the cart and a separate working copy; we don't (cart and
+ * runtime memory are the same buffer at machine.mem) so the typical
+ * use case (`reload(0, 0, 0x4300)` to "reset graphics back to the
+ * cart's original sprites") is conceptually a no-op for us — the
+ * sprites/map/sfx never get modified at runtime unless the cart
+ * does so explicitly. A no-op stub is correct for the vast
+ * majority of carts. */
+static int l_p8_reload(lua_State *L) {
+    (void)L;
+    return 0;
+}
+
+/* memcpy(dest, src, len) — copy bytes within machine memory. PICO-8
+ * carts use this for cheap blitting and animation tricks. */
+static int l_p8_memcpy(lua_State *L) {
+    p8_machine *m = get_machine(L);
+    int dest = argi(L, 1, 0);
+    int src  = argi(L, 2, 0);
+    int len  = argi(L, 3, 0);
+    if (len <= 0) return 0;
+    if (dest < 0 || src < 0) return 0;
+    if (dest + len > P8_MEM_SIZE) len = P8_MEM_SIZE - dest;
+    if (src  + len > P8_MEM_SIZE) len = P8_MEM_SIZE - src;
+    if (len <= 0) return 0;
+    memmove(&m->mem[dest], &m->mem[src], (size_t)len);
+    return 0;
+}
+
+/* memset(dest, val, len) — fill bytes in machine memory. */
+static int l_p8_memset(lua_State *L) {
+    p8_machine *m = get_machine(L);
+    int dest = argi(L, 1, 0);
+    int val  = argi(L, 2, 0);
+    int len  = argi(L, 3, 0);
+    if (len <= 0 || dest < 0) return 0;
+    if (dest + len > P8_MEM_SIZE) len = P8_MEM_SIZE - dest;
+    if (len <= 0) return 0;
+    memset(&m->mem[dest], val & 0xff, (size_t)len);
+    return 0;
+}
+
 /* --- table helpers (add/del/foreach/count + all iterator) ----------- */
 /* PICO-8 ships these as built-in globals on top of the Lua tables. */
 
@@ -549,8 +674,13 @@ static int l_p8_all(lua_State *L) {
     return 1;
 }
 
+/* PICO-8 add/del/count/foreach are LENIENT — they accept nil
+ * tables and silently no-op or return nil. Real PICO-8 carts
+ * (Delunky's level-init code in particular) call add(table, x)
+ * before the table has been initialised; PICO-8 just returns nil,
+ * Lua's strict luaL_checktype errors. We match PICO-8 here. */
 static int l_add(lua_State *L) {
-    luaL_checktype(L, 1, LUA_TTABLE);
+    if (!lua_istable(L, 1)) { lua_pushnil(L); return 1; }
     /* PICO-8 add returns the inserted value */
     lua_Integer len = luaL_len(L, 1);
     lua_pushvalue(L, 2);
@@ -559,7 +689,7 @@ static int l_add(lua_State *L) {
     return 1;
 }
 static int l_del(lua_State *L) {
-    luaL_checktype(L, 1, LUA_TTABLE);
+    if (!lua_istable(L, 1)) { lua_pushnil(L); return 1; }
     lua_Integer len = luaL_len(L, 1);
     for (lua_Integer i = 1; i <= len; i++) {
         lua_geti(L, 1, i);
@@ -581,7 +711,7 @@ static int l_del(lua_State *L) {
     return 1;
 }
 static int l_count(lua_State *L) {
-    luaL_checktype(L, 1, LUA_TTABLE);
+    if (!lua_istable(L, 1)) { lua_pushinteger(L, 0); return 1; }
     lua_pushinteger(L, luaL_len(L, 1));
     return 1;
 }
@@ -593,8 +723,7 @@ static int l_count(lua_State *L) {
  * advance i, so next iteration picks up the new occupant of slot i.
  * Also re-evaluates #t each step so add() during iter is honored. */
 static int l_foreach(lua_State *L) {
-    luaL_checktype(L, 1, LUA_TTABLE);
-    luaL_checktype(L, 2, LUA_TFUNCTION);
+    if (!lua_istable(L, 1) || !lua_isfunction(L, 2)) return 0;
     lua_Integer i = 1;
     for (;;) {
         lua_Integer len = luaL_len(L, 1);
@@ -662,6 +791,17 @@ static const luaL_Reg p8_funcs[] = {
     { "mid",      l_p8_mid },
     { "rnd",      l_p8_rnd },
     { "srand",    l_p8_srand },
+    { "sgn",      l_p8_sgn },
+    { "sqrt",     l_p8_sqrt },
+    { "shl",      l_p8_shl },
+    { "shr",      l_p8_shr },
+    { "lshr",     l_p8_lshr },
+    { "band",     l_p8_band },
+    { "bor",      l_p8_bor },
+    { "bxor",     l_p8_bxor },
+    { "bnot",     l_p8_bnot },
+    { "ord",      l_p8_ord },
+    { "chr",      l_p8_chr },
     /* memory */
     { "peek",     l_peek },
     { "poke",     l_poke },
@@ -690,6 +830,9 @@ static const luaL_Reg p8_funcs[] = {
     { "cartdata", l_p8_cartdata },
     { "dget",     l_p8_dget },
     { "dset",     l_p8_dset },
+    { "reload",   l_p8_reload },
+    { "memcpy",   l_p8_memcpy },
+    { "memset",   l_p8_memset },
     { NULL, NULL }
 };
 

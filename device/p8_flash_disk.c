@@ -28,12 +28,18 @@
 
 #define XIP_BASE_ADDR 0x10000000u
 
-/* Cache: 16 erase-blocks (64 KB). With the continuous-drain main
- * loop we no longer need to absorb a whole file at once — we just
- * need enough headroom to bridge the 300 ms USB-quiet windows
- * between host bursts. 64 KB returns 64 KB to the malloc heap so
- * stb_image's PNG decoder (~150 KB peak) actually fits. */
-#define CACHE_BLOCKS 16
+/* Cache: 8 erase-blocks (32 KB). With continuous draining (one
+ * commit per main-loop iteration whenever any block is dirty) we
+ * only need enough headroom to bridge the gap between Windows
+ * write bursts and the next commit cycle (~66 ms). Windows
+ * sustained MSC throughput is ~50-100 KB/s, so 32 KB of cache is
+ * over half a second of buffering — plenty.
+ *
+ * Trimming from 16 → 8 blocks gives back 32 KB of BSS, which goes
+ * directly to the malloc heap. That extra room is the difference
+ * between delunky (97 KB cart bytes + 192 KB Lua heap cap = 289 KB
+ * out of ~291 KB free) tipping over and fitting comfortably. */
+#define CACHE_BLOCKS 8
 
 typedef struct {
     int32_t  block;     /* erase-block index, -1 = empty slot */

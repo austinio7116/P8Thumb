@@ -34,6 +34,7 @@
 #include "p8_picker.h"
 #include "p8_draw.h"
 #include "p8_font.h"
+#include "p8_log.h"
 
 /* Set by boot_filesystem(): 1 if we ran f_mkfs at boot (label
  * mismatch / no FS / MENU forced), 0 if the existing FS was kept.
@@ -434,26 +435,39 @@ int main(void) {
         uint32_t frame = 0;
         absolute_time_t next = make_timeout_time_us(frame_us);
 
-        /* Run until the user holds MENU to return to the picker. */
+        /* Run until the user holds MENU, or a Lua error fires. */
         int return_to_picker = 0;
+        char err_msg[160] = {0};
         while (!return_to_picker) {
-            /* USB + cache drain deliberately NOT serviced while a
-             * cart runs. The lobby screen is the only USB-active
-             * mode; picker + cart-run are offline. If the user
-             * wants to upload more carts they power-cycle back to
-             * the lobby. */
             write_frame_count(&machine, frame);
 
             uint8_t btn = p8_buttons_read();
             p8_input_begin_frame(&input, btn);
             if (p8_buttons_menu_pressed()) {
-                /* MENU button → exit cart, back to picker. */
                 return_to_picker = 1;
                 break;
             }
 
-            p8_api_call_optional(&vm, update_fn);
-            p8_api_call_optional(&vm, "_draw");
+            /* Call _update / _draw with explicit error capture so
+             * any Lua runtime error gets surfaced to the user
+             * (instead of silently producing a black screen). */
+            for (int phase = 0; phase < 2; phase++) {
+                const char *fn = (phase == 0) ? update_fn : "_draw";
+                lua_getglobal(vm.L, fn);
+                if (!lua_isfunction(vm.L, -1)) {
+                    lua_pop(vm.L, 1);
+                    continue;
+                }
+                if (lua_pcall(vm.L, 0, 0, 0) != LUA_OK) {
+                    const char *m = lua_tostring(vm.L, -1);
+                    snprintf(err_msg, sizeof(err_msg),
+                             "%s: %s", fn, m ? m : "(no msg)");
+                    lua_pop(vm.L, 1);
+                    /* Persist for post-mortem inspection. */
+                    p8_log_to_file(err_msg);
+                    goto cart_error;
+                }
+            }
 
             int n = P8_AUDIO_SAMPLE_RATE / target_fps;
             int16_t audio_buf[1024];
@@ -469,6 +483,37 @@ int main(void) {
             next = delayed_by_us(next, frame_us);
             frame++;
         }
+        goto after_cart;
+
+cart_error:
+        /* Show the error on screen and wait for MENU to return. */
+        {
+            p8_machine_reset(&machine);
+            p8_camera(&machine, 0, 0);
+            p8_cls(&machine, 8);   /* red */
+            p8_font_draw(&machine, "lua error",          32,  4, 7);
+            p8_font_draw(&machine, cart_entries[chosen].name, 4, 14, 7);
+            /* Wrap the error text across lines (~30 chars per line). */
+            int y = 28;
+            int len = (int)strlen(err_msg);
+            for (int s = 0; s < len && y < 110; s += 30) {
+                char line[32] = {0};
+                int chunk = (len - s > 30) ? 30 : (len - s);
+                memcpy(line, err_msg + s, chunk);
+                p8_font_draw(&machine, line, 2, y, 7);
+                y += 8;
+            }
+            p8_font_draw(&machine, "MENU = picker", 20, 116, 10);
+            p8_machine_present(&machine, scanline);
+            p8_lcd_wait_idle();
+            p8_lcd_present(scanline);
+
+            /* Idle until MENU pressed. Don't service USB. */
+            while (!p8_buttons_menu_pressed()) {
+                sleep_ms(50);
+            }
+        }
+after_cart: ;
 
         p8_cart_free(&cart);
         p8_vm_free(&vm);

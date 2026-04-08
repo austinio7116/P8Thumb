@@ -155,7 +155,8 @@ static int find_compound(const char *line, size_t n, const int *state, char *op_
         if (c == '(' || c == '[' || c == '{') depth++;
         else if (c == ')' || c == ']' || c == '}') { if (depth > 0) depth--; }
         else if (depth == 0 &&
-                 (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') &&
+                 (c == '+' || c == '-' || c == '*' || c == '/' || c == '%'
+                  || c == '|' || c == '&' || c == '^') &&
                  i + 1 < n && line[i+1] == '=') {
             /* Guard: not `//=` — but Lua doesn't have that anyway,
              * and a standalone `//` is int divide. If we see `/` we
@@ -633,8 +634,18 @@ char *p8_rewrite_lua(const char *src_in, size_t len_in, size_t *out_len) {
         free(state);
         free(work);
 
-        /* 3. shorthand if — re-scan tmp and emit to out */
-        apply_shorthand_if(&out, tmp.data ? tmp.data : "", tmp.len);
+        /* 3. shorthand if — DISABLED. The line-based detector hits
+         * false positives on multi-clause conditions like
+         * `if (a) or (b) then`, where it sees the first `)` as
+         * end-of-condition and tries to wrap from there. With the
+         * Python-side preprocessor (tools/p8png_extract.py) we
+         * always pass shrinko8-unminified Lua to the device, which
+         * is already long-form `if (cond) then`. Hand-written .p8
+         * files might still need this — re-enable + replace with
+         * the token-based approach if that ever matters. */
+        if (tmp.data && tmp.len > 0) {
+            buf_append(&out, tmp.data, tmp.len);
+        }
 
         /* Did a block comment open on this emitted line? Walk the
          * emitted portion of `out` since we last started the line. */
