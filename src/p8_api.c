@@ -13,6 +13,7 @@
  */
 #include "p8_api.h"
 #include "p8_draw.h"
+#include "p8_font.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -333,14 +334,58 @@ static int l_poke(lua_State *L) {
     return 0;
 }
 
-/* --- print stub ------------------------------------------------------- */
-/* Real font lands in Phase 3. For now we just route to stdout so
- * carts can debug-print. PICO-8 print() with x/y draws to screen;
- * we ignore those args until the font is ready. */
+/* --- print(str, [x, y, [col]]) -------------------------------------- */
+/* Draws `str` into the framebuffer using the built-in font.
+ *
+ * PICO-8 semantics:
+ *  - With no x/y, advances a cursor stored in draw-state and wraps
+ *    at the bottom of the screen.
+ *  - With x/y, draws at the given position and does NOT update the
+ *    cursor.
+ *  - Color arg is optional; defaults to current pen color.
+ *
+ * The cursor lives at draw-state offsets 0x26 (x) and 0x27 (y),
+ * which we already reserved in p8_machine.h. */
 static int l_print(lua_State *L) {
+    p8_machine *m = get_machine(L);
     const char *s = luaL_optstring(L, 1, "");
-    fputs(s, stdout);
-    fputc('\n', stdout);
+    int has_xy = !lua_isnoneornil(L, 2) && !lua_isnoneornil(L, 3);
+    int x, y;
+    if (has_xy) {
+        x = argi(L, 2, 0);
+        y = argi(L, 3, 0);
+    } else {
+        x = m->mem[P8_DS_CURSOR_X];
+        y = m->mem[P8_DS_CURSOR_Y];
+    }
+    int c;
+    if (!lua_isnoneornil(L, 4)) {
+        c = argi(L, 4, p8_pen(m));
+        p8_set_pen(m, (uint8_t)(c & 0x0f));
+    } else if (has_xy && !lua_isnoneornil(L, 4)) {
+        c = argi(L, 4, p8_pen(m));
+    } else {
+        c = p8_pen(m);
+    }
+    p8_font_draw(m, s, x, y, c);
+    if (!has_xy) {
+        /* Advance cursor: PICO-8 increments y by 6 and wraps;
+         * x resets to the original cursor x. */
+        int next_y = y + P8_FONT_CELL_H;
+        if (next_y >= P8_SCREEN_H) next_y = P8_SCREEN_H - P8_FONT_CELL_H;
+        m->mem[P8_DS_CURSOR_Y] = (uint8_t)next_y;
+    }
+    return 0;
+}
+
+/* cursor(x, y, [col]) — set the print cursor and optionally pen. */
+static int l_cursor(lua_State *L) {
+    p8_machine *m = get_machine(L);
+    int x = argi(L, 1, 0);
+    int y = argi(L, 2, 0);
+    m->mem[P8_DS_CURSOR_X] = (uint8_t)(x & 0xff);
+    m->mem[P8_DS_CURSOR_Y] = (uint8_t)(y & 0xff);
+    if (!lua_isnoneornil(L, 3)) p8_set_pen(m, (uint8_t)(argi(L, 3, 6) & 0x0f));
     return 0;
 }
 
@@ -556,8 +601,9 @@ static const luaL_Reg p8_funcs[] = {
     /* memory */
     { "peek",     l_peek },
     { "poke",     l_poke },
-    /* misc */
+    /* text + cursor */
     { "print",    l_print },
+    { "cursor",   l_cursor },
     /* table helpers */
     { "add",      l_add },
     { "del",      l_del },
