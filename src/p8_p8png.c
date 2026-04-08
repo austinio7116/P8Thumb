@@ -23,9 +23,10 @@
  * to keep the code-size cost down. */
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
-#define STBI_NO_STDIO       /* keeps fopen out of the device build */
+#define STBI_NO_STDIO          /* keeps fopen out of the device build */
 #define STBI_NO_HDR
 #define STBI_NO_LINEAR
+#define STBI_NO_THREAD_LOCALS  /* drops __aeabi_read_tp on bare-metal */
 #define STBI_ASSERT(x) ((void)0)
 #include "lib/stb_image.h"
 

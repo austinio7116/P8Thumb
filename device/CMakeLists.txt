@@ -123,19 +123,41 @@ add_executable(p8run_device
     p8_lcd_gc9107.c
     p8_buttons.c
     p8_audio_pwm.c
+    p8_flash_disk.c
+    p8_msc.c
+    p8_picker.c
+    p8_log.c
+    p8_bmp.c
+    usb_descriptors.c
+    fatfs/ff.c
+    fatfs/ffsystem.c
+    fatfs/ffunicode.c
+    fatfs/diskio.c
 )
-target_include_directories(p8run_device PRIVATE ${CMAKE_CURRENT_LIST_DIR})
-target_compile_options(p8run_device PRIVATE -O3)
+target_include_directories(p8run_device PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}/fatfs
+)
+target_compile_options(p8run_device PRIVATE -O3 -Wno-unused-parameter)
+# Direct TinyUSB integration (no pico_stdio_usb — we own the descriptors).
 target_link_libraries(p8run_device PRIVATE
     thumbyp8_runtime
     pico_stdlib
+    pico_unique_id
     hardware_clocks
     hardware_spi
     hardware_dma
     hardware_gpio
     hardware_pwm
     hardware_irq
+    hardware_flash
+    hardware_sync
+    tinyusb_device
+    tinyusb_board
 )
-pico_enable_stdio_usb(p8run_device 1)
+# Stdio: no USB CDC via pico_stdio_usb (would clash with composite),
+# no UART (no pin). On-screen errors only for now; CDC is exposed
+# through TinyUSB but stdio doesn't auto-route to it yet.
+pico_enable_stdio_usb(p8run_device 0)
 pico_enable_stdio_uart(p8run_device 0)
 pico_add_extra_outputs(p8run_device)

@@ -76,7 +76,12 @@ void p8_audio_pwm_init(void) {
     pwm_clear_irq(TIMER_SLICE);
     pwm_set_irq_enabled(TIMER_SLICE, true);
     irq_set_exclusive_handler(PWM_IRQ_WRAP, audio_irq);
-    irq_set_priority(PWM_IRQ_WRAP, 1);
+    /* Audio IRQ priority: deliberately LOWER than USB so enumeration
+     * isn't starved. The audio handler runs at 22050 Hz and is short,
+     * but back-to-back PWM IRQs at higher priority can lock USB out
+     * for whole control transfers. PICO_LOWEST_IRQ_PRIORITY pushes
+     * us below the SDK default (which TinyUSB uses). */
+    irq_set_priority(PWM_IRQ_WRAP, PICO_LOWEST_IRQ_PRIORITY);
     irq_set_enabled(PWM_IRQ_WRAP, true);
 
     pwm_config timer_cfg = pwm_get_default_config();

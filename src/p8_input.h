@@ -26,7 +26,13 @@ typedef struct p8_input {
     uint8_t prev;  /* bitmask, previous frame */
 } p8_input;
 
-static inline void p8_input_reset(p8_input *in) { in->cur = 0; in->prev = 0; }
+/* Reset input state. Both cur and prev are set to 0xff so that
+ * any button currently being held (e.g. the A press that just
+ * triggered a screen transition) registers as "already down last
+ * frame" — btnp() will only fire after a release-and-re-press.
+ * Without this, every screen transition immediately consumes the
+ * still-held button and fires a phantom press in the new screen. */
+static inline void p8_input_reset(p8_input *in) { in->cur = 0xff; in->prev = 0xff; }
 
 /* Called by the host runner once per frame, BEFORE _update() runs. */
 static inline void p8_input_begin_frame(p8_input *in, uint8_t new_state) {
