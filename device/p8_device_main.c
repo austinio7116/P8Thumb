@@ -20,9 +20,11 @@
 #include "p8_input.h"
 #include "p8_api.h"
 #include "p8_cart.h"
+#include "p8_audio.h"
 
 #include "p8_lcd_gc9107.h"
 #include "p8_buttons.h"
+#include "p8_audio_pwm.h"
 #include "embedded_cart.h"
 
 /* Static memory: machine + scanline DMA buffer. The framebuffer
@@ -50,6 +52,7 @@ int main(void) {
     /* Hardware bring-up */
     p8_buttons_init();
     p8_lcd_init();
+    p8_audio_pwm_init();
 
     /* Splash: clear to PICO-8 dark blue so we can see the LCD is alive
      * even before the cart loads. */
@@ -106,6 +109,13 @@ int main(void) {
     uint32_t frame = 0;
     absolute_time_t next = make_timeout_time_us(frame_us);
 
+    /* Pre-fill the audio ring with one frame of silence so the IRQ
+     * has something to chew on while we boot the first cart frame. */
+    {
+        int16_t silence[1024] = {0};
+        p8_audio_pwm_push(silence, 1024);
+    }
+
     while (1) {
         write_frame_count(&machine, frame);
 
@@ -115,6 +125,16 @@ int main(void) {
         /* Cart update + draw */
         p8_api_call_optional(&vm, update_fn);
         p8_api_call_optional(&vm, "_draw");
+
+        /* Top up the audio ring buffer with this frame's worth of
+         * synthesized samples. The IRQ pulls them at 22050 Hz. */
+        {
+            int n = P8_AUDIO_SAMPLE_RATE / target_fps;
+            int16_t buf[1024];
+            if (n > 1024) n = 1024;
+            p8_audio_render(buf, n);
+            p8_audio_pwm_push(buf, n);
+        }
 
         /* Expand 4bpp framebuffer → RGB565 scanline → DMA to LCD */
         p8_lcd_wait_idle();

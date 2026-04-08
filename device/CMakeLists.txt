@@ -121,6 +121,7 @@ add_executable(p8run_device
     p8_device_main.c
     p8_lcd_gc9107.c
     p8_buttons.c
+    p8_audio_pwm.c
 )
 target_include_directories(p8run_device PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_compile_options(p8run_device PRIVATE -O3)
@@ -131,6 +132,8 @@ target_link_libraries(p8run_device PRIVATE
     hardware_spi
     hardware_dma
     hardware_gpio
+    hardware_pwm
+    hardware_irq
 )
 pico_enable_stdio_usb(p8run_device 1)
 pico_enable_stdio_uart(p8run_device 0)
