@@ -24,6 +24,7 @@
 #include "p8_input.h"
 #include "p8_api.h"
 #include "p8_cart.h"
+#include "p8_audio.h"
 
 #define WIN_SCALE 4
 #define WIN_W (P8_SCREEN_W * WIN_SCALE)
@@ -112,10 +113,26 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* --- SDL window ------------------------------------------------- */
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    /* --- SDL window + audio ----------------------------------------- */
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
+    }
+
+    /* Audio callback: SDL asks for `len` bytes of audio whenever its
+     * ring buffer is half-empty. We render directly from p8_audio. */
+    SDL_AudioSpec want = {0}, have = {0};
+    want.freq = P8_AUDIO_SAMPLE_RATE;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;
+    want.samples = 512;
+    want.callback = NULL;   /* we'll use SDL_QueueAudio in the main loop */
+    SDL_AudioDeviceID audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (audio_dev == 0) {
+        fprintf(stderr, "SDL_OpenAudioDevice: %s\n", SDL_GetError());
+        /* Non-fatal: silent host run still works. */
+    } else {
+        SDL_PauseAudioDevice(audio_dev, 0);
     }
 
     SDL_Window *win = SDL_CreateWindow(
@@ -186,6 +203,20 @@ int main(int argc, char **argv) {
         if (p8_api_call_optional(&vm, update_fn) != 0) running = 0;
         if (p8_api_call_optional(&vm, "_draw")    != 0) running = 0;
 
+        /* Audio: queue one frame's worth of samples (synth runs at
+         * 22050 Hz, so 30 fps → 735 samples/frame; 60 fps → 367). */
+        if (audio_dev != 0) {
+            int n = P8_AUDIO_SAMPLE_RATE / target_fps;
+            int16_t buf[2048];
+            if (n > (int)(sizeof(buf) / sizeof(buf[0]))) n = sizeof(buf)/sizeof(buf[0]);
+            p8_audio_render(buf, n);
+            /* Avoid building up audio latency: skip if the queue is
+             * already full (>3 frames buffered). */
+            if (SDL_GetQueuedAudioSize(audio_dev) < (Uint32)(n * 2 * 4)) {
+                SDL_QueueAudio(audio_dev, buf, n * sizeof(int16_t));
+            }
+        }
+
         /* Present: expand 4bpp framebuffer to RGB565 then upload */
         p8_machine_present(&machine, scanline);
         SDL_UpdateTexture(tex, NULL, scanline, P8_SCREEN_W * sizeof(uint16_t));
@@ -206,6 +237,7 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (audio_dev != 0) SDL_CloseAudioDevice(audio_dev);
     SDL_DestroyTexture(tex);
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);

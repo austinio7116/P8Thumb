@@ -14,6 +14,7 @@
 #include "p8_api.h"
 #include "p8_draw.h"
 #include "p8_font.h"
+#include "p8_audio.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -448,14 +449,39 @@ static int l_p8_tonum(lua_State *L) {
     return 1;
 }
 
-/* Audio stubs for Phase 3 — return nothing, do nothing. Real synth
- * arrives in Phase 4. Important: they must NOT error so carts that
- * call sfx()/music() from _init don't crash. */
-static int l_p8_sfx_stub(lua_State *L)   { (void)L; return 0; }
-static int l_p8_music_stub(lua_State *L) { (void)L; return 0; }
+/* Phase 4 — real audio synth bindings.
+ *
+ * sfx(n, [channel], [offset], [length])
+ *   n=-1 stops the channel; n=-2 stops sfx playing on the channel
+ *   without disturbing the music slot. We treat both as stop. */
+static int l_p8_sfx(lua_State *L) {
+    int n      = argi(L, 1, -1);
+    int chan   = lua_isnoneornil(L, 2) ? -1 : argi(L, 2, -1);
+    int offset = argi(L, 3, 0);
+    int length = argi(L, 4, 0);
+    p8_audio_sfx(n, chan, offset, length);
+    return 0;
+}
+
+/* music(n, [fade_len], [channel_mask])
+ *   n=-1 stops music. */
+static int l_p8_music(lua_State *L) {
+    int n          = argi(L, 1, -1);
+    int fade_len   = argi(L, 2, 0);
+    int chan_mask  = argi(L, 3, 0);
+    p8_audio_music(n, fade_len, chan_mask);
+    return 0;
+}
+
+/* stat(n) — partial PICO-8 surface. The synth-related queries
+ * (16..23) come from p8_audio_stat(); other ids return 0. */
 static int l_p8_stat(lua_State *L) {
-    (void)L;
-    lua_pushnumber(L, 0);
+    int n = argi(L, 1, 0);
+    if (n >= 16 && n <= 23) {
+        lua_pushinteger(L, p8_audio_stat(n));
+    } else {
+        lua_pushinteger(L, 0);
+    }
     return 1;
 }
 
@@ -655,9 +681,9 @@ static const luaL_Reg p8_funcs[] = {
     /* frame counter */
     { "t",        l_p8_time },
     { "time",     l_p8_time },
-    /* audio + persistence stubs (Phase 4/6) */
-    { "sfx",      l_p8_sfx_stub },
-    { "music",    l_p8_music_stub },
+    /* audio + persistence (Phase 4 = real, Phase 6 stubs) */
+    { "sfx",      l_p8_sfx },
+    { "music",    l_p8_music },
     { "stat",     l_p8_stat },
     { "printh",   l_p8_printh },
     { "menuitem", l_p8_menuitem },
@@ -669,6 +695,10 @@ static const luaL_Reg p8_funcs[] = {
 
 void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input) {
     lua_State *L = vm->L;
+
+    /* Bind the synth to this machine — the audio Lua functions
+     * will route into it. */
+    p8_audio_init(machine);
 
     /* Stash machine + input pointers in registry. */
     lua_pushlightuserdata(L, (void *)&k_machine_key);
