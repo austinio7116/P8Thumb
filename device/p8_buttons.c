@@ -82,8 +82,16 @@ static uint8_t read_raw(void) {
     if (!gpio_get(BTN_RIGHT_GP)) b |= 1 << 1;
     if (!gpio_get(BTN_UP_GP))    b |= 1 << 2;
     if (!gpio_get(BTN_DOWN_GP))  b |= 1 << 3;
-    if (!gpio_get(BTN_B_GP) || !gpio_get(BTN_LB_GP))  b |= 1 << 4;  /* O */
-    if (!gpio_get(BTN_A_GP) || !gpio_get(BTN_RB_GP))  b |= 1 << 5;  /* X */
+    if (!gpio_get(BTN_B_GP))     b |= 1 << 4;  /* O */
+    if (!gpio_get(BTN_A_GP))     b |= 1 << 5;  /* X */
+
+    /* Triggers as instant up-diagonal chords. The d-pad rocker is
+     * mechanically hostile to corner presses, so the most useful
+     * shoulder-button mapping is "give me a perfect up-diagonal".
+     * LB = UP+LEFT, RB = UP+RIGHT — ideal for Celeste wall-jumps. */
+    if (!gpio_get(BTN_LB_GP)) b |= (1 << 0) | (1 << 2);  /* L+U */
+    if (!gpio_get(BTN_RB_GP)) b |= (1 << 1) | (1 << 2);  /* R+U */
+
     return b;
 }
 
