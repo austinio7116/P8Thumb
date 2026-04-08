@@ -344,8 +344,122 @@ static int l_print(lua_State *L) {
     return 0;
 }
 
-/* --- table helpers (add/del/foreach/count) --------------------------- */
+/* --- frame counter, string helpers, audio stubs --------------------- */
+/* t() / time() return seconds since program start. We piggyback on
+ * a counter the host runner increments each frame. */
+static int l_p8_time(lua_State *L) {
+    p8_machine *m = get_machine(L);
+    /* Stash frame count in unused draw-state word 0x5f30..0x5f33 as
+     * a uint32; host runner writes it each frame. */
+    uint32_t frames = (uint32_t)m->mem[P8_DRAWSTATE + 0x34]
+                    | ((uint32_t)m->mem[P8_DRAWSTATE + 0x35] << 8)
+                    | ((uint32_t)m->mem[P8_DRAWSTATE + 0x36] << 16)
+                    | ((uint32_t)m->mem[P8_DRAWSTATE + 0x37] << 24);
+    /* 30 fps assumption for now; the host chooses. */
+    lua_pushnumber(L, (lua_Number)frames / 30.0);
+    return 1;
+}
+
+/* sub(s, i, [j]) — 1-indexed, supports negatives. PICO-8 semantics
+ * match Lua's string.sub exactly, so we just route there. */
+static int l_p8_sub(lua_State *L) {
+    lua_getglobal(L, "string");
+    lua_getfield(L, -1, "sub");
+    lua_remove(L, -2);
+    lua_insert(L, 1);
+    lua_call(L, lua_gettop(L) - 1, 1);
+    return 1;
+}
+
+/* tostr(v, hex) / tonum(s) */
+static int l_p8_tostr(lua_State *L) {
+    if (lua_isnoneornil(L, 1)) { lua_pushstring(L, ""); return 1; }
+    if (lua_isnumber(L, 1)) {
+        char buf[32];
+        lua_Number n = lua_tonumber(L, 1);
+        if (n == (lua_Number)(long long)n) {
+            snprintf(buf, sizeof(buf), "%lld", (long long)n);
+        } else {
+            snprintf(buf, sizeof(buf), "%g", (double)n);
+        }
+        lua_pushstring(L, buf);
+        return 1;
+    }
+    if (lua_isboolean(L, 1)) {
+        lua_pushstring(L, lua_toboolean(L, 1) ? "true" : "false");
+        return 1;
+    }
+    const char *s = lua_tostring(L, 1);
+    lua_pushstring(L, s ? s : "");
+    return 1;
+}
+static int l_p8_tonum(lua_State *L) {
+    if (lua_isnumber(L, 1)) { lua_pushvalue(L, 1); return 1; }
+    const char *s = luaL_checkstring(L, 1);
+    char *end;
+    double v = strtod(s, &end);
+    if (end == s) { lua_pushnil(L); return 1; }
+    lua_pushnumber(L, (lua_Number)v);
+    return 1;
+}
+
+/* Audio stubs for Phase 3 — return nothing, do nothing. Real synth
+ * arrives in Phase 4. Important: they must NOT error so carts that
+ * call sfx()/music() from _init don't crash. */
+static int l_p8_sfx_stub(lua_State *L)   { (void)L; return 0; }
+static int l_p8_music_stub(lua_State *L) { (void)L; return 0; }
+static int l_p8_stat(lua_State *L) {
+    (void)L;
+    lua_pushnumber(L, 0);
+    return 1;
+}
+
+/* printh — PICO-8 debug print, routes to stdout. */
+static int l_p8_printh(lua_State *L) {
+    const char *s = luaL_optstring(L, 1, "");
+    fputs(s, stdout);
+    fputc('\n', stdout);
+    return 0;
+}
+
+/* menuitem, cartdata, dget, dset — stubs. */
+static int l_p8_menuitem(lua_State *L) { (void)L; return 0; }
+static int l_p8_cartdata(lua_State *L) { (void)L; return 0; }
+static int l_p8_dget(lua_State *L)     { lua_pushinteger(L, 0); return 1; }
+static int l_p8_dset(lua_State *L)     { (void)L; return 0; }
+
+/* --- table helpers (add/del/foreach/count + all iterator) ----------- */
 /* PICO-8 ships these as built-in globals on top of the Lua tables. */
+
+/* all(t) returns an iterator over t[1..#t]. PICO-8 iterator is
+ * "safe" against del() during iteration, but we're pragmatic: a
+ * simple index-based iterator is enough for Celeste Classic and most
+ * carts (they del() on separate lists). */
+static int all_iter(lua_State *L) {
+    /* upvalues: table, index */
+    int idx = (int)lua_tointeger(L, lua_upvalueindex(2)) + 1;
+    lua_geti(L, lua_upvalueindex(1), idx);
+    if (lua_isnil(L, -1)) return 1;  /* nil terminates */
+    /* store updated index */
+    lua_pushinteger(L, idx);
+    lua_replace(L, lua_upvalueindex(2));
+    return 1;
+}
+static int l_p8_all(lua_State *L) {
+    if (lua_isnoneornil(L, 1)) {
+        /* empty iterator */
+        lua_pushcfunction(L, all_iter);
+        lua_newtable(L);
+        lua_pushinteger(L, 0);
+        lua_pushcclosure(L, all_iter, 2);
+        return 1;
+    }
+    luaL_checktype(L, 1, LUA_TTABLE);
+    lua_pushvalue(L, 1);
+    lua_pushinteger(L, 0);
+    lua_pushcclosure(L, all_iter, 2);
+    return 1;
+}
 
 static int l_add(lua_State *L) {
     luaL_checktype(L, 1, LUA_TTABLE);
@@ -449,6 +563,23 @@ static const luaL_Reg p8_funcs[] = {
     { "del",      l_del },
     { "count",    l_count },
     { "foreach",  l_foreach },
+    { "all",      l_p8_all },
+    /* string / number conversion */
+    { "sub",      l_p8_sub },
+    { "tostr",    l_p8_tostr },
+    { "tonum",    l_p8_tonum },
+    /* frame counter */
+    { "t",        l_p8_time },
+    { "time",     l_p8_time },
+    /* audio + persistence stubs (Phase 4/6) */
+    { "sfx",      l_p8_sfx_stub },
+    { "music",    l_p8_music_stub },
+    { "stat",     l_p8_stat },
+    { "printh",   l_p8_printh },
+    { "menuitem", l_p8_menuitem },
+    { "cartdata", l_p8_cartdata },
+    { "dget",     l_p8_dget },
+    { "dset",     l_p8_dset },
     { NULL, NULL }
 };
 

@@ -7,6 +7,7 @@
  * __music__ in Phase 1+2) are silently skipped.
  */
 #include "p8_cart.h"
+#include "p8_rewrite.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -159,8 +160,17 @@ int p8_cart_load(p8_cart *cart, p8_machine *m, const char *path) {
     }
     fclose(f);
 
-    cart->lua_source = lua_buf;
-    cart->lua_size = lua_len;
+    /* Rewrite PICO-8 dialect → vanilla Lua 5.4. */
+    size_t rewritten_len = 0;
+    char *rewritten = p8_rewrite_lua(lua_buf, lua_len, &rewritten_len);
+    if (rewritten) {
+        free(lua_buf);
+        cart->lua_source = rewritten;
+        cart->lua_size = rewritten_len;
+    } else {
+        cart->lua_source = lua_buf;
+        cart->lua_size = lua_len;
+    }
     return 0;
 }
 

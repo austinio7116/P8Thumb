@@ -43,6 +43,7 @@ add_library(thumbyp8 STATIC
     src/p8_draw.c
     src/p8_api.c
     src/p8_cart.c
+    src/p8_rewrite.c
 )
 target_include_directories(thumbyp8 PUBLIC src)
 target_link_libraries(thumbyp8 PUBLIC thumbyp8_lua)

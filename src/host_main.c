@@ -161,7 +161,17 @@ int main(int argc, char **argv) {
     int frame_count = 0;
     Uint32 next_tick = SDL_GetTicks();
 
+    /* Write frame counter into draw-state memory so l_p8_time() can
+     * read it without having to plumb a separate pointer. */
+    #define WRITE_FRAMES(m, fc) do {                                  \
+        (m).mem[P8_DRAWSTATE + 0x34] = (uint8_t)((fc) & 0xff);        \
+        (m).mem[P8_DRAWSTATE + 0x35] = (uint8_t)(((fc) >> 8) & 0xff); \
+        (m).mem[P8_DRAWSTATE + 0x36] = (uint8_t)(((fc) >> 16) & 0xff);\
+        (m).mem[P8_DRAWSTATE + 0x37] = (uint8_t)(((fc) >> 24) & 0xff);\
+    } while (0)
+
     while (running) {
+        WRITE_FRAMES(machine, frame_count);
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) running = 0;
