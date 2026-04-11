@@ -17,6 +17,7 @@
 #include "pico/stdlib.h"
 #include "pico/time.h"
 #include "hardware/clocks.h"
+#include "hardware/watchdog.h"
 #include "tusb.h"
 #include "ff.h"
 
@@ -441,6 +442,31 @@ static int convert_pending_carts(p8_machine *m, uint16_t *sl) {
 
     if (converted > 0) {
         p8_flash_disk_flush();
+
+        /* Reboot after conversion to reclaim fragmented heap.
+         * The conversion pipeline allocates and frees many large
+         * buffers (PNG decode ~131KB, Lua source ~50KB, etc.) which
+         * fragments the heap. After ~5 carts, malloc can't find
+         * contiguous blocks even though total free memory suffices.
+         * On reboot, carts already have .luac files so conversion
+         * is skipped and the heap starts clean for gameplay. */
+        p8_machine_reset(m);
+        p8_camera(m, 0, 0);
+        p8_cls(m, 1);
+        {
+            char msg[40];
+            snprintf(msg, sizeof(msg), "converted %d cart(s)", converted);
+            p8_font_draw(m, msg, 16, 50, 11);
+        }
+        p8_font_draw(m, "rebooting...", 28, 62, 7);
+        p8_machine_present(m, sl);
+        p8_lcd_wait_idle();
+        p8_lcd_present(sl);
+        sleep_ms(1500);
+
+        /* Watchdog reset — cleanest way to reboot on RP2350 */
+        watchdog_reboot(0, 0, 0);
+        while (1) tight_loop_contents();
     }
 
     return converted;
