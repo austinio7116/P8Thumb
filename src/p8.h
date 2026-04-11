@@ -23,11 +23,12 @@ extern "C" {
  * tight so OOMs surface early. Will be raised in Phase 1 once the
  * 64 KB P8 memory map and framebuffers are accounted for. */
 #ifndef P8_LUA_HEAP_CAP
-/* Device: 520 KB SRAM − ~184 KB BSS − 16 KB stack = ~320 KB for
- * libc heap. Give 256 KB to Lua's capped allocator, leaving ~64 KB
- * for cart-load transients. 256 KB covers Delunky (peaks ~220 KB
- * runtime). lootslime (~300 KB+ _init) still OOMs. */
-#define P8_LUA_HEAP_CAP (256 * 1024)
+/* Device: 520 KB SRAM − ~148 KB BSS − 16 KB stack = ~356 KB for
+ * libc heap. With the XIP bytecode patch, Proto.code[] arrays
+ * live in flash (not heap), so the Lua heap only holds strings,
+ * tables, closures, and GC metadata. 300 KB cap leaves ~56 KB
+ * for libc overhead + malloc fragmentation. */
+#define P8_LUA_HEAP_CAP (300 * 1024)
 #endif
 
 typedef struct p8_vm {
