@@ -24,6 +24,8 @@
 #include "lundump.h"
 #include "lzio.h"
 
+/* ThumbyP8 XIP patch: detect flash-resident buffers. */
+#include "../src/p8_xip.h"
 
 #if !defined(luai_verifycode)
 #define luai_verifycode(L,f)  /* empty */
@@ -143,8 +145,22 @@ static TString *loadString (LoadState *S, Proto *p) {
 
 static void loadCode (LoadState *S, Proto *f) {
   int n = loadInt(S);
-  f->code = luaM_newvectorchecked(S->L, n, Instruction);
   f->sizecode = n;
+  /* ThumbyP8 XIP patch: if the ZIO buffer is in XIP-mapped flash,
+   * point Proto.code[] directly there instead of heap-allocating a
+   * copy. Saves 50-100 KB of Lua heap per cart. The GC is patched
+   * (lfunc.c) to not free XIP-resident code arrays. */
+  {
+    size_t nbytes = cast_sizet(n) * sizeof(Instruction);
+    if (IS_XIP_ADDR(S->Z->p) && S->Z->n >= nbytes) {
+      f->code = (Instruction *)(S->Z->p);
+      S->Z->p += nbytes;
+      S->Z->n -= nbytes;
+      return;
+    }
+  }
+  /* Normal path: allocate on Lua heap and copy. */
+  f->code = luaM_newvectorchecked(S->L, n, Instruction);
   loadVector(S, f->code, n);
 }
 

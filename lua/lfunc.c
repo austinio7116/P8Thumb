@@ -264,8 +264,13 @@ Proto *luaF_newproto (lua_State *L) {
 }
 
 
+/* ThumbyP8 XIP patch */
+#include "../src/p8_xip.h"
+
 void luaF_freeproto (lua_State *L, Proto *f) {
-  luaM_freearray(L, f->code, f->sizecode);
+  /* ThumbyP8: code[] may point into XIP flash (not heap). Don't free it. */
+  if (!IS_XIP_ADDR(f->code))
+    luaM_freearray(L, f->code, f->sizecode);
   luaM_freearray(L, f->p, f->sizep);
   luaM_freearray(L, f->k, f->sizek);
   luaM_freearray(L, f->lineinfo, f->sizelineinfo);

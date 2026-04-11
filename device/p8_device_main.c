@@ -32,6 +32,7 @@
 #include "p8_audio_pwm.h"
 #include "p8_flash_disk.h"
 #include "p8_picker.h"
+#include "p8_cart_flash.h"
 #include "p8_draw.h"
 #include "p8_font.h"
 #include "p8_log.h"
@@ -471,46 +472,149 @@ int main(void) {
          * hardfault dump shows the last few bindings the cart called. */
         p8_trace_hook = p8_log_ring;
 
-        p8_cart cart;
-        if (p8_cart_load_from_memory(&cart, &machine,
-                (const char *)cart_bytes, cart_len) != 0) {
-            p8_log_to_file("load: cart parse failed");
-            free(cart_bytes);
-            /* Leak VM — lua_close can panic on OOM. */
-            splash(0xf81f);
-            sleep_ms(1500);
-            continue;
-        }
-        free(cart_bytes);
-        cart_bytes = NULL;
+        /* --- Try the precompiled path (.luac + .rom) first. ---
+         *
+         * If <name>.luac exists, we:
+         *   1. Read .rom → program to active-cart flash → XIP
+         *   2. Copy ROM from XIP to machine.mem (sprites/map/sfx)
+         *   3. Read .luac → program to active-cart flash → XIP
+         *   4. Load bytecode via lua_load with XIP reader
+         *   5. Proto.code[] arrays point into flash (no heap copy)
+         *
+         * If .luac doesn't exist, fall back to the .p8 text path
+         * (C-side rewriter + compile on device, all in SRAM).
+         */
+        {
+            /* Build the .luac and .rom filenames from the .p8 name. */
+            char luac_name[P8_PICKER_NAME_MAX];
+            char rom_name[P8_PICKER_NAME_MAX];
+            strncpy(luac_name, cart_entries[chosen].name,
+                    sizeof(luac_name) - 1);
+            luac_name[sizeof(luac_name) - 1] = 0;
+            strncpy(rom_name, luac_name, sizeof(rom_name) - 1);
+            rom_name[sizeof(rom_name) - 1] = 0;
+            size_t nL = strlen(luac_name);
+            /* Replace .p8 extension with .luac / .rom */
+            if (nL >= 3 && strcasecmp(luac_name + nL - 3, ".p8") == 0) {
+                luac_name[nL - 3] = 0;
+                rom_name[nL - 3] = 0;
+            }
+            strncat(luac_name, ".luac",
+                    sizeof(luac_name) - strlen(luac_name) - 1);
+            strncat(rom_name, ".rom",
+                    sizeof(rom_name) - strlen(rom_name) - 1);
 
-        if (cart.lua_source && cart.lua_size > 0) {
-            if (p8_vm_do_string(&vm, cart.lua_source, "=cart") != LUA_OK) {
-                /* Get the actual error message from the VM and log
-                 * it before tearing down. */
-                const char *m = lua_tostring(vm.L, -1);
-                char buf[160];
-                snprintf(buf, sizeof(buf), "load: lua compile: %s",
-                         m ? m : "(no msg)");
-                p8_log_to_file(buf);
+            size_t luac_len = 0, rom_len = 0;
+            unsigned char *luac_data = p8_picker_load_cart(luac_name,
+                                                           &luac_len);
+            unsigned char *rom_data  = p8_picker_load_cart(rom_name,
+                                                           &rom_len);
+
+            if (luac_data && rom_data && luac_len > 4 && rom_len > 0) {
+                /* ---- XIP precompiled path ---- */
+                p8_log_to_file("load: using precompiled .luac + .rom");
+
+                /* Erase the active-cart flash region. */
+                p8_cart_flash_erase_all();
+
+                /* Program ROM at offset 0, bytecode right after. */
+                size_t rom_padded = (rom_len + 255) & ~255u;
+                const void *rom_xip = p8_cart_flash_program(
+                    rom_data, rom_len, 0);
+                const void *bc_xip = p8_cart_flash_program(
+                    luac_data, luac_len, rom_padded);
+
+                /* Free SRAM buffers — data is now in flash. */
+                free(rom_data);  rom_data = NULL;
+                free(luac_data); luac_data = NULL;
+                /* Also free the .p8 cart_bytes if still alive. */
+                free(cart_bytes); cart_bytes = NULL;
+
+                if (!rom_xip || !bc_xip) {
+                    p8_log_to_file("load: flash program failed");
+                    splash(0xf800);
+                    sleep_ms(1500);
+                    continue;
+                }
+
+                /* Copy ROM from XIP flash into machine.mem. */
+                size_t rom_copy = rom_len;
+                if (rom_copy > 0x4300) rom_copy = 0x4300;
+                memcpy(machine.mem, rom_xip, rom_copy);
+
+                /* Load bytecode from XIP via lua_load. The patched
+                 * lundump.c detects IS_XIP_ADDR(Z->p) and stores
+                 * Proto.code[] as a direct flash pointer. */
+                const char *bc_ptr = (const char *)bc_xip;
+                size_t bc_remain = luac_len;
+                /* Simple one-shot reader closure. */
+                struct { const char *p; size_t n; } rd = { bc_ptr, bc_remain };
+                /* We can't use a nested function for the reader
+                 * (not portable), so use lua_load with a global. */
+                if (luaL_loadbuffer(vm.L, bc_ptr, bc_remain, "=cart") != LUA_OK) {
+                    const char *m = lua_tostring(vm.L, -1);
+                    char buf[160];
+                    snprintf(buf, sizeof(buf), "load: bytecode: %s",
+                             m ? m : "(no msg)");
+                    p8_log_to_file(buf);
+                    lua_pop(vm.L, 1);
+                    splash(0xffe0);
+                    sleep_ms(1500);
+                    continue;
+                }
+                /* Execute the loaded chunk (top-level cart code). */
+                if (lua_pcall(vm.L, 0, 0, 0) != LUA_OK) {
+                    const char *m = lua_tostring(vm.L, -1);
+                    char buf[160];
+                    snprintf(buf, sizeof(buf), "load: top-level: %s",
+                             m ? m : "(no msg)");
+                    p8_log_to_file(buf);
+                    lua_pop(vm.L, 1);
+                    splash(0xffe0);
+                    sleep_ms(1500);
+                    continue;
+                }
+                p8_log_to_file("load: XIP bytecode loaded ok");
+
+            } else {
+                /* ---- Fallback: .p8 text path ---- */
+                if (luac_data) free(luac_data);
+                if (rom_data)  free(rom_data);
+
+                p8_log_to_file("load: using .p8 text fallback");
+
+                p8_cart cart;
+                if (p8_cart_load_from_memory(&cart, &machine,
+                        (const char *)cart_bytes, cart_len) != 0) {
+                    p8_log_to_file("load: cart parse failed");
+                    free(cart_bytes);
+                    splash(0xf81f);
+                    sleep_ms(1500);
+                    continue;
+                }
+                free(cart_bytes);
+                cart_bytes = NULL;
+
+                if (cart.lua_source && cart.lua_size > 0) {
+                    if (p8_vm_do_string(&vm, cart.lua_source,
+                                         "=cart") != LUA_OK) {
+                        const char *m = lua_tostring(vm.L, -1);
+                        char buf[160];
+                        snprintf(buf, sizeof(buf), "load: compile: %s",
+                                 m ? m : "(no msg)");
+                        p8_log_to_file(buf);
+                        p8_cart_free(&cart);
+                        splash(0xffe0);
+                        sleep_ms(1500);
+                        continue;
+                    }
+                }
+                /* Free source text — Lua has the bytecode now. */
                 p8_cart_free(&cart);
-                /* Leak VM — lua_close can panic on OOM. */
-                splash(0xffe0);
-                sleep_ms(1500);
-                continue;
             }
         }
 
-        /* Lua has compiled the source into bytecode — the text is
-         * no longer needed. Free it NOW so the ~43 KB (for a big
-         * cart like delunky) returns to the libc heap and Lua has
-         * more room to grow during _init + gameplay. Without this,
-         * 43 KB of dead source text sits in libc heap the entire
-         * time the cart is running, eating into the 256 KB Lua cap. */
-        p8_cart_free(&cart);
-
-        /* Force a GC cycle to reclaim any transient Lua objects
-         * from the compilation phase before the cart starts. */
+        /* Force a GC cycle to reclaim compile/load transients. */
         lua_gc(vm.L, LUA_GCCOLLECT, 0);
 
         /* Run _init and capture any error explicitly so we can
@@ -666,9 +770,6 @@ cart_error:
         }
 after_cart: ;
 
-        /* Cart source was already freed after compilation (see the
-         * p8_cart_free call before _init). This is a safe no-op. */
-        p8_cart_free(&cart);
         /* DO NOT call p8_vm_free / lua_close here. lua_close runs
          * GC finalizers which may try to allocate (e.g. to resize
          * internal buffers during sweep). If the Lua heap is near

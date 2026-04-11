@@ -124,6 +124,7 @@ add_executable(p8run_device
     p8_buttons.c
     p8_audio_pwm.c
     p8_flash_disk.c
+    p8_cart_flash.c
     p8_msc.c
     p8_picker.c
     p8_log.c
