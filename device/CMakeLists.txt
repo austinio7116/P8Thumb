@@ -100,16 +100,16 @@ pico_add_extra_outputs(p8bench_device)
 # ----------------------------------------------------------------------
 # Same source list as the host build's `thumbyp8` target, but compiled
 # with PICO_ON_DEVICE so the file IO path in p8_cart.c is excluded.
+# Device runtime: no cart loader or dialect rewriter — all translation
+# and compilation happens on the host. The device is a pure bytecode
+# executor + drawing/audio/input engine.
 add_library(thumbyp8_runtime STATIC
     ${P8_ROOT}/src/p8.c
     ${P8_ROOT}/src/p8_machine.c
     ${P8_ROOT}/src/p8_draw.c
     ${P8_ROOT}/src/p8_api.c
-    ${P8_ROOT}/src/p8_cart.c
-    ${P8_ROOT}/src/p8_rewrite.c
     ${P8_ROOT}/src/p8_font.c
     ${P8_ROOT}/src/p8_audio.c
-    ${P8_ROOT}/src/p8_p8png.c
 )
 target_include_directories(thumbyp8_runtime PUBLIC ${P8_ROOT}/src)
 target_compile_options(thumbyp8_runtime PRIVATE -O3)

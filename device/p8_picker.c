@@ -39,13 +39,12 @@ int p8_picker_scan(p8_cart_entry *out, int max) {
         if (info.fname[0] == 0) break;
         if (info.fattrib & AM_DIR) continue;
         size_t L = strlen(info.fname);
-        /* Accept plain .p8 text carts only. .p8.png is no longer
-         * supported on-device — too slow to PNG-decode. Use the
-         * tools/p8png_extract.py preprocessor on a host machine
-         * to convert .p8.png → .p8 + .bmp before uploading. */
+        /* Accept .p8 files only (the .luac + .rom + .bmp siblings
+         * are loaded by name derivation from the .p8 name). The
+         * .p8 itself is no longer loaded on device — it just serves
+         * as the "cart exists" marker in the picker scan. */
         if (L < 3) continue;
         if (strcasecmp(info.fname + L - 3, ".p8") != 0) continue;
-        /* Reject .p8.png by checking the char before the .p8 */
         if (L >= 7 && strcasecmp(info.fname + L - 7, ".p8.png") == 0) continue;
         strncpy(out[n].name, info.fname, P8_PICKER_NAME_MAX - 1);
         out[n].name[P8_PICKER_NAME_MAX - 1] = 0;

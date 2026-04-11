@@ -897,7 +897,7 @@ def main():
                 tmp_lua = dst_dir / f"{stem}_tmp.lua"
                 tmp_lua.write_text(lua_clean, encoding="latin-1")
                 result = subprocess.run(
-                    [str(LUAC54), "-s", "-o", str(out_luac), str(tmp_lua)],
+                    [str(LUAC54), "-o", str(out_luac), str(tmp_lua)],
                     capture_output=True, text=True)
                 tmp_lua.unlink()
                 if result.returncode != 0:
