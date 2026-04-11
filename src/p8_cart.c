@@ -190,7 +190,11 @@ int p8_cart_load_from_memory(p8_cart *cart, p8_machine *m,
     if (p8_p8png_is_png((const unsigned char *)src, src_len)) {
         char *lua = NULL;
         size_t lua_len = 0;
-        if (p8_p8png_load(m, (const unsigned char *)src, src_len,
+        /* p8_p8png_load takes ownership and frees png_data, so copy */
+        unsigned char *png_copy = (unsigned char *)malloc(src_len);
+        if (!png_copy) return -1;
+        memcpy(png_copy, src, src_len);
+        if (p8_p8png_load(m, png_copy, src_len,
                           &lua, &lua_len, NULL /* no thumbnail */) != 0) {
             return -1;
         }

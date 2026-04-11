@@ -38,12 +38,16 @@ int p8_p8png_is_png(const unsigned char *data, size_t len);
  *
  * Returns 0 on success, nonzero on parse / decompress error. Error
  * messages go to stderr. */
-/* out_thumb: if non-NULL, must point to a 128*128 uint16_t buffer.
+/* IMPORTANT: takes ownership of png_data and frees it internally
+ * (right after stb_image finishes decoding) to reduce peak memory.
+ * Caller must NOT free png_data after this call.
+ *
+ * out_thumb: if non-NULL, must point to a 128*128 uint16_t buffer.
  * Filled with the visible PNG label cropped from (16,24) and
  * converted to RGB565 — done during the same PNG decode, no extra
  * memory allocation. Pass NULL if you don't need a thumbnail. */
 int p8_p8png_load(p8_machine *m,
-                  const unsigned char *png_data, size_t png_len,
+                  unsigned char *png_data, size_t png_len,
                   char **out_lua_src, size_t *out_lua_len,
                   uint16_t *out_thumb);
 

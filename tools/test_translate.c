@@ -51,9 +51,10 @@ int main(int argc, char **argv) {
 
     char *lua_src = NULL;
     size_t lua_len = 0;
+    /* p8_p8png_load takes ownership of png_data and frees it */
     int rc = p8_p8png_load(&m, png_data, (size_t)fsize,
                            &lua_src, &lua_len, NULL);
-    free(png_data);
+    /* png_data already freed inside p8_p8png_load */
     if (rc != 0 || !lua_src) {
         fprintf(stderr, "p8_p8png_load failed (rc=%d)\n", rc);
         return 1;

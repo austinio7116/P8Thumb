@@ -280,7 +280,7 @@ static char *extract_lua(const unsigned char *cart, size_t *out_len) {
 /* ---------- public API ---------------------------------------------- */
 
 int p8_p8png_load(p8_machine *m,
-                  const unsigned char *png_data, size_t png_len,
+                  unsigned char *png_data, size_t png_len,
                   char **out_lua_src, size_t *out_lua_len,
                   uint16_t *out_thumb) {
     if (out_lua_src) *out_lua_src = NULL;
@@ -289,6 +289,10 @@ int p8_p8png_load(p8_machine *m,
     int w = 0, h = 0, ch = 0;
     unsigned char *rgba = stbi_load_from_memory(png_data, (int)png_len,
                                                  &w, &h, &ch, 4);
+    /* Free the compressed PNG immediately — stb_image has finished
+     * reading it. This frees 40-70KB before we allocate cart bytes. */
+    free(png_data);
+
     if (!rgba) {
         fprintf(stderr, "[ThumbyP8] p8.png: PNG decode failed: %s\n",
                 stbi_failure_reason() ? stbi_failure_reason() : "(?)");

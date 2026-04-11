@@ -258,10 +258,12 @@ static int convert_one_cart(const char *stem, p8_machine *m,
      * call — screen_log overwrites sl via p8_machine_present. */
     char *lua_src = NULL;
     size_t lua_len = 0;
+    /* p8_p8png_load takes ownership of png_data and frees it
+     * internally after stb_image finishes — reduces peak memory. */
     int rc = p8_p8png_load(m, png_data, (size_t)png_sz,
                             &lua_src, &lua_len, sl);
+    png_data = NULL;  /* already freed inside p8_p8png_load */
     if (rc != 0 || !lua_src) {
-        free(png_data);
         if (lua_src) free(lua_src);
         screen_log(m, sl, "ERR: png decode fail");
         p8_log_to_file("convert: png decode failed");
@@ -277,10 +279,6 @@ static int convert_one_cart(const char *stem, p8_machine *m,
         f_write(&f, m->mem, 0x4300, &bw);
         f_close(&f);
     }
-
-    /* Free PNG — we have everything we need now */
-    free(png_data);
-    png_data = NULL;
 
     /* Now safe to use screen_log (which overwrites sl) */
     {
