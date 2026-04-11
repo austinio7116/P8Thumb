@@ -160,7 +160,7 @@ interpreter for most carts.
 
 **Memory.** The Lua VM uses a custom allocator (`p8_lua_alloc` in
 `src/p8.c`) that wraps libc `malloc`/`free`/`realloc` and tracks
-total bytes-in-use against a hard ceiling. The cap is 192 KB on
+total bytes-in-use against a hard ceiling. The cap is 256 KB on
 device — Lua's `lua_Alloc` callback returns NULL when a request
 would exceed it, which Lua treats as an out-of-memory condition
 that propagates as a Lua error. This bounds runaway allocations
@@ -256,21 +256,71 @@ shorthands, and the ⬅➡⬆⬇🅾❎ Unicode button glyphs).
 
 ```
 520 KB SRAM
-├── 64 KB   p8_machine.mem      (PICO-8's documented 0x0000-0xFFFF)
-├── 32 KB   scanline DMA buffer (4bpp → RGB565 expand for the LCD)
-├── 32 KB   picker thumbnail    (one cart label image at a time)
-├── 32 KB   flash disk cache    (8 erase blocks × 4 KB)
-├── ~21 KB  Pico SDK / FatFs / TinyUSB statics
-├── ~16 KB  stacks
-└── ~325 KB libc heap, of which:
-    ├── 192 KB  Lua VM heap cap
-    ├── ~100 KB cart bytes during load (transient)
-    └── margin
+├── 64 KB   p8_machine.mem       (PICO-8's documented 0x0000-0xFFFF)
+├── 32 KB   scanline DMA buffer  (4bpp → RGB565 expand for the LCD)
+├── 32 KB   flash disk cache     (8 erase blocks × 4 KB)
+├── ~20 KB  Pico SDK / FatFs / TinyUSB / misc statics
+├── 16 KB   stack (bumped from SDK default 2 KB — see below)
+├── ~2 KB   audio scratch buffer
+├── ═══════════════════════════════
+├── ~356 KB libc heap, of which:
+│   ├── 256 KB  Lua VM heap cap
+│   ├── ~95 KB  cart bytes during load (transient, freed before _init)
+│   └── ~5 KB   margin
+│
+│   At game-run time, cart.lua_source (~43 KB) is freed immediately
+│   after compilation and a GC cycle is forced, so the effective
+│   heap available to Lua at runtime is ~300 KB (of which 256 KB
+│   is the hard cap).
+│
+│   Picker thumbnail is malloc'd on demand (32 KB) and freed
+│   before the cart launches, so it doesn't compete with Lua.
 
 16 MB QSPI flash
-├── 0..1 MB    firmware (currently ~700 KB)
+├── 0..1 MB    firmware (currently ~720 KB)
 └── 1..13 MB   FAT16 cart filesystem (12 MB usable)
 ```
+
+### Stack
+
+The Pico SDK's RP2350 default stack is `StackSize = 0x800` (2 KB),
+set via `PICO_STACK_SIZE` in `crt0.S`. This is wildly insufficient
+for a Lua VM that recurses C → Lua → C during `foreach` / `all`
+iteration chains. Three levels of nested `foreach` is enough to
+overflow 2 KB.
+
+ThumbyP8 bumps this to **16 KB** via:
+```cmake
+target_compile_definitions(pico_platform INTERFACE PICO_STACK_SIZE=0x4000)
+```
+This must be on `pico_platform`'s INTERFACE (not PRIVATE on the
+target) so it reaches `crt0.S` — the assembly file that actually
+reserves the stack. Previous attempts using `target_compile_definitions(PRIVATE)`,
+`target_link_options(--defsym=__stack_size__)`, and `--defsym=StackSize`
+all failed because they either didn't reach the assembly file or
+set the wrong symbol.
+
+### OOM and panic handling
+
+When a cart exhausts the 256 KB Lua heap cap, the allocator returns
+NULL. Lua handles most OOMs gracefully via `lua_pcall` error
+propagation. But for some internal operations (stack growth, error
+message construction), the OOM triggers `lua_atpanic` — an
+unrecoverable error.
+
+The panic handler uses `longjmp` to jump back to a recovery point
+set up before the cart's Lua lifecycle begins. This avoids the
+alternative (calling `abort()` which on bare-metal Cortex-M is
+a hardfault). The device shows a **dark purple screen** with the
+panic message + cart name, logs `PANIC: <message>` to
+`/thumbyp8.log`, and MENU returns to the picker.
+
+After a panic the Lua VM is invalid and is intentionally leaked
+(not `lua_close`'d, since `lua_close` itself can trigger panics
+during GC finalization). The next cart launch creates a fresh VM.
+If leaked VMs accumulate (e.g. user tries 3 carts that all OOM),
+eventually there's no heap left and the next VM init fails
+cleanly. Power cycling always gives a clean slate.
 
 ### State machines
 
@@ -416,20 +466,23 @@ string literals or comments.
 The runtime exposes the documented PICO-8 API. Highlights:
 
 **Drawing**: `cls`, `pset`, `pget`, `line`, `rect`, `rectfill`,
-`circ`, `circfill`, `spr`, `sspr`, `map`, `mget`, `mset`, `fget`,
-`fset`, `sget`, `sset`, `print`, `cursor`, `color`, `camera`,
-`clip`, `pal`, `palt`
+`circ`, `circfill`, `oval`, `ovalfill`, `spr`, `sspr`, `map`,
+`mapdraw`, `mget`, `mset`, `fget`, `fset`, `sget`, `sset`,
+`print`, `cursor`, `color`, `camera`, `clip`, `pal`, `palt`,
+`fillp` (stub), `tline` (stub), `flip` (stub)
 
 **Input**: `btn`, `btnp`
 
 **Math**: `sin`, `cos`, `atan2` (PICO-8 turns), `flr`, `ceil`,
 `abs`, `min`, `max`, `mid`, `sgn`, `sqrt`, `rnd`, `srand`,
-`shl`, `shr`, `lshr`, `band`, `bor`, `bxor`, `bnot`, `ord`, `chr`
+`shl`, `shr`, `lshr`, `band`, `bor`, `bxor`, `bnot`, `rotl`,
+`rotr`, `ord`, `chr`
 
-**Tables** (PICO-8-style, lenient on nil): `add`, `del`, `count`,
-`foreach`, `all`
+**Tables** (PICO-8-style, lenient on nil): `add`, `del`, `deli`,
+`count`, `foreach`, `all`, `pack`, `unpack`, `split`
 
-**Memory**: `peek`, `poke`, `memcpy`, `memset`, `reload`
+**Memory**: `peek`, `poke`, `peek2`, `poke2`, `peek4`, `poke4`,
+`memcpy`, `memset`, `reload` (stub)
 
 **Audio**: `sfx`, `music`, `stat` (channel state queries)
 
@@ -438,6 +491,9 @@ The runtime exposes the documented PICO-8 API. Highlights:
 **Strings**: `sub`, `tostr`, `tonum`, `printh`
 
 **Persistence stubs**: `cartdata`, `dget`, `dset`, `menuitem`
+
+**Host-control stubs** (no-op): `extcmd`, `cstore`, `serial`,
+`stop`, `run`, `reset`, `ls`, `holdframe`, `_set_fps`
 
 All numeric arguments are PICO-8-lenient: passing `nil` is treated
 as `0` instead of erroring (matches what real carts assume).
@@ -457,27 +513,63 @@ as `0` instead of erroring (matches what real carts assume).
 | **4** | 4-channel audio synth (host SDL2), then PWM + IRQ on device; full audio playback |
 | **6** | USB MSC + FatFs on flash, lobby state machine, picker UI with BMP thumbnails |
 | **6.5** | Host preprocessor with shrinko8 integration; multi-cart support |
-| **7** | (in progress) PICO-8 dialect compatibility for arbitrary BBS carts |
+| **7** | (in progress) PICO-8 dialect compatibility, memory optimisation, hardfault diagnosis |
 
 ---
 
 ## Known limitations
 
-- **Lua heap cap is 192 KB.** Carts that pre-allocate more than
-  this in `_init` won't run. Lootslime is the canary — it allocates
-  ~250 KB of game state in init.
-- **`print()` uses the PICO-8 font shape** transcribed from Pemsa
-  (MIT, egordorichev). 3-wide × 5-tall glyphs, ASCII 32–127. Real
-  PICO-8 font shape, not a placeholder.
+### Memory
+
+- **Lua heap cap is 256 KB** (raised from the initial 128 KB →
+  192 KB → 256 KB as we discovered how much real carts need). The
+  cap is enforced by a custom `lua_Alloc` that returns NULL when
+  a request would exceed it.
+- **Total SRAM is 520 KB.** After BSS (~148 KB), stack (16 KB),
+  and libc overhead, ~356 KB is available for the libc heap. The
+  256 KB Lua cap plus ~95 KB of transient cart-load buffers
+  (freed before _init) fits, but barely.
+- **Carts that need >256 KB of Lua heap at runtime will OOM.**
+  The device shows a dark-purple "PANIC (oom?)" screen, logs the
+  error, and MENU returns to the picker. Lootslime (~300 KB+) and
+  mossmoss are known to exceed this. Delunky fits just under.
+- **Leaked VMs accumulate.** After a panic, the Lua VM is
+  intentionally not closed (lua_close can itself panic during GC
+  finalization). Each leaked VM holds its peak heap allocation.
+  After 2–3 panics in a row, heap may be exhausted; power-cycle
+  to reset.
+
+### Dialect / compatibility
+
+- **13 of 25 test carts load on host.** Failures are clustered
+  into: P8SCII string escapes (`\^`, `\-` etc.), PICO-8 rotate
+  operators (`>>>`, `<<>`, `>><`), non-button Unicode glyphs in
+  code positions, and a handful of edge cases.
+- **`fillp` is a no-op stub.** Carts that use fill patterns draw
+  without them. Visual-only degradation.
+- **`tline` is a no-op stub.** Mode-7 / floor-texture effects
+  don't render.
+- **`reload` is a no-op stub.** Carts that restore sprites/map
+  from the cart's ROM at runtime won't see the restore.
+- **`cstore`/`dset`/`dget` are stubs.** No persistent save data
+  across sessions.
+
+### Performance
+
 - **`sin`/`cos` go through libm `sinf`/`cosf`** which on
   newlib-nano internally promote to double precision and are slow
-  (~3 µs/call on M33). A LUT-based version is on the Phase 7 todo.
-- **Dialect rewriter doesn't yet handle**: P8SCII string control
-  characters (`\^`, `\-`, `\|` inside strings), binary fixed-point
-  literals (`0b1010.1`), some non-button Unicode identifiers.
-- **No `cstore`/`reload` cross-cart persistence.** `dset`/`dget`
-  return zero stubs.
-- **Picker doesn't support folders** — flat `/carts/` listing only.
+  (~3 µs/call on M33). A LUT-based version would give ~60×
+  speedup.
+- **On-device PNG decoding is not currently used** (stb_image was
+  too slow or hitting memory issues). Carts are preprocessed on
+  the host via `tools/p8png_extract.py`. Re-enabling the on-device
+  path is planned now that memory headroom is better.
+
+### Other
+
+- **Picker doesn't support folders** — flat `/carts/` listing.
+- **No multi-cart support** — carts that `load()` other carts
+  won't work.
 
 ---
 

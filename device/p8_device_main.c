@@ -424,6 +424,40 @@ int main(void) {
         p8_machine_reset(&machine);
         p8_input_reset(&input);
 
+        /* Arm the panic longjmp BEFORE any Lua operation. If the
+         * compiler, _init, or any frame hits an unrecoverable OOM,
+         * the panic handler longjmps back here and we show a clean
+         * error instead of hardfaulting. */
+        if (p8_vm_panic_arm() != 0) {
+            /* Panic was caught! VM is invalid — leak it. */
+            char buf[120];
+            snprintf(buf, sizeof(buf), "PANIC: %s", g_panic_msg);
+            p8_log_to_file(buf);
+            p8_log_ring("PANIC caught");
+
+            p8_machine_reset(&machine);
+            p8_camera(&machine, 0, 0);
+            p8_cls(&machine, 2);   /* dark purple */
+            p8_font_draw(&machine, "lua panic (oom?)", 8, 4, 7);
+            p8_font_draw(&machine, cart_entries[chosen].name, 4, 14, 7);
+            int y = 28;
+            int plen = (int)strlen(g_panic_msg);
+            for (int s = 0; s < plen && y < 110; s += 30) {
+                char line[32] = {0};
+                int chunk = (plen - s > 30) ? 30 : (plen - s);
+                memcpy(line, g_panic_msg + s, chunk);
+                p8_font_draw(&machine, line, 2, y, 7);
+                y += 8;
+            }
+            p8_font_draw(&machine, "MENU = picker", 20, 116, 10);
+            p8_machine_present(&machine, scanline);
+            p8_lcd_wait_idle();
+            p8_lcd_present(scanline);
+            while (!p8_buttons_menu_pressed()) sleep_ms(50);
+            p8_vm_panic_disarm();
+            continue;
+        }
+
         p8_vm vm;
         if (p8_vm_init(&vm, 0) != 0) {
             p8_log_to_file("load: lua VM init OOM");
@@ -442,7 +476,7 @@ int main(void) {
                 (const char *)cart_bytes, cart_len) != 0) {
             p8_log_to_file("load: cart parse failed");
             free(cart_bytes);
-            p8_vm_free(&vm);
+            /* Leak VM — lua_close can panic on OOM. */
             splash(0xf81f);
             sleep_ms(1500);
             continue;
@@ -460,7 +494,7 @@ int main(void) {
                          m ? m : "(no msg)");
                 p8_log_to_file(buf);
                 p8_cart_free(&cart);
-                p8_vm_free(&vm);
+                /* Leak VM — lua_close can panic on OOM. */
                 splash(0xffe0);
                 sleep_ms(1500);
                 continue;
@@ -512,9 +546,7 @@ int main(void) {
                     p8_lcd_wait_idle();
                     p8_lcd_present(scanline);
                     while (!p8_buttons_menu_pressed()) sleep_ms(50);
-                    lua_pop(vm.L, 1);
-                    p8_cart_free(&cart);
-                    p8_vm_free(&vm);
+                    /* Leak VM — lua_close can panic on OOM. */
                     continue;
                 }
             } else {
@@ -634,8 +666,21 @@ cart_error:
         }
 after_cart: ;
 
+        /* Cart source was already freed after compilation (see the
+         * p8_cart_free call before _init). This is a safe no-op. */
         p8_cart_free(&cart);
-        p8_vm_free(&vm);
+        /* DO NOT call p8_vm_free / lua_close here. lua_close runs
+         * GC finalizers which may try to allocate (e.g. to resize
+         * internal buffers during sweep). If the Lua heap is near
+         * the cap, that allocation hits the cap → lua_atpanic →
+         * abort() → hardfault. We just leak the VM — the outer
+         * loop is about to create a new one for the next cart, and
+         * malloc doesn't care about unreferenced heap blocks.
+         *
+         * For extra safety, NULL out the trace hook so stale
+         * pointers from this VM cycle don't fire into freed ring
+         * slots. */
+        p8_trace_hook = NULL;
     }
     return 0;
 }

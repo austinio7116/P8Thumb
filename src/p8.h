@@ -42,6 +42,19 @@ typedef struct p8_vm {
 int  p8_vm_init(p8_vm *vm, size_t heap_cap);
 void p8_vm_free(p8_vm *vm);
 
+/* Panic recovery. Call p8_vm_panic_arm() before any Lua operation
+ * that might trigger an unrecoverable error (typically OOM during
+ * compilation). Returns 0 on first call (arm succeeded). If a
+ * panic fires, longjmp brings us back here with return value 1.
+ * Call p8_vm_panic_disarm() when done with the dangerous section.
+ * After a panic, the Lua VM is INVALID — do not use it. */
+#include <setjmp.h>
+extern jmp_buf g_panic_jmp;
+extern volatile int g_panic_armed;
+extern char g_panic_msg[80];
+#define p8_vm_panic_arm()    (g_panic_armed = 1, setjmp(g_panic_jmp))
+#define p8_vm_panic_disarm() (g_panic_armed = 0)
+
 /* Run a chunk of Lua source. Returns 0 on success, nonzero on error.
  * On error, the error message is left on the Lua stack and can be
  * fetched with p8_vm_last_error_msg(). */

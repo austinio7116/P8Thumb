@@ -7,8 +7,21 @@
  */
 #include "p8.h"
 
+#include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Panic recovery via longjmp. When a Lua operation hits an
+ * unrecoverable error (typically OOM during compilation or error
+ * construction), the panic handler fires. Instead of abort()
+ * (which is a hardfault on bare metal), we longjmp back to the
+ * caller's setjmp point so they can display a clean error.
+ *
+ * Usage: call p8_vm_set_panic_recovery() before any Lua call
+ * that might panic. If it returns nonzero, panic was caught. */
+jmp_buf g_panic_jmp;
+volatile int g_panic_armed = 0;
+char g_panic_msg[80] = {0};
 
 /* Custom allocator: enforces P8_LUA_HEAP_CAP and tracks peak usage.
  * Lua's allocator contract is documented in lua.h: it doubles as
@@ -52,11 +65,21 @@ static void *p8_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize) {
  * display the red screen. On host, abort() produces a core dump. */
 static int p8_lua_panic(lua_State *L) {
     const char *msg = lua_tostring(L, -1);
-    fprintf(stderr, "[ThumbyP8] PANIC: %s\n",
-            msg ? msg : "unrecoverable Lua error (likely OOM)");
+    if (msg) {
+        strncpy(g_panic_msg, msg, sizeof(g_panic_msg) - 1);
+    } else {
+        strncpy(g_panic_msg, "unrecoverable Lua error (likely OOM)",
+                sizeof(g_panic_msg) - 1);
+    }
+    g_panic_msg[sizeof(g_panic_msg) - 1] = 0;
+    fprintf(stderr, "[ThumbyP8] PANIC: %s\n", g_panic_msg);
     fflush(stderr);
-    abort();   /* MUST NOT return — Lua state is invalid */
-    return 0;  /* unreachable, keeps the compiler happy */
+    if (g_panic_armed) {
+        longjmp(g_panic_jmp, 1);
+        /* unreachable */
+    }
+    abort();   /* fallback if longjmp isn't armed */
+    return 0;
 }
 
 int p8_vm_init(p8_vm *vm, size_t heap_cap) {
