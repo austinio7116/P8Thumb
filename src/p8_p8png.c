@@ -68,9 +68,7 @@ static void unpack_cart_bytes(const unsigned char *rgba, int w, int h,
  * Our cart memory layout matches PICO-8's exactly (we deliberately
  * use the same offsets), so this is just a memcpy. */
 static void rom_to_machine(p8_machine *m, const unsigned char *cart) {
-    /* Copy ROM (gfx, gff, map, sfx, music). Do NOT copy the label
-     * region (0x6000..0x7fff) — that overlaps the 4bpp framebuffer
-     * and would corrupt any on-screen display. */
+    /* Copy ROM (gfx, gff, map, sfx, music). */
     memcpy(&m->mem[0x0000], cart, 0x4300);
 }
 
@@ -328,6 +326,9 @@ int p8_p8png_load(p8_machine *m,
     memset(cart, 0, 0x8000);
     unpack_cart_bytes(rgba, w, h, cart, 0x8000);
     stbi_image_free(rgba);
+
+    /* Copy ROM region into machine memory. */
+    rom_to_machine(m, cart);
 
     /* Decompress Lua section. */
     size_t lua_len = 0;
