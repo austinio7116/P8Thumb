@@ -38,7 +38,7 @@ function _init()
 end
 
 function _update()
-  frames += 1
+  frames = frames + (1)
   update_map()
   update_items()
   update_people()
@@ -183,15 +183,15 @@ function update_cur()
       local larger = cur.movefrm > 24 and cur.movefrm % 2 == 0
       if contains(frms, cur.movefrm) or larger then
         sfx(7)
-        cur.x += dirx[i + 1]
-        cur.y += diry[i + 1]
+        cur.x = cur.x + (dirx[i + 1])
+        cur.y = cur.y + (diry[i + 1])
       end
     end
   end
   if moved == false then
     cur.movefrm = 0
   else
-    cur.movefrm += 1
+    cur.movefrm = cur.movefrm + (1)
   end
   cur.x = mid(0, 15, cur.x)
   cur.y = mid(0, 19, cur.y)
@@ -208,7 +208,7 @@ function build()
   local tile = building.sp
   local x, y = cur.x, cur.y
   local curtile = mget(x, y)
-  if tile != 16 and fget(curtile, 1) then
+  if tile ~= 16 and fget(curtile, 1) then
     if hold.x < 0 then
       sfx(2)
     end
@@ -255,14 +255,14 @@ function build_building(x, y, tile, building)
   mset(x, y, tile)
   tut_check(building.n)
   rem_con(x, y)
-  if building.con != nil then
+  if building.con ~= nil then
     add_con(x, y, building)
   end
   for i = 1, 4 do
     update_road(x + dirx[i], y + diry[i])
   end
   rem_growing(x, y)
-  if building.gtime != nil then
+  if building.gtime ~= nil then
     add_growing(x, y, building)
   end
   update_connect()
@@ -338,7 +338,7 @@ end
 
 function update_scenario()
   if tut_timeout > 0 then
-    tut_timeout -= 1
+    tut_timeout = tut_timeout - (1)
     if tut_timeout == 0 then
       show_next_tut()
     end
@@ -348,7 +348,7 @@ function update_scenario()
       sfx(11)
     end
     if dec_progress_frames > 0 and frames % dec_progress_frames == 0 then
-      progress -= 1
+      progress = progress - (1)
     end
     if progress < 0 then
       game_over()
@@ -405,16 +405,16 @@ function draw_overlay()
     return
   end
   if overlay_open > 0 then
-    overlay_h += overlay_open
-    overlay_open += overlay_open * 0.2
+    overlay_h = overlay_h + (overlay_open)
+    overlay_open = overlay_open + (overlay_open * 0.2)
     if overlay_h > overlay_mh then
       overlay_h = overlay_mh
       overlay_open = 0
       sfx(4)
     end
   elseif overlay_open < 0 then
-    overlay_h += overlay_open
-    overlay_open += overlay_open * 0.2
+    overlay_h = overlay_h + (overlay_open)
+    overlay_open = overlay_open + (overlay_open * 0.2)
     if overlay_h < 0 then
       overlay_h = -1
       overlay_open = 0
@@ -485,7 +485,7 @@ end
 function update_panel()
   local pselected = selected
   selected = update_select(0, 1, selected, #buildings - hidden_buildings)
-  if pselected != selected then
+  if pselected ~= selected then
     local b = buildings[selected]
     text(b.n, 2, 7, b.desc)
   end
@@ -495,14 +495,14 @@ function update_select(keyp, keyn, sel, maxsel)
   if btn(keyp) or btn(keyn) then
     if breleased then
       if btn(keyn) then
-        sel += 1
+        sel = sel + (1)
         sfx(8)
         if sel > maxsel then
           sel = 1
         end
       end
       if btn(keyp) then
-        sel -= 1
+        sel = sel - (1)
         sfx(8)
         if sel < 1 then
           sel = maxsel
@@ -686,7 +686,7 @@ function generate_river()
         mset(bx, i, 80)
       end
       mset(r2, i, 122)
-    elseif mget(r2, i) != 80 then
+    elseif mget(r2, i) ~= 80 then
       for k = 0, mx do
         mset(r2, i, 96)
         if mget(r2 + dx, i - 1) == 96 then
@@ -736,7 +736,7 @@ function prepare_trees()
       if fget(tile, 7) then
         local btile = mget(x + 48, y)
         if btile < 9 then
-          tile += 1
+          tile = tile + (1)
           mset(x, y, tile)
         end
         mset(x + 16, y, tile - 16)
@@ -751,7 +751,7 @@ function set_play_area()
       local x2 = x + 48
       mset(x2, y, 0)
       local dist = (x - 8) ^ 2 + (y - 9) ^ 2
-      dist += 0 + rnd(30)
+      dist = dist + (0 + rnd(30))
       if dist < 50 then
         mset(x2, y, 13)
       elseif dist < 60 then
@@ -788,7 +788,7 @@ function count_range(v1, v2)
   for x = 0, 16 do
     for y = 0, 19 do
       if mget(x, y) >= v1 and mget(x, y) <= v2 then
-        cnt += 1
+        cnt = cnt + (1)
       end
     end
   end
@@ -815,7 +815,7 @@ function update_map()
   end
   --update growing
   for g in all(growing) do
-    g.t += 1
+    g.t = g.t + (1)
     local b = g.b
     if g.t < b.gtime then
       local sdur = flr(b.gtime / (b.gstages + 1))
@@ -841,7 +841,7 @@ function update_buildings()
   for k, v in pairs(cons) do
     local b = v.b
     if b.prog and v.c then
-      v.tick += 1
+      v.tick = v.tick + (1)
       if v.tick > b.prog then
         if b.oi and has_item_room(b.o) then
           if has_item(b.oi, b.oicr) then
@@ -891,7 +891,7 @@ function harvest(x, y)
     if g.b.n == "field" and d < 3 and g.t >= g.b.gtime then
       g.t = 0
       add_item_tile("food", 1, g.x, g.y)
-      c += 1
+      c = c + (1)
     end
   end
   return c
@@ -917,16 +917,16 @@ end
 function get_road(x, y)
   local mask = 0
   if is_road_or_edge(x, y - 1) then
-    mask += 1
+    mask = mask + (1)
   end
   if is_road_or_edge(x, y + 1) then
-    mask += 2
+    mask = mask + (2)
   end
   if is_road_or_con(x - 1, y) then
-    mask += 4
+    mask = mask + (4)
   end
   if is_road_or_con(x + 1, y) then
-    mask += 8
+    mask = mask + (8)
   end
   return 80 + mask
 end
@@ -965,16 +965,16 @@ end
 function get_river(x, y)
   local mask = 0
   if is_river_or_edge(x, y - 1) then
-    mask += 1
+    mask = mask + (1)
   end
   if is_river_or_edge(x, y + 1) then
-    mask += 2
+    mask = mask + (2)
   end
   if is_river_or_edge(x - 1, y) then
-    mask += 4
+    mask = mask + (4)
   end
   if is_river_or_edge(x + 1, y) then
-    mask += 8
+    mask = mask + (8)
   end
   return 96 + mask
 end
@@ -1010,7 +1010,7 @@ function update_connect()
   end
   --update connected houses
   for v, k in pairs(cons) do
-    if k.cp != k.c then
+    if k.cp ~= k.c then
       local px, py = k.x * 8, k.y * 5 - 4
       if k.c then
         fx_float(px, py, 71, -0.1)
@@ -1098,9 +1098,9 @@ function update_messages()
   if message.tout < time() then
     message.tout = 0
   elseif message.tout < time() + 0.2 then
-    message.open -= 2
+    message.open = message.open - (2)
   elseif message.open < 12 then
-    message.open += 2
+    message.open = message.open + (2)
   end
 end
 
@@ -1126,9 +1126,9 @@ end
 --effects
 function draw_fx()
   for p in all(particles) do
-    p.x += p.vx
-    p.y += p.vy
-    p.t += 1
+    p.x = p.x + (p.vx)
+    p.y = p.y + (p.vy)
+    p.t = p.t + (1)
     local f = p.t / p.dur
     local r = p.r * (1.5 - f)
     if f > 0.9 then
@@ -1144,8 +1144,8 @@ function draw_fx()
     fillp(0)
   end
   for f in all(floaters) do
-    f.t += 1
-    f.y += f.my
+    f.t = f.t + (1)
+    f.y = f.y + (f.my)
     spr(f.sp, f.x, f.y)
     if f.t > 40 then
       del(floaters, f)
@@ -1185,8 +1185,8 @@ end
 function update_people()
   local pop = get_item("pop").c
   for i, p in pairs(people) do
-    p.t += 0.2
-    p.t2 += 1
+    p.t = p.t + (0.2)
+    p.t2 = p.t2 + (1)
     if p.t2 % 6 == 0 or p.knight and p.t2 % 3 == 0 then
       if p.knight then
         pop = max(i, pop)
@@ -1198,11 +1198,11 @@ function update_people()
         p.wcy = p.hy * 5
       end
       if p.wx >= 0 and p.wy >= 0 then
-        if p.wcx != p.cx then
-          p.cx += sgn(p.wcx - p.cx)
+        if p.wcx ~= p.cx then
+          p.cx = p.cx + (sgn(p.wcx - p.cx))
         end
-        if p.wcy != p.cy then
-          p.cy += sgn(p.wcy - p.cy)
+        if p.wcy ~= p.cy then
+          p.cy = p.cy + (sgn(p.wcy - p.cy))
         end
         --text(p.wcx.."_"..p.cx..":"..p.wcy.."_"..p.cy)
         if p.wcx == p.cx and p.wcy == p.cy then
@@ -1219,20 +1219,20 @@ function update_people()
         if p.knight then
           local dir = get_con_dir(p.x, p.y)
           if dir > 0 then
-            wx += dirx[dir]
-            wy += diry[dir]
+            wx = wx + (dirx[dir])
+            wy = wy + (diry[dir])
           else
             del(people, p)
             fx_float(p.cx, p.cy, 69, -0.2)
             if state == "game" then
-              progress += knight_progress_inc
+              progress = progress + (knight_progress_inc)
               sfx(5)
             end
           end
         else
           local dir = flr(rnd(4)) + 1
-          wx += dirx[dir]
-          wy += diry[dir]
+          wx = wx + (dirx[dir])
+          wy = wy + (diry[dir])
         end
         if is_road(wx, wy) then
           --text(p.x,0.4)
@@ -1269,8 +1269,8 @@ end
 function update_fading()
   --fading
   if fading_game then
-    game_fade_time -= fading_game
-    fading_game -= 2
+    game_fade_time = game_fade_time - (fading_game)
+    fading_game = fading_game - (2)
     if fading_game > 0 then
       if game_fade_time <= 0 then
         game_fade_time = 0
@@ -1288,15 +1288,15 @@ function update_fading()
   end
   --fading menu
   if fading_menu then
-    menu_fade_time += fading_menu
+    menu_fade_time = menu_fade_time + (fading_menu)
     if fading_menu > 0 then
-      fading_menu += fading_menu * 0.2
+      fading_menu = fading_menu + (fading_menu * 0.2)
       if menu_fade_time > 256 then
         start_game(menuselected)
         fading_menu = nil
       end
     else
-      fading_menu -= fading_menu * 0.2
+      fading_menu = fading_menu - (fading_menu * 0.2)
       if menu_fade_time < 0 then
         menu_fade_time = 0
         fading_menu = nil
@@ -1310,10 +1310,10 @@ end
 function update_items()
   for item in all(items) do
     if item.change > 0 then
-      item.change -= 1
+      item.change = item.change - (1)
     end
     if item.change < 0 then
-      item.change += 1
+      item.change = item.change + (1)
     end
   end
 end
@@ -1340,7 +1340,7 @@ function add_item(name, val, x, y)
   if x and y and val > 0 then
     fx_float(x, y, item.sp, -0.1)
   end
-  item.c += val
+  item.c = item.c + (val)
   item.change = mid(-7, 7, val * 7)
 end
 
@@ -1354,7 +1354,7 @@ end
 
 function add_item_max(name, val)
   local item = get_item(name)
-  item.maxc += val
+  item.maxc = item.maxc + (val)
   if item.c > item.maxc then
     item.c = item.maxc
   end

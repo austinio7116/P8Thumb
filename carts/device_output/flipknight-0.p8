@@ -190,7 +190,7 @@ end
 function tween:main()
   self.x, self.y = self.method(self.t, self.sx, self.cx, self.delay), self.method(self.t, self.sy, self.cy, self.delay)
   --add(debug,self.x)
-  self.t += 1
+  self.t = self.t + (1)
   if self.t >= self.delay then
     self.done = true
   end
@@ -203,13 +203,13 @@ function ease_linear(t, b, c, d)
 end
 
 function ease_incubic(t, b, c, d)
-  t /= d
+  t = t / (d)
   return c * t * t * t + b
 end
 
 function ease_outcubic(t, b, c, d)
-  t /= d
-  t -= 1
+  t = t / (d)
+  t = t - (1)
   return c * (t * t * t + 1) + b
 end
 
@@ -281,14 +281,14 @@ function _init()
         if mget(lx, y) == roomfind or mget(lx - 1, y) == roomfind then
           break
         end
-        w += 1
+        w = w + (1)
       end
       --get the height
       for ly = y + 16, y + 64, 16 do
         if mget(x, ly) == roomfind or mget(x, ly - 1) == roomfind then
           break
         end
-        h += 1
+        h = h + (1)
       end
       room(c, r, w, h)
       --tile roomfind is for me to look at, change the corners to roomrpl
@@ -315,8 +315,8 @@ end
 function _update()
   --end flight
   if ending and us.y < -4 * 64 then
-    us.y += 128
-    cam_y += 128
+    us.y = us.y + (128)
+    cam_y = cam_y + (128)
   end
   -- clear colision data
   for a in all(blox) do
@@ -348,18 +348,18 @@ function _update()
   for a in all(blox) do
     if a.active then
       good[i] = a
-      i += 1
+      i = i + (1)
     end
   end
   -- add spawned
   for a in all(spawned) do
     if a.active then
       good[i] = a
-      i += 1
+      i = i + (1)
     end
   end
   blox, spawned = good, {}
-  frames += 1
+  frames = frames + (1)
 end
 
 --draw----------------------
@@ -383,8 +383,8 @@ function _draw()
     local x, y = us:cam()
     local f = 0.5
     local scroll_x, scroll_y = (x - cam_x) * f, (y - cam_y) * f
-    cam_x += scroll_x
-    cam_y += scroll_y
+    cam_x = cam_x + (scroll_x)
+    cam_y = cam_y + (scroll_y)
   end
   camera(cam_x + shkx, cam_y + shky)
   if ending then
@@ -430,7 +430,7 @@ function _draw()
   fx = draw_active(fx)
   --update screen shake
   if shkxt > 0 then
-    shkxt -= 1
+    shkxt = shkxt - (1)
     if shkxt == 0 then
       local sn = sgn(shkx)
       if sn > 0 then
@@ -442,7 +442,7 @@ function _draw()
     end
   end
   if shkyt > 0 then
-    shkyt -= 1
+    shkyt = shkyt - (1)
     if shkyt == 0 then
       local sn = sgn(shky)
       if sn > 0 then
@@ -456,7 +456,7 @@ function _draw()
   if ending then
     print("the end", cam_x + 64 - 12, us.y + the_end_y, 7)
     if the_end_y < -24 then
-      the_end_y += 1
+      the_end_y = the_end_y + (1)
     end
   end
   -- print out values added to debug
@@ -464,7 +464,7 @@ function _draw()
   for i = 1, total do
     local s = debug[i]
     print(s, 1 + cam_x, 1 + cam_y + ty, 7)
-    ty += 8
+    ty = ty + (8)
     if i > total - 15 then
       add(good, s)
     end
@@ -493,7 +493,7 @@ function draw_active(table)
       a:draw()
       -- if(a.drawdbg) a:drawdbg()
       good[i] = a
-      i += 1
+      i = i + (1)
     end
   end
   return good
@@ -513,18 +513,18 @@ end
 function drawstars()
   for st in all(stars) do
     local x, y, v, c = st.x, st.y, st.v, st.c
-    y += v
+    y = y + (v)
     if x < cam_x + 0 then
-      x += 128
+      x = x + (128)
     end
     if x > cam_x + 127 then
-      x -= 128
+      x = x - (128)
     end
     if y < cam_y + 0 then
-      y += 128
+      y = y + (128)
     end
     if y > cam_y + 127 then
-      y -= 128
+      y = y - (128)
     end
     pset(x, y, c)
     st.x, st.y = x, y
@@ -548,7 +548,7 @@ function blok:init(x, y, w, h, flag, ignore, sp)
   self.downignore, self.upignore = nil, nil
   --mom = floor, g = gravity, coyote = read as being on floor
   self.mom, self.g, self.coyote = nil, 0, 0
-  blokn += 1
+  blokn = blokn + (1)
   self.n = blokn
 end
 
@@ -563,17 +563,17 @@ function blok:upd()
     self:movey(self.vy)
   end
   --apply damping
-  self.vx *= self.dx
-  self.vy *= self.dy
+  self.vx = self.vx * (self.dx)
+  self.vy = self.vy * (self.dy)
   --fall
   if abs(self.g) ~= 0 then
     if not self.mom then
-      self.vy += self.g
+      self.vy = self.vy + (self.g)
       if abs(self.vy) > speedlimit then
         self.vy = sgn(self.vy) * speedlimit
       end
       if self.coyote > 0 then
-        self.coyote -= 1
+        self.coyote = self.coyote - (1)
       end
     else
       if self.coyote == 0 and band(self.mom.flag, f_outside) == 0 then
@@ -601,9 +601,9 @@ function blok:movex(v)
     local shdmove = (edge + v) - obedge
     --how far should it move?
     self.touchx = ob
-    v -= shdmove
+    v = v - (shdmove)
   end
-  self.x += v
+  self.x = self.x + (v)
   --have i lost a parent?
   if self.mom then
     local p = self.mom
@@ -652,7 +652,7 @@ function blok:movey(v)
       end
       if not skip then
         self.touchy = ob
-        v -= shdmove
+        v = v - (shdmove)
         --floor?
         if shdmove > 0 and self.g > 0 then
           self.mom = ob
@@ -671,7 +671,7 @@ function blok:movey(v)
       end
     end
   end
-  self.y += v
+  self.y = self.y + (v)
   --have i lost a parent?
   if self.mom then
     if self.g > 0 and self.y + self.h < self.mom.y then
@@ -876,11 +876,11 @@ end
 
 function player:upd()
   if self.enterroomwait > 0 then
-    self.enterroomwait -= 1
+    self.enterroomwait = self.enterroomwait - (1)
     return
   end
   if self.respawncount > 0 then
-    self.respawncount -= 1
+    self.respawncount = self.respawncount - (1)
     if self.respawncount == 0 then
       self:respawn()
       debrisblok(self, 80, 5, 1)
@@ -904,7 +904,7 @@ function player:upd()
     end
   end
   if self.getsword > 0 then
-    self.getsword -= 1
+    self.getsword = self.getsword - (1)
     if self.getsword == 0 then
       splode(self.x + self.w * 0.5, self.y + self.h * 0.5, 8, 9, fx, 10)
       self.nosword = false
@@ -1007,7 +1007,7 @@ function player:upd()
       shake(strong * ((self.eggcount % 2) == 0 and -1 or 1), 0)
       debrisrect(self.x - 3, self.y - 11, 10, 10, 81, strong * 2, strong * 0.25)
       debrisrect(self.x - 3, self.y - 11, 10, 10, 80, strong, strong * 0.5)
-      self.eggcount -= 1
+      self.eggcount = self.eggcount - (1)
       sfx(5)
       if self.eggcount == 0 then
         self.egg = nil
@@ -1019,11 +1019,11 @@ function player:upd()
   else
     -- move
     if btn(0) then
-      self.vx -= self.speed
+      self.vx = self.vx - (self.speed)
       self.flipx = true
     end
     if btn(1) then
-      self.vx += self.speed
+      self.vx = self.vx + (self.speed)
       self.flipx = false
     end
     --jump!
@@ -1073,7 +1073,7 @@ function player:upd()
     self.mom:crumble()
   end
   if self.flipignore > 0 then
-    self.flipignore -= 1
+    self.flipignore = self.flipignore - (1)
   end
 end
 
@@ -1096,11 +1096,11 @@ function player:cam()
   if not self.active then
     x, y = centertile(self.sc, self.sr)
   end
-  self.camlook += sgn(self.g) * 2
+  self.camlook = self.camlook + (sgn(self.g) * 2)
   if abs(self.camlook) > 12 then
     self.camlook = 12 * sgn(self.camlook)
   end
-  y += self.camlook
+  y = y + (self.camlook)
   --if(abs(self.vy)>0) y+=sgn(self.g)*4
   --handle any size room of 128px units
   x = min(max(x - 64, currentroom.x * 8), -128 + (currentroom.x + currentroom.w) * 8)
@@ -1152,42 +1152,42 @@ function player:reacttouch(touch)
         prevroomx, prevroomy = 0, 0
         -- push into next room
         if touch.x >= self.x + self.w then
-          self.x += self.w
+          self.x = self.x + (self.w)
         end
         if touch.x + touch.w <= self.x then
-          self.x -= self.w
+          self.x = self.x - (self.w)
         end
         if touch.y >= self.y + self.h then
-          self.y += self.h
+          self.y = self.y + (self.h)
         end
         if touch.y + touch.h <= self.y then
-          self.y -= self.h
+          self.y = self.y - (self.h)
         end
         -- map wrap
         if self.x >= 1024 then
           --8 rooms
-          self.x -= 1024
-          c -= 8
-          tc -= 128
+          self.x = self.x - (1024)
+          c = c - (8)
+          tc = tc - (128)
           prevroomx = -128
         end
         if self.x + self.w <= 0 then
-          self.x += 1024
-          c += 8
-          tc += 128
+          self.x = self.x + (1024)
+          c = c + (8)
+          tc = tc + (128)
           prevroomx = 128
         end
         if self.y >= 512 then
           --4 rooms
-          self.y -= 512
-          r -= 4
-          tr -= 64
+          self.y = self.y - (512)
+          r = r - (4)
+          tr = tr - (64)
           prevroomy = -64
         end
         if self.y + self.h <= 0 and room ~= exitroom then
-          self.y += 512
-          r += 4
-          tr += 64
+          self.y = self.y + (512)
+          r = r + (4)
+          tr = tr + (64)
           prevroomy = 64
         end
         self.goroomc, self.goroomr, self.sc, self.sr = c, r, tc, tr
@@ -1210,7 +1210,7 @@ end
 function player:draw(sp)
   local x, y = self:center()
   if self.egg then
-    x += -shkx
+    x = x + (-shkx)
     spr(54, x - 8, y - 4)
     spr(55, x, y - 4)
     spr(48, x - 8, y - 12)
@@ -1231,13 +1231,13 @@ function player:draw(sp)
   end
   if self.sword then
     if flipy then
-      offy -= 2
+      offy = offy - (2)
     end
     blok.draw(self, 32 + framen, offx, offy + (flipy and 8 or -8))
     blok.draw(self, 17 + framen, offx, offy)
   else
     if not flipy then
-      offy -= 2
+      offy = offy - (2)
     end
     local f = ((abs(self.vx) > 0.1) and framen or 0)
     if self.coyote == 0 then
@@ -1399,7 +1399,7 @@ function enemy:draw(sp)
     end
   else
     if self.g > 0 then
-      offy -= 2
+      offy = offy - (2)
     end
     if self.coyote == 0 then
       f = 1
@@ -1425,7 +1425,7 @@ end
 
 function crumbleflr:upd()
   if self.crumbling then
-    self.count -= 1
+    self.count = self.count - (1)
     if self.count == 28 then
       debrisblok(self, 64, self.w / 4)
       debrisblok(self, 80, self.w / 8)
@@ -1444,7 +1444,7 @@ function crumbleflr:upd()
       sfx(6)
     end
   elseif self.count < 0 then
-    self.count += 1
+    self.count = self.count + (1)
     if self.count >= 0 then
       local obs = getobstacles(self.x, self.y, self.w, self.h)
       if #obs == 1 then
@@ -1462,12 +1462,12 @@ function crumbleflr:phantom()
   else
     local temp, sp = {islist = true}, self.sp
     if self.count <= 28 then
-      sp += 1
+      sp = sp + (1)
     end
     if self.count <= 0 then
-      sp += 1
+      sp = sp + (1)
       if self.count > -5 then
-        sp -= 1
+        sp = sp - (1)
       end
     end
     for x = self.x, self.x + self.w - 8, 8 do
@@ -1484,12 +1484,12 @@ end
 function crumbleflr:draw(sp)
   local sp, y = self.sp, self.y
   if self.count <= 28 then
-    sp += 1
+    sp = sp + (1)
   end
   if self.count <= 0 then
-    sp += 1
+    sp = sp + (1)
     if self.count > -5 then
-      sp -= 1
+      sp = sp - (1)
     end
   end
   for x = flr(self.x), self.x + self.w - 8, 8 do
@@ -1516,7 +1516,7 @@ function slab:mergeslab(o)
   if o.y < self.y then
     self.y = o.y
   end
-  self.h += o.h
+  self.h = self.h + (o.h)
   o.active = false
 -- debugp(self.y,self.h,self.n,o.n)
 end
@@ -1566,7 +1566,7 @@ end
 function slab:draw(sp)
   local sp, y = self.sp, self.y
   if not self.mom then
-    sp += 1
+    sp = sp + (1)
   end
   for y = flr(self.y), self.y + self.h - 8, 8 do
     spr(sp, self.x, y, 1, 1, self.flipx, self.flipy)
@@ -1647,8 +1647,8 @@ function room:enter()
       local x, w = c, 0
       while (mget(x, r) == sp) do
         self:to_reset(x, r, sp)
-        x += 1
-        w += 8
+        x = x + (1)
+        w = w + (8)
       end
       add2(crumbleflr(c, r, sp, w), blox, them)
     end
@@ -1696,11 +1696,11 @@ end
 
 --when wrapping we fake the room position, so phantoms come too
 function room:movephantoms(c, r)
-  c *= 8
-  r *= 8
+  c = c * (8)
+  r = r * (8)
   for a in all(self.phantoms) do
-    a.x += c
-    a.y += r
+    a.x = a.x + (c)
+    a.y = a.y + (r)
   end
 end
 
@@ -1766,7 +1766,7 @@ function spcopy:draw(sp)
   sp = sp or self.sp
   spr(self.sp, -4 + self.x, -4 + self.y, 1, 1, self.flipx, self.flipy)
   if self.t > 0 then
-    self.t -= 1
+    self.t = self.t - (1)
     if self.t == 0 then
       self.active = false
     end
@@ -1791,7 +1791,7 @@ function blinky:draw()
   else
     spr(self.spb, self.x, self.y)
   end
-  self.t -= 1
+  self.t = self.t - (1)
   --garbage collect when room changes or spa ~= mget(c,r)
   if self.room ~= currentroom or mget(self.c, self.r) ~= self.spa then
     self.active = false
@@ -1807,8 +1807,8 @@ end
 
 function dust:draw()
   circfill(self.x, self.y, self.r, self.c)
-  self.r -= 0.2
-  self.y += 0.1
+  self.r = self.r - (0.2)
+  self.y = self.y + (0.1)
   if self.r <= 0 then
     self.active = false
   end
@@ -1847,7 +1847,7 @@ function splode:draw()
       self.active = false
     end
   end
-  self.t += 1
+  self.t = self.t + (1)
 end
 
 --square splode
@@ -1881,7 +1881,7 @@ function squode:draw()
       self.active = false
     end
   end
-  self.t += 1
+  self.t = self.t + (1)
 end
 
 function squar(x, y, s, c)
@@ -1900,12 +1900,12 @@ end
 
 function debris:draw()
   spr(self.sp, self.x, self.y, 1, 1, self.flipx)
-  self.x += self.vx
-  self.y += self.vy
+  self.x = self.x + (self.vx)
+  self.y = self.y + (self.vy)
   --apply damping
-  self.vx *= dropdamp
-  self.vy *= dropdamp
-  self.vy += grav * gravdir
+  self.vx = self.vx * (dropdamp)
+  self.vy = self.vy * (dropdamp)
+  self.vy = self.vy + (grav * gravdir)
   if gravdir > 0 and self.y > cam_y + 128 or gravdir < 0 and self.y < cam_y then
     self.active = false
   end

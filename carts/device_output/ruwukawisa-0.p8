@@ -68,13 +68,13 @@ function init_menu()
       music(-1)
     end
     if go then
-      lt -= 1
+      lt = lt - (1)
       if lt == -1 then
         init_game()
         upd_game()
       end
     else
-      lt += 1
+      lt = lt + (1)
     end
   end
   main_dr = function()
@@ -171,7 +171,7 @@ function get_shape(n)
     n = fsh
     fsh = nil
   end
-  n *= 4
+  n = n * (4)
   local a = {}
   local sx = shapes[n + 1]
   local sy = shapes[n + 2]
@@ -193,12 +193,12 @@ end
 function pop_block()
   -- height
   local y = seek_height()
-  y -= 18
+  y = y - (18)
   -- shape
   local smax = 6
   for l in all(levels) do
     if toth > l then
-      smax += 3
+      smax = smax + (3)
     end
   end
   local n = rand(smax)
@@ -294,8 +294,8 @@ function push(e, dx, dy, spd)
       if dy == 1 then
         mset(e.px, e.py, 0)
       end
-      e.px += dx
-      e.py += dy
+      e.px = e.px + (dx)
+      e.py = e.py + (dy)
       if dy == 1 then
         msetf(e.px, e.py, 34)
       end
@@ -330,10 +330,10 @@ end
 
 function grab(fr)
   if fr == 55 then
-    diams += 1
+    diams = diams + (1)
     sfx(7)
   elseif fr == 59 then
-    planks += 2
+    planks = planks + (2)
     sfx(20)
   elseif fr == 123 then
     hp = min(hp + 1, hpmax)
@@ -476,20 +476,20 @@ function pmov(e, vx, vy)
   end
   local cf = e == hero and hpcol or pcol
   -- x
-  e.x += vx
+  e.x = e.x + (vx)
   cl = e.bnc
   while ecol(e) or ecol(e, 0, 0, blocks_col) do
-    e.x -= sgn(vx)
+    e.x = e.x - (sgn(vx))
     if cl then
       cl(e, false)
       cl = nil
     end
   end
   -- y
-  e.y += vy
+  e.y = e.y + (vy)
   cl = e.bnc
   while ecol(e, 0, 0, cf) or ecol(e, 0, 0, blocks_col) do
-    e.y -= sgn(vy)
+    e.y = e.y - (sgn(vy))
     if cl then
       cl(e, true)
       cl = nil
@@ -535,7 +535,7 @@ function brk(px, py, dx, dy)
   dx = dx or 0
   dy = dy or 0
   local tl = mget(px, py)
-  if tl != 3 then
+  if tl ~= 3 then
     return
   end
   sfx(5)
@@ -557,13 +557,13 @@ function fx_stone(px, py)
     e.we = .25
     e.frict = .97
     impulse(e, atan2(dx, dy), 1 + rnd(2))
-    e.vy -= 1
+    e.vy = e.vy - (1)
   end
 end
 
 function impulse(e, an, spd)
-  e.vx += cos(an) * spd
-  e.vy += sin(an) * spd
+  e.vx = e.vx + (cos(an) * spd)
+  e.vy = e.vy + (sin(an) * spd)
 end
 
 function get_fall(px, py)
@@ -586,7 +586,7 @@ function run_gob(e)
   -- check fall
   if not mcol(e.px, e.py + 1) then
     move(e, 0, 8, spd, again)
-    e.py += 1
+    e.py = e.py + (1)
     return
   end
   local clu = mcol(e.px, e.py - 1)
@@ -596,7 +596,7 @@ function run_gob(e)
 
   function go()
     move(e, e.di * 8, 0, spd, again)
-    e.px += e.di
+    e.px = e.px + (e.di)
   end
 
   if not clf and clfb then
@@ -604,7 +604,7 @@ function run_gob(e)
   else
     if e.y <= hero.y and rand(3) == 0 and clf and clfb then
       brk(e.px + e.di, e.py)
-      e.x += e.di * 4
+      e.x = e.x + (e.di * 4)
       move(e, -e.di * 4, 0, 6, again)
     elseif e.y + 4 < hero.y and not clf and not clfb then
       if e.y + get_fall(e.px + e.di, e.py) * 8 <= hero.y then
@@ -616,8 +616,8 @@ function run_gob(e)
     elseif e.y - 4 > hero.y and clf and not clfu and not clu then
       move(e, e.di * 8, -8, spd * 2, again)
       e.jmp = 8
-      e.px += e.di
-      e.py -= 1
+      e.px = e.px + (e.di)
+      e.py = e.py - (1)
     else
       e.di = -e.di
       wait(10, again)
@@ -650,7 +650,7 @@ function upd_hero(e)
   end
   if not gr then
     if e.vy < 4 then
-      e.vy += .5
+      e.vy = e.vy + (.5)
     end
     if e.gdi and e.vy > 1 then
       e.vy = 1
@@ -667,9 +667,9 @@ function upd_hero(e)
 
   function hmov(di)
     e.di = di
-    e.vx += di * 2
+    e.vx = e.vx + (di * 2)
     if t % 4 == 0 then
-      wfr += 1
+      wfr = wfr + (1)
     end
   end
 
@@ -728,15 +728,15 @@ function upd_hero(e)
   local lim = 512 - acid
   if hero.y > lim then
     if hero.y > lim + 16 then
-      hero.vy *= .5
+      hero.vy = hero.vy * (.5)
     end
     hurt_hero()
   end
   -- frame
   if gr then
     e.fr = 28
-    if e.di != 0 then
-      e.fr += wfr % 4
+    if e.di ~= 0 then
+      e.fr = e.fr + (wfr % 4)
     end
   else
     e.fr = 30
@@ -753,10 +753,10 @@ function use()
     return
   end
   if gr and look_up then
-    planks -= 1
+    planks = planks - (1)
     build_ladder()
   elseif floor_ready then
-    planks -= 1
+    planks = planks - (1)
     build_floor()
   end
 end
@@ -772,7 +772,7 @@ function build_floor()
   mset(hero.px, hero.py + 1, 0)
   cap = dum(hero)
   cap.fr = 0
-  cap.py += 1
+  cap.py = cap.py + (1)
   cap.ends = 0
   spread(cap, 7)
   sfx(22)
@@ -794,7 +794,7 @@ function spread(dm, tp, count)
   kl(dm)
   if mcol(x, y) then
     if cap then
-      cap.ends += 1
+      cap.ends = cap.ends + (1)
       if cap.ends == 2 then
         diam_floor()
       end
@@ -811,7 +811,7 @@ function spread(dm, tp, count)
     sfx(2, -1, 2, 3)
     for i = -1, 1, 2 do
       local a = dum(dm)
-      a.px += i
+      a.px = a.px + (i)
       local k = a.px >= 0 and a.px < 16
       local f = function()
         if k then
@@ -837,7 +837,7 @@ function spread(dm, tp, count)
     end
     -- again
     local a = dum(dm)
-    a.py -= 1
+    a.py = a.py - (1)
     local f = function()
       if a.py >= 0 and count < 10 then
         spread(a, tp, count + 1)
@@ -890,8 +890,8 @@ function rot(dm, tp)
     local dy = dr[i * 2 + 2]
     if mget(x + dx, y + dy) == tp then
       local a = dum(dm)
-      a.px += dx
-      a.py += dy
+      a.px = a.px + (dx)
+      a.py = a.py + (dy)
       wait(4, rot, a, tp)
     end
   end
@@ -937,17 +937,17 @@ function sg(n)
 end
 
 function upe(e)
-  e.t += 1
+  e.t = e.t + (1)
   if e.upd then
     e.upd(e)
   end
   -- phys
   if e.we then
-    e.vy += e.we
+    e.vy = e.vy + (e.we)
   end
   if e.frict then
-    e.vx *= e.frict
-    e.vy *= e.frict
+    e.vx = e.vx * (e.frict)
+    e.vy = e.vy * (e.frict)
   end
   -- col
   local vx = e.vx
@@ -959,8 +959,8 @@ function upe(e)
   if e.phys then
     pmov(e, vx, vy)
   else
-    e.x += vx
-    e.y += vy
+    e.x = e.x + (vx)
+    e.y = e.y + (vy)
   end
   -- monsters
   if e.mons then
@@ -981,9 +981,9 @@ function upe(e)
     if look_up then
       mvs = .5
     end
-    e.mv += mvs
+    e.mv = e.mv + (mvs)
     while e.mv > 8 and not e.dead do
-      e.mv -= 8
+      e.mv = e.mv - (8)
       push(e, e.mdx, e.mdy, e.mvs)
     end
     for b in all(e.gr) do
@@ -1000,8 +1000,8 @@ function upe(e)
           fset(7, 0, false)
           return
         else
-          hero.x += dx
-          hero.y += dy
+          hero.x = hero.x + (dx)
+          hero.y = hero.y + (dy)
         end
         fset(7, 0, false)
       end
@@ -1029,7 +1029,7 @@ function upe(e)
   -- counters
   for v, n in pairs(e) do
     if sub(v, 1, 1) == "c" then
-      n -= 1
+      n = n - (1)
       e[v] = n > 0 and n or nil
     end
   end
@@ -1040,7 +1040,7 @@ function upe(e)
     e.x = e.sx + (e.ex - e.sx) * cc
     e.y = e.sy + (e.ey - e.sy) * cc
     if e.jmp then
-      e.y += sin(c / 2) * e.jmp
+      e.y = e.y + (sin(c / 2) * e.jmp)
     end
     e.twc = c
     if c == 1 then
@@ -1074,7 +1074,7 @@ function upe(e)
   end
   -- life
   if e.life then
-    e.life -= 1
+    e.life = e.life - (1)
     if e.life <= 0 then
       kl(e)
     end
@@ -1109,7 +1109,7 @@ function hurt_hero()
   --frz=16
   hero.churt = 40
   sfx(6)
-  hp -= 1
+  hp = hp - (1)
   if hp == 0 then
     game_over()
   end
@@ -1133,26 +1133,26 @@ function dr_gmo(e)
   local t = e.t - 24
   camera()
   if gmo.diams then
-    dt += 1
+    dt = dt + (1)
     local ma = 16
     local a = {0, 7, 0}
     for i = 1, 3 do
       rectfill(ma, ma, 127 - ma, 127 - ma, a[i])
-      ma += 1
+      ma = ma + (1)
     end
     fcl = 9
     if gmo.hh > 0 then
       sfx(23)
-      gmo.hh -= 1
-      gmo.score += 10
+      gmo.hh = gmo.hh - (1)
+      gmo.score = gmo.score + (10)
     elseif gmo.diams > 0 then
       sfx(24)
-      gmo.diams -= 1
-      gmo.score += 5
+      gmo.diams = gmo.diams - (1)
+      gmo.score = gmo.score + (5)
     elseif gmo.planks > 0 then
       sfx(25)
-      gmo.planks -= 1
-      gmo.score += 1
+      gmo.planks = gmo.planks - (1)
+      gmo.score = gmo.score + (1)
     else
       fcl = 8 + _t % 8
     end
@@ -1181,18 +1181,18 @@ function dr_gmo(e)
       c = c * c
       local an = i / 7 + c
       z = 2.5 + cos(t / 40 + i / 7)
-      x += cos(an) * sin(c * .5) * 128
-      y += sin(an) * sin(c * .5) * 128
+      x = x + (cos(an) * sin(c * .5) * 128)
+      y = y + (sin(an) * sin(c * .5) * 128)
       local bx = 64 + cos(i / 7) * 48
       local by = 64 + sin(i / 7) * 48
-      x += (bx - x) * c
-      y += (by - y) * c
+      x = x + ((bx - x) * c)
+      y = y + ((by - y) * c)
       if k == 0 then
         apal(1)
-        x += z
-        y += z
+        x = x + (z)
+        y = y + (z)
       else
-        y -= z
+        y = y - (z)
       end
       sspr(18 + i * 7, 40, 7, 8, x, y)
       pal()
@@ -1324,9 +1324,9 @@ function dre(e)
   --
   local shk = e.cshk
   if shk then
-    shk /= 4
-    x += rand(shk * 2) - shk
-    y += rand(shk * 2) - shk
+    shk = shk / (4)
+    x = x + (rand(shk * 2) - shk)
+    y = y + (rand(shk * 2) - shk)
   end
   -- walk
   if e.wlk then
@@ -1334,11 +1334,11 @@ function dre(e)
   end
   -- float
   if e.float then
-    y += cos(e.t / 40) * e.float - .5
+    y = y + (cos(e.t / 40) * e.float - .5)
   end
   -- jump
   if fget(fr, 0) then
-    y -= 1
+    y = y - (1)
   end
   -- anim
   if fget(fr, 3) and t % 2 == 0 then
@@ -1392,10 +1392,10 @@ end
 function upd_game()
   -- acid
   if acid < bsc * 8 then
-    acid += (bsc * 8 - acid) * .1
+    acid = acid + ((bsc * 8 - acid) * .1)
   end
   if t % 4 == 0 and acid < 128 then
-    acid += 1
+    acid = acid + (1)
   end
   -- spawn monster
   if t % 4000 == 10 then
@@ -1425,17 +1425,17 @@ function upd_game()
       gmo.diams = diams
       gmo.score = 0
       gmo.planks = planks
-      gmo.diams += 8 + rand(32)
-      gmo.hh += 16 + rand(32)
+      gmo.diams = gmo.diams + (8 + rand(32))
+      gmo.hh = gmo.hh + (16 + rand(32))
     end
   end
 end
 
 function _update()
-  _t += 1
+  _t = _t + (1)
   -- freze
   if frz then
-    frz -= 1
+    frz = frz - (1)
     if frz <= 0 then
       frz = nil
     end
@@ -1453,26 +1453,26 @@ function _update()
   return
  end
  --]]
-  t += 1
+  t = t + (1)
   main_upd()
 end
 
 function scroll_map()
-  toth += bsc
-  curh += bsc
+  toth = toth + (bsc)
+  curh = curh + (bsc)
   local dd = bsc * 8
-  cy += dd
-  acid -= dd
+  cy = cy + (dd)
+  acid = acid - (dd)
   for e in all(ents) do
-    e.y += dd
+    e.y = e.y + (dd)
     if e.py then
-      e.py += bsc
+      e.py = e.py + (bsc)
     end
     if e.tws then
-      e.sx += dd
-      e.sy += dd
-      e.ex += dd
-      e.ey += dd
+      e.sx = e.sx + (dd)
+      e.sy = e.sy + (dd)
+      e.ex = e.ex + (dd)
+      e.ey = e.ey + (dd)
     end
   end
   for y = 63, 0, -1 do
@@ -1489,12 +1489,12 @@ function dr_game()
     cy = hero.y - 64
   end
   local tcy = min(hero.y - 64, 512 - 128)
-  cy += (tcy - cy) * .2
+  cy = cy + ((tcy - cy) * .2)
   cmx = hero.x - 64
   camera(cmx, cy)
   -- line
   local y = seek_height()
-  curh += (y - curh) * .25
+  curh = curh + ((y - curh) * .25)
   local str = flr(toth + 64 - curh - 16)
   local h = curh * 8
   line(cmx, h, 127 + cmx, h, 1)

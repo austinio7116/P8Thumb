@@ -34,7 +34,7 @@ function _update()
   end
   nN()
   if j > 0 then
-    j -= 1
+    j = j - (1)
     return
   end
   nO()
@@ -144,20 +144,20 @@ function nC()
 end
 
 function nN()
-  nd += 1
+  nd = nd + (1)
   if nd >= 30 then
-    nd -= 30
-    q += 1
+    nd = nd - (30)
+    q = q + (1)
     dset(6, q)
   end
   if q >= 60 then
-    q -= 60
-    z += 1
+    q = q - (60)
+    z = z + (1)
     dset(7, z)
   end
   if z >= 60 then
-    z -= 60
-    R += 1
+    z = z - (60)
+    R = R + (1)
     dset(8, R)
   end
 end
@@ -171,23 +171,23 @@ function nS()
     return
   end
   if not l.grounded and l.coyote > 0 then
-    l.coyote -= 1
+    l.coyote = l.coyote - (1)
   elseif l.grounded and not l.hit_left and not l.hit_right then
     l.coyote = 3
   end
   l.prev_vely = l.vely
   if l.wall_jump_timer_left > 0 or l.wall_jump_timer_right > 0 then
-    l.wall_jump_timer_left -= 1
-    l.wall_jump_timer_right -= 1
+    l.wall_jump_timer_left = l.wall_jump_timer_left - (1)
+    l.wall_jump_timer_right = l.wall_jump_timer_right - (1)
   end
   ep()
   if (l.hit_left or l.hit_right) and l.vely > 0 then
-    l.vely += .1
+    l.vely = l.vely + (.1)
     if l.vely > 1.5 then
       l.vely = 1.5
     end
   else
-    l.vely += .3
+    l.vely = l.vely + (.3)
   end
   if l.on_ladder then
     l.vely = 0
@@ -198,15 +198,15 @@ function nS()
     l.velx = 0
   elseif l.velx < 0 then
     if l.grounded then
-      l.velx += .3
+      l.velx = l.velx + (.3)
     else
-      l.velx += .2
+      l.velx = l.velx + (.2)
     end
   elseif l.velx > 0 then
     if l.grounded then
-      l.velx -= .3
+      l.velx = l.velx - (.3)
     else
-      l.velx -= .2
+      l.velx = l.velx - (.2)
     end
   end
   if l.prev_vely - l.vely > 2 then
@@ -225,9 +225,9 @@ function ew(n)
   local n = n / e
   for e = 1, e do
     if not l.grounded then
-      l.y += n
+      l.y = l.y + (n)
     elseif l.vely < 0 then
-      l.y += n
+      l.y = l.y + (n)
     end
     no()
   end
@@ -256,23 +256,23 @@ function em()
   no()
   if l.grounded and l.hit_top then
     if mget(l.x / 8, (l.y - 1) / 8) == 0 then
-      l.y -= 1
+      l.y = l.y - (1)
     else
-      l.x += 1
+      l.x = l.x + (1)
       l.vely = 0
     end
   end
   if l.grounded and l.vely > 0 then
-    l.y -= (l.y + 8) % 8
+    l.y = l.y - ((l.y + 8) % 8)
     l.vely = 0
   elseif l.hit_top and l.vely < 0 then
-    l.y += (4 - l.y % 8) % 8
+    l.y = l.y + ((4 - l.y % 8) % 8)
   end
   e_()
 end
 
 function e_()
-  l.x += l.velx
+  l.x = l.x + (l.velx)
   no()
   if l.hit_left then
     local n = flr(l.x / 8)
@@ -314,12 +314,12 @@ function ey()
   end
   if btn(0) and l.wall_jump_timer_left <= 0 then
     l.sprite = 2
-    l.velx -= 1
+    l.velx = l.velx - (1)
     w = 0
   end
   if btn(1) and l.wall_jump_timer_right <= 0 then
     l.sprite = 1
-    l.velx += 1
+    l.velx = l.velx + (1)
     w = 0
   end
   if btnp(3) and nf then
@@ -401,7 +401,7 @@ G = {}
 function n1()
   sfx(9)
   if not Q then
-    P += 1
+    P = P + (1)
   end
   dset(5, P)
   l.dead = true
@@ -419,9 +419,9 @@ function np()
     return
   end
   for n in all(G) do
-    n.x += n.vx
-    n.y += n.vy
-    n.t += 1
+    n.x = n.x + (n.vx)
+    n.y = n.y + (n.vy)
+    n.t = n.t + (1)
     if n.t < 12 then
       circfill(n.x, n.y, 1, H)
     elseif n.t < 18 then
@@ -492,9 +492,9 @@ end
 
 function nT()
   for n in all(x) do
-    n.x += n.spdx
-    n.y += n.spdy
-    n.life -= 1
+    n.x = n.x + (n.spdx)
+    n.y = n.y + (n.spdy)
+    n.life = n.life - (1)
     if n.life <= 3 then
       n.radius = .5
     end
@@ -529,8 +529,8 @@ end
 
 function nQ()
   for n in all(v) do
-    n.x += n.spdx
-    n.y += n.spdy
+    n.x = n.x + (n.spdx)
+    n.y = n.y + (n.spdy)
     n.x = (n.x + 135) % 135
     n.y = (n.y + 135) % 135
   end
@@ -569,7 +569,7 @@ function nZ()
       sfx(6)
     end
     if n.fading then
-      n.f += .2
+      n.f = n.f + (.2)
     end
     if n.f >= 0 then
       if n.f < 4 then
@@ -634,21 +634,21 @@ function ex()
   end
   if btn(0) then
     if l.hit_top then
-      l.y += 1
+      l.y = l.y + (1)
     end
-    l.velx -= .5
+    l.velx = l.velx - (.5)
   end
   if btn(1) then
     if l.hit_top then
-      l.y += 1
+      l.y = l.y + (1)
     end
-    l.velx += .5
+    l.velx = l.velx + (.5)
   end
   if btn(2) and not l.hit_top then
-    l.y -= 1
+    l.y = l.y - (1)
   end
   if btn(3) and not l.grounded then
-    l.y += 1
+    l.y = l.y + (1)
   end
   if btnp(4) then
     sfx(0)
@@ -692,8 +692,8 @@ function nU(n)
       local e, d = (n.x - n.px) * .95, (n.y - n.py) * .95
       n.px = n.x
       n.py = n.y
-      n.x += e
-      n.y += d + .2
+      n.x = n.x + (e)
+      n.y = n.y + (d + .2)
     end
     return
   end
@@ -702,8 +702,8 @@ function nU(n)
     local e, d = (n.x - n.px) * .95, (n.y - n.py) * .95
     n.px = n.x
     n.py = n.y
-    n.x += e
-    n.y += d + .1
+    n.x = n.x + (e)
+    n.y = n.y + (d + .1)
   end
   for e = 1, 3 do
     for t = 2, #n.seg do
@@ -712,11 +712,11 @@ function nU(n)
       local l = sqrt(o * o + f * f)
       local n = (l - n.len) / l
       if t > 2 then
-        e.x += o * n * .5
-        e.y += f * n * .5
+        e.x = e.x + (o * n * .5)
+        e.y = e.y + (f * n * .5)
       end
-      d.x -= o * n * .5
-      d.y -= f * n * .5
+      d.x = d.x - (o * n * .5)
+      d.y = d.y - (f * n * .5)
     end
   end
   eB(n, l.x + 4, l.y + 4)
@@ -728,8 +728,8 @@ function eB(n, e, d)
     local e, d = n.x - e, n.y - d
     local o = e * e + d * d
     if o < 8 then
-      n.x += e * .3
-      n.y += d * .3
+      n.x = n.x + (e * .3)
+      n.y = n.y + (d * .3)
     end
   end
 end
@@ -813,8 +813,8 @@ function nV()
       if not n.collected then
         sfx(1)
         n.collected = true
-        U[n.kind] += 1
-        F += 1
+        U[n.kind] = U[n.kind] + (1)
+        F = F + (1)
         eD()
         for e = 1, #c do
           local e = c[e]
@@ -827,7 +827,7 @@ function nV()
       end
     end
     if n.collected and n.collectedf < 5 then
-      n.collectedf += .4
+      n.collectedf = n.collectedf + (.4)
     end
   end
 end
@@ -970,9 +970,9 @@ function ei()
       end
     end
     if o.timer < 8 then
-      o.timer += .2
+      o.timer = o.timer + (.2)
     end
-    o.timer2 += .2
+    o.timer2 = o.timer2 + (.2)
     if o.timer2 > 30 then
       o.showing = false
     end
@@ -1067,7 +1067,7 @@ function nP()
     eL()
   end
   if b.f < 6 then
-    b.f += .4
+    b.f = b.f + (.4)
   else
     r = false
   end
@@ -1121,9 +1121,9 @@ end
 
 function nx(e, d)
   for n in all(e) do
-    n.x += n.spdx / 2
-    n.y += n.spdy
-    n.life += .2
+    n.x = n.x + (n.spdx / 2)
+    n.y = n.y + (n.spdy)
+    n.life = n.life + (.2)
     if n.life > 3.4 then
       n.r = .5
     end
@@ -1151,7 +1151,7 @@ function et()
   for n in all(nq) do
     spr(51, n.x, n.y)
     if not n.active then
-      n.timer += 1
+      n.timer = n.timer + (1)
       if n.timer > 60 then
         n.active = true
       end
@@ -1164,7 +1164,7 @@ function et()
       end
       nx(n.particles, 0)
     else
-      n.timer += .01
+      n.timer = n.timer + (.01)
       local e = sin(n.timer + n.f) * 2
       spr(47, n.x, n.y + e)
       if k(l, n) then
@@ -1234,7 +1234,7 @@ end
 
 function en()
   if w < 65 then
-    w += 1
+    w = w + (1)
   end
   W = (W + 1) % 30
 end
@@ -1287,19 +1287,19 @@ function eu()
     if f < 10 then
       local d = (10 - f) / 10
       if l.velx ~= 0 and e * l.velx < 0 then
-        n.vx += l.velx * d * .6
-        n.vy += l.vely * d * .2
+        n.vx = n.vx + (l.velx * d * .6)
+        n.vy = n.vy + (l.vely * d * .2)
       end
-      n.vy -= d * .2
+      n.vy = n.vy - (d * .2)
     end
-    n.vx *= .92
-    n.vy *= .92
+    n.vx = n.vx * (.92)
+    n.vy = n.vy * (.92)
     if e * l.velx > 0 then
-      n.vx *= .8
+      n.vx = n.vx * (.8)
     end
     n.vx = mid(-1.2, n.vx, 1.2)
-    n.x += n.spdx + n.vx
-    n.y += n.spdy + n.vy
+    n.x = n.x + (n.spdx + n.vx)
+    n.y = n.y + (n.spdy + n.vy)
     n.x = d + (n.x - d) % 128
     n.y = o + (n.y - o) % 128
     circfill(n.x, n.y, n.r, 7)
@@ -1368,7 +1368,7 @@ d = 0
 
 function nM()
   cls()
-  d += 1
+  d = d + (1)
   if n.x % 8 > 4 then
     n.y = 63
   else
@@ -1376,9 +1376,9 @@ function nM()
   end
   if f == 0 then
     if l.x > 97 then
-      l.x -= 1.5
+      l.x = l.x - (1.5)
     elseif n.x < 27 then
-      n.x += 1
+      n.x = n.x + (1)
     end
     if n.x == -30 then
       sfx(7)
@@ -1394,8 +1394,8 @@ function nM()
       eQ()
     end
     if d > 70 then
-      e.x += 4
-      e.y += .25
+      e.x = e.x + (4)
+      e.y = e.y + (.25)
     end
     if e.x > 97 then
       e.x = -10
@@ -1419,7 +1419,7 @@ function nM()
   if f == 4 then
     print("+3 xp", X.x, X.y, 3)
     if X.y > 68 then
-      X.y -= .2
+      X.y = X.y - (.2)
     end
     if d > 120 then
       h()
@@ -1430,7 +1430,7 @@ function nM()
       sfx(7)
       n.flip_x = true
     end
-    n.x -= 1
+    n.x = n.x - (1)
     if d == 180 then
       h()
     end
@@ -1496,7 +1496,7 @@ function eQ()
 end
 
 function h()
-  f += 1
+  f = f + (1)
   d = 0
 end
 
@@ -1506,10 +1506,10 @@ function ee()
   map()
   spr(91, e.x, e.y)
   for n in all(e.particles) do
-    n.x += n.spdx
-    n.y += n.spdy
+    n.x = n.x + (n.spdx)
+    n.y = n.y + (n.spdy)
     circfill(n.x, n.y, n.r, 8 + rnd(2))
-    n.t += 1
+    n.t = n.t + (1)
     if e.x > 0 then
       if n.t > 6 then
         n.x = e.x + rnd(7)
@@ -1549,14 +1549,14 @@ function e8()
     return
   end
   if D == 2 then
-    D -= 1
+    D = D - (1)
     eS()
   elseif D > 0 then
-    D -= 1
+    D = D - (1)
   end
   for n in all(Z) do
     if D < 2 then
-      n.r -= rnd(.2)
+      n.r = n.r - (rnd(.2))
       if n.r < 0 then
         del(Z, n)
       end
@@ -1589,7 +1589,7 @@ end
 
 function nO()
   if L > 0 then
-    L -= 1
+    L = L - (1)
     if L <= 0 then
       E = 0
     end
@@ -1611,7 +1611,7 @@ function e5(e, d)
   if j <= 0 and _ <= 0 then
     return
   end
-  nA += .1
+  nA = nA + (.1)
   local n = #M * 4
   e = mid(i * 128 + 4, e, i * 128 + 128 - n - 4)
   d = mid(a * 128 + 4, d, a * 128 + 128 - 6 - 4)
@@ -1690,9 +1690,9 @@ function N(e, f, n, t)
   for n = 1, #e do
     if e[n][f] then
       if n <= 16 then
-        d |= 1 << n - 1
+        d = d | (1 << n - 1)
       else
-        o |= 1 << n - 17
+        o = o | (1 << n - 17)
       end
     end
   end
@@ -1735,8 +1735,8 @@ function eX()
       ni(n[3], n[4], n.kind)
     end
     if n.coin_found then
-      U[n.kind] += 1
-      F += 1
+      U[n.kind] = U[n.kind] + (1)
+      F = F + (1)
     end
   end
 end
@@ -1749,8 +1749,8 @@ function eW()
   O(s, "collected", 12, 15)
   for n = 1, #s do
     if s[n].collected then
-      U[s[n].kind] += 1
-      F += 1
+      U[s[n].kind] = U[s[n].kind] + (1)
+      F = F + (1)
     end
   end
 end

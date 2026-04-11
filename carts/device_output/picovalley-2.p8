@@ -160,10 +160,10 @@ function _update()
   if time() > minute_timer then
     --simulating time
     if game == 1 then
-      minute += 10
+      minute = minute + (10)
       if minute > 50 then
         minute = 0
-        hour += 1
+        hour = hour + (1)
         if hour > 23 then
           sleep()
         end
@@ -218,7 +218,7 @@ function _update()
     end
     --managing items
     if btnp(4) and #dia == 0 and is_fishing == false then
-      chosen_item += 1
+      chosen_item = chosen_item + (1)
       if chosen_item > #p.inv then
         chosen_item = 1
       end
@@ -245,7 +245,7 @@ function _update()
           --if at correct position port
           --the player there
           transition()
-          if temp != 217 and temp != 218 then
+          if temp ~= 217 and temp ~= 218 then
             if p_pos_x == 41 then
               outside_x = px
               outside_y = py - 12
@@ -264,7 +264,7 @@ function _update()
       --set swimming
       is_swimming = true
       if rnd(5) < 1 then
-        energy += 1
+        energy = energy + (1)
       end
       if energy > maxenergy then
         energy = maxenergy
@@ -295,7 +295,7 @@ function _update()
       if temp == 6 or temp == 2 then
         if #p.inv > 0 then
           --plant plants
-          p.inv[chosen_item][2] -= 1
+          p.inv[chosen_item][2] = p.inv[chosen_item][2] - (1)
           if p.inv[chosen_item][1] == "tOMATO\xe2\x96\x91" then
             addchar(tempx, tempy, "tomato")
           elseif p.inv[chosen_item][1] == "sUNFLOWER\xe2\x96\x91" then
@@ -304,7 +304,7 @@ function _update()
             addchar(tempx, tempy, "strawberry")
           else
             mset(tempx, tempy, 6)
-            p.inv[chosen_item][2] += 1
+            p.inv[chosen_item][2] = p.inv[chosen_item][2] + (1)
           end
         end
       elseif fget(temp, 2) then
@@ -318,7 +318,7 @@ function _update()
         --and save wares-value
         sell_value = 0
         for i in all(sell) do
-          sell_value += i[2] * i[3]
+          sell_value = sell_value + (i[2] * i[3])
         end
         dset(63, sell_value)
         save_game()
@@ -328,7 +328,7 @@ function _update()
         --find artifacts
         mset(tempx, tempy, 3)
         if artifacts_found < #artifacts then
-          artifacts_found += 1
+          artifacts_found = artifacts_found + (1)
           dia = {"you found", artifacts[artifacts_found]}
         else
           dia = split_str("the mole problem is getting worse")
@@ -339,7 +339,7 @@ function _update()
         mset(tempx, tempy, 6)
       elseif temp == 19 then
         --water plants
-        energy -= 1
+        energy = energy - (1)
         xplode(tempx * 8 + 4, tempy * 8 + 4, 12)
         sfx(2)
         mset(tempx, tempy, 18)
@@ -359,14 +359,14 @@ function _update()
         add_sell(p.inv[chosen_item][1], 1, p.inv[chosen_item][3])
         --add sell sound
         xplode(tempx * 8 + 4, tempy * 8 + 2, 10)
-        p.inv[chosen_item][2] -= 1
+        p.inv[chosen_item][2] = p.inv[chosen_item][2] - (1)
       elseif temp == 24 or temp == 8 then
         --sleep	
         sleep()
       elseif temp == 65 then
         --buy sunflower seeds
         if money >= 5 then
-          money -= 5
+          money = money - (5)
           add_item("sUNFLOWER\xe2\x96\x91", 1, 3)
         else
           dia = split_str("you need 5\xe2\x97\x8f to buy these seeds")
@@ -374,7 +374,7 @@ function _update()
       elseif temp == 66 then
         --buy tomato seeds
         if money > 5 then
-          money -= 5
+          money = money - (5)
           add_item("tOMATO\xe2\x96\x91", 1, 3)
         else
           dia = split_str("you need 5\xe2\x97\x8f to buy these seeds")
@@ -382,7 +382,7 @@ function _update()
       elseif temp == 83 then
         --buy strawberry seeds
         if money >= 10 then
-          money -= 10
+          money = money - (10)
           add_item("strawberry\xe2\x96\x91", 1, 3)
         else
           dia = split_str("you need 10\xe2\x97\x8f to buy these seeds")
@@ -397,7 +397,7 @@ function _update()
       elseif temp == 82 then
         --donate to museum
         if artifacts_found > artifacts_given then
-          artifacts_given += 1
+          artifacts_given = artifacts_given + (1)
           dia = split_str("thank you for your donation!")
           update_artifacts()
         elseif artifacts_given == 14 then
@@ -414,8 +414,8 @@ function _update()
             dia = split_str("hi! would you like to buy some chicken for your coop? they are 500\xe2\x97\x8f each.")
           else
             if money >= 500 then
-              money -= 500
-              chicks += 1
+              money = money - (500)
+              chicks = chicks + (1)
               dia = split_str("here you go, ill bring her by tomorrow morning. and you don't need to feed them, they live on the towns scraps.")
             else
               dia = split_str("sorry, but you need 500\xe2\x97\x8f to buy one chicken.")
@@ -430,8 +430,8 @@ function _update()
             dia = split_str("would you like to buy some cows for your barn? they are 700\xe2\x97\x8f each.")
           else
             if money >= 700 then
-              money -= 700
-              cows += 1
+              money = money - (700)
+              cows = cows + (1)
               dia = split_str("here you go, ill bring her by tomorrow morning. and you don't need to feed them, they eat the grass on your farm.")
             else
               dia = split_str("sorry, but you need 700\xe2\x97\x8f to buy one cow.")
@@ -445,10 +445,10 @@ function _update()
           if build_progress == i[1] then
             if test_req(i[2], i[3], i[4]) then
               dia = split_str("perect! it'll be done by tomorrow. sleep tight!")
-              build_progress += 1
-              wood -= i[2]
-              stone -= i[3]
-              money -= i[4]
+              build_progress = build_progress + (1)
+              wood = wood - (i[2])
+              stone = stone - (i[3])
+              money = money - (i[4])
             else
               dia = split_str(i[5])
             end
@@ -487,7 +487,7 @@ function _update()
     elseif btnp(4) and game2_state == 0 then
       game2_state = 1
       sell_scroll = 0
-      money += sell_value
+      money = money + (sell_value)
       sell = {}
     end
     if #sell == 0 then
@@ -513,7 +513,7 @@ function _draw()
     rectfill(0, 0, 64, 64, 1)
     for i in all(clouds) do
       ovalfill(i.x, i.y, i.x + i.size, i.y + i.size / 2, i.c)
-      i.x += i.xdir
+      i.x = i.x + (i.xdir)
       if i.x < -100 or i.x > 100 then
         if rnd(10) < 5 then
           i.x = 64
@@ -626,7 +626,7 @@ function _draw()
     --inventory text
     if #p.inv > 0 then
       if chosen_item > #p.inv then
-        chosen_item -= 1
+        chosen_item = chosen_item - (1)
       end
       rectfill(cx, cy + 59, cx + 64, cy + 64, gui_color)
       printm(p.inv[chosen_item][1] .. "X" .. p.inv[chosen_item][2], 59)
@@ -636,7 +636,7 @@ function _draw()
       rectfill(cx, cy + 49, cx + 63, cy + 63, gui_color)
       rect(cx, cy + 49, cx + 63, cy + 63, 1)
       printm(dia[1], 51)
-      if dia[2] != nil then
+      if dia[2] ~= nil then
         printm(dia[2], 57)
       end
     end
@@ -652,20 +652,20 @@ function _draw()
       for i in all(sell) do
         printm(i[1], selly + sell_scroll)
         printm(i[2] .. "X " .. i[3] .. "\xe2\x97\x8f", selly + 6 + sell_scroll)
-        selly += 12
-        sell_value += i[2] * i[3]
+        selly = selly + (12)
+        sell_value = sell_value + (i[2] * i[3])
         maxy = selly + 6 + sell_scroll
       end
-      if maxy > 58 and sell_scroll != -maxy then
+      if maxy > 58 and sell_scroll ~= -maxy then
         print("3", cx + 56, cy + 51)
       end
       if sell_scroll < 0 then
         print("2", cx + 56, cy + 1)
       end
       if btn(3) and sell_scroll > -maxy and maxy > 58 then
-        sell_scroll -= 1
+        sell_scroll = sell_scroll - (1)
       elseif btn(2) and sell_scroll < 0 then
-        sell_scroll += 1
+        sell_scroll = sell_scroll + (1)
       end
       rectfill(cx, cy + 58, cx + 64, cy + 64, 2)
       printm("tOTAL: " .. sell_value .. "\xe2\x97\x8f", 58, 7)
@@ -682,7 +682,7 @@ function _draw()
     rectfill(cx, cy, cx + trans + 5, cy + 64)
     rectfill(cx + 59 - trans, cy, cx + 64, cy + 64)
     fillp()
-    trans -= 4
+    trans = trans - (4)
   end
 end
 
@@ -730,21 +730,21 @@ function check_lovers(frame, x, y)
     if i.frame == frame then
       --begin options
       --offer a gift if sth is held
-      if #p.inv > 0 and i.given_gift == false and i.offered_gift != p.inv[chosen_item][1] then
+      if #p.inv > 0 and i.given_gift == false and i.offered_gift ~= p.inv[chosen_item][1] then
         dia = split_str("do you want to give " .. p.inv[chosen_item][1] .. " to " .. i.name .. "?")
         i.offered_gift = p.inv[chosen_item][1]
       elseif #p.inv > 0 and i.given_gift == false and i.offered_gift == p.inv[chosen_item][1] then
         if i.likes == p.inv[chosen_item][1] then
           dia = split_str("thank you, i love " .. p.inv[chosen_item][1] .. "!")
           if i.friendshiplevel < 10 then
-            i.friendshiplevel += 1
+            i.friendshiplevel = i.friendshiplevel + (1)
           end
           new_part(tempx * 8 + 2, tempy * 8, 0, -rnd(.25), 1, -1)
         else
           dia = split_str(p.inv[chosen_item][1] .. "... thank you, i guess.")
         end
         i.given_gift = true
-        p.inv[chosen_item][2] -= 1
+        p.inv[chosen_item][2] = p.inv[chosen_item][2] - (1)
       elseif #p.inv == 0 or i.given_gift == true then
         dia = split_str(i.text[flr(i.friendshiplevel / 3) + 1])
       end
@@ -792,11 +792,11 @@ function test_req(rwood, rstone, rmoney)
 end
 
 function generate_mines()
-  mine_level += 1
+  mine_level = mine_level + (1)
   for i in all(pp) do
     if i.name == "boulder" or i.name == "bat" or i.name == "crystal" or i.name == "metal" or i.name == "stone" or i.name == "batwing" then
       if i.name == "boulder" then
-        mine_stones_left -= 1
+        mine_stones_left = mine_stones_left - (1)
         mset(i.x / 8, i.y / 8, 16)
       end
       del(pp, i)
@@ -808,7 +808,7 @@ function generate_mines()
         mset(x, y, 16)
       end
       if mget(x, y) == 16 and mine_stones_left < mine_stones_max and rnd(10) < 1 then
-        mine_stones_left += 1
+        mine_stones_left = mine_stones_left + (1)
         addchar(x, y, "boulder")
       elseif mget(x, y) == 16 and rnd(70) < 1 then
         addchar(x, y, "bat")
@@ -823,7 +823,7 @@ function add_sell(what, nr, val)
   local value = val or 5
   for i in all(sell) do
     if i[1] == what then
-      i[2] += nr
+      i[2] = i[2] + (nr)
       done = true
     end
   end
@@ -863,7 +863,7 @@ function progress()
       mset(i.pos[1], i.pos[2], i.frame)
     end
     --if returned from prairie king
-    if dget(0) != 0 then
+    if dget(0) ~= 0 then
       given_gift = true
     end
   end
@@ -933,7 +933,7 @@ function progress()
   --setting the blank farmspaces
   --back to seeded spaces via pp
   for i in all(pp) do
-    if mget(flr(i.x / 8), flr(i.y / 8)) != 19 and i.plant == 1 then
+    if mget(flr(i.x / 8), flr(i.y / 8)) ~= 19 and i.plant == 1 then
       if i.age < 3 then
         mset(flr(i.x / 8), flr(i.y / 8), 19)
       else
@@ -961,7 +961,7 @@ function water(value)
           if check_m == 1 then
             --grass
             addchar(i, l, grass_loot_table[ceil(rnd(#grass_loot_table))])
-            rnd_stuff_count += 1
+            rnd_stuff_count = rnd_stuff_count + (1)
           end
           if check_m == 3 and rnd(10) < 5 and spawn_mound == true then
             mset(i, l, 14)
@@ -1010,15 +1010,15 @@ function check_pos(x, y)
         add_item(i.name, 1, i.value)
         del(pp, i)
       elseif i.name == "wood" then
-        wood += 1
+        wood = wood + (1)
         sfx(1)
         del(pp, i)
-        rnd_stuff_count -= 1
+        rnd_stuff_count = rnd_stuff_count - (1)
       elseif i.name == "chicken" or i.name == "cow" or i.name == "cat" then
         sfx(7)
         new_part(i.x + 2, i.y, 0, -rnd(.25), 1, -1)
       elseif i.name == "stone" then
-        stone += 1
+        stone = stone + (1)
         sfx(1)
         del(pp, i)
       elseif i.name == "bat" then
@@ -1029,9 +1029,9 @@ function check_pos(x, y)
       elseif i.name == "boulder" then
         sfx(3)
         xplode(i.x + 4, i.y + 4, 6)
-        mine_stones_left -= 1
+        mine_stones_left = mine_stones_left - (1)
         mset(i.x / 8, i.y / 8, 16)
-        energy -= 1
+        energy = energy - (1)
         if flr(rnd(mine_stones_left * mine_stones_left) + 1) == 1 or mine_stones_left == 1 then
           --spawning the stairs
           mset(i.x / 8, i.y / 8, 50)
@@ -1054,7 +1054,7 @@ function check_pos(x, y)
         add_item(i.name, 1, i.value)
         del(pp, i)
         if mine_level == 0 then
-          rnd_stuff_count -= 1
+          rnd_stuff_count = rnd_stuff_count - (1)
         end
       end
     end
@@ -1162,8 +1162,8 @@ function addchar(x, y, name, age)
   p.grow = function()
     if p.plant == 1 then
       if p.age < 3 and mget(flr(p.x / 8), flr(p.y / 8)) == 18 then
-        p.age += 1
-        p.frame += 1
+        p.age = p.age + (1)
+        p.frame = p.frame + (1)
       elseif p.age < 3 and mget(flr(p.x / 8), flr(p.y / 8)) == 19 then
         --let dry plants die
         mset(flr(p.x / 8), flr(p.y / 8), 6)
@@ -1204,10 +1204,10 @@ function addchar(x, y, name, age)
       end
       --moving characters
       if colli(p.x + p.dirx, p.y) == 1 then
-        p.x += p.dirx
+        p.x = p.x + (p.dirx)
       end
       if colli(p.x, p.y + p.diry) == 1 then
-        p.y += p.diry
+        p.y = p.y + (p.diry)
       end
     end
     --chicken brain
@@ -1217,10 +1217,10 @@ function addchar(x, y, name, age)
           p.dirx = rnd(.25) - .5
           p.diry = rnd(.25) - .5
           if rnd(10) < 5 then
-            p.dirx *= -1
+            p.dirx = p.dirx * (-1)
           end
           if rnd(10) < 5 then
-            p.diry *= -1
+            p.diry = p.diry * (-1)
           end
           p.brain_cd = time() + rnd(1)
         else
@@ -1237,15 +1237,15 @@ function addchar(x, y, name, age)
       if p.name == "bat" then
         if dist(p.x, p.y, px, py) < 3 then
           xplode(p.x, p.y)
-          energy -= 10
+          energy = energy - (10)
           del(pp, p)
         end
       end
       if colli(p.x + p.dirx, p.y) == 1 then
-        p.x += p.dirx
+        p.x = p.x + (p.dirx)
       end
       if colli(p.x, p.y + p.diry) == 1 then
-        p.y += p.diry
+        p.y = p.y + (p.diry)
       end
     end
   end
@@ -1253,12 +1253,12 @@ function addchar(x, y, name, age)
     if p.name == "bat" then
       spr(p.frame + anim, p.x, p.y, 1, 1, p.flip)
     else
-      if p.name != "player" then
+      if p.name ~= "player" then
         spr(p.frame, p.x, p.y, 1, 1, p.flip)
       end
     end
     if p.name == "player" and is_swimming == false then
-      if p.dirx != 0 or p.diry != 0 then
+      if p.dirx ~= 0 or p.diry ~= 0 then
         spr(113 + anim, p.x, p.y, 1, 1, p.flip)
       else
         spr(112, p.x, p.y, 1, 1, p.flip)
@@ -1275,7 +1275,7 @@ function add_item(what, howmuch, price)
   local done = false
   for i in all(pp[1].inv) do
     if i[1] == what then
-      i[2] += nr
+      i[2] = i[2] + (nr)
       done = true
     end
   end
@@ -1309,8 +1309,8 @@ function draw_part()
       pset(i.x, i.y, i.c)
     end
     --simulate
-    i.x += i.xs
-    i.y += i.ys
+    i.x = i.x + (i.xs)
+    i.y = i.y + (i.ys)
     --kill
     if time() > i.t then
       del(part, i)
@@ -1335,14 +1335,14 @@ function sleep()
   else
     --take away some items
     for i in all(pp[1].inv) do
-      i[2] -= flr(rnd(3))
+      i[2] = i[2] - (flr(rnd(3)))
     end
     energy = flr(maxenergy / 2)
   end
   --sleep
   game = 2
   mine_level = 0
-  day += 1
+  day = day + (1)
   hour = 7
   minute = 0
   game2_state = 0
@@ -1523,15 +1523,15 @@ function get_slot_code(x, y)
   for i in all(pp) do
     if i.x / 8 == x and i.y / 8 == y then
       if i.name == "tomato" then
-        ret += 5
+        ret = ret + (5)
       end
       if i.name == "sunflower" then
-        ret += 10
+        ret = ret + (10)
       end
       if i.name == "strawberry" then
-        ret += 15
+        ret = ret + (15)
       end
-      ret += i.age
+      ret = ret + (i.age)
     end
   end
   return ret
@@ -1610,20 +1610,20 @@ function do_fishing()
     spr(115, cx + 30, cy + 51 - fish_y)
     --making the fish bar work
     if btn(5) then
-      bar_y += 2
+      bar_y = bar_y + (2)
       if bar_y + bar_size > 39 then
         bar_y = 39 - bar_size
       end
     end
     if bar_y > 0 then
-      bar_y -= 1
+      bar_y = bar_y - (1)
     end
     --moving the fish
     if time() > fish_move_cd then
       fish_move_cd = time() + rnd(.5)
       fish_dir = rnd(fish[what_fish][2]) - (fish[what_fish][2] / 2)
     end
-    fish_y += fish_dir
+    fish_y = fish_y + (fish_dir)
     if fish_y > 38 then
       fish_y = 38
       fish_move_cd = 0
@@ -1634,10 +1634,10 @@ function do_fishing()
     --checking wether the fish is
     --caught or not
     if bar_y - bar_size < fish_y - 12 and bar_y > fish_y - 12 then
-      fish_progress += 1
+      fish_progress = fish_progress + (1)
     else
       if fish_progress > 0 then
-        fish_progress -= 1
+        fish_progress = fish_progress - (1)
       end
     end
     if fish_progress >= 100 then

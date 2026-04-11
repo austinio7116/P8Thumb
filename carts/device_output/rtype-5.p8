@@ -49,19 +49,19 @@ function pd_draw(index, cx, cy, s_start, h_flip, v_flip, s_end)
       cmd = {unpack(brush_c[index][i])}
     else
       cmd = {ord(brush_s[index], i, 6)}
-      cmd[1] += 46
+      cmd[1] = cmd[1] + (46)
       for j = 1, 5 do
-        cmd[j] -= 78
+        cmd[j] = cmd[j] - (78)
       end
       cmd[7] = (cmd[6] & 240) >> 4
-      cmd[6] &= 15
+      cmd[6] = cmd[6] & (15)
       if cmd[1] == 10 then
         cmd[8], cmd[7] = cmd[7] % 2 == 1, cmd[7] // 2 == 1
       end
       if cmd[1] == 11 then
         add(cmd, index, 2)
-        cmd[6] *= 8
-        cmd[7] *= 8
+        cmd[6] = cmd[6] * (8)
+        cmd[7] = cmd[7] * (8)
         cmd[8] = i - 6
       end
       brush_c[index][i] = {unpack(cmd)}
@@ -77,10 +77,10 @@ function pd_draw(index, cx, cy, s_start, h_flip, v_flip, s_end)
         _fillp(-dither_p[c6] + .5, -ecx, -ecy)
       end
     end
-    if h_flip and h_flip != 0 then
+    if h_flip and h_flip ~= 0 then
       _flip(pdx, h_flip, pdox, pdon)
     end
-    if v_flip and v_flip != 0 then
+    if v_flip and v_flip ~= 0 then
       _flip(pdx + 1, v_flip, pdoy, pdon + 1)
     end
     _ENV[split("rect,oval,line,map,select,rectfill,ovalfill,tri,pset,spr,pd_draw,,trifill")[cc]](unpack(cmd))
@@ -92,14 +92,14 @@ end
 function pd_rotate(x, y, rot, mx, my, w, flip, scale)
   scale = scale or 1
   rot = rot // .05 * .05
-  w *= scale * 4
+  w = w * (scale * 4)
   local cs, ss = rot_coord(rot, .125 / scale)
   local sx, sy = mx + .5 + cs * -w, my + w / 8 + ss * -w
   local hx = flip and -w or w
   local halfw = -w
   for py = y - w, y + w do
     tline(x - hx, py, x + hx, py, sx - ss * halfw, sy + cs * halfw, cs, ss)
-    halfw += 1
+    halfw = halfw + (1)
   end
 end
 
@@ -156,9 +156,9 @@ function _init()
       local l = peek(0x2830 + (i \ 64) * 128 + i % 64)
       for xs = 0, l % 128 do
         sset(x, y, l // 128 * 1)
-        x += 1
+        x = x + (1)
         if x > 127 then
-          y += 1
+          y = y + (1)
           x = 0
         end
       end
@@ -171,7 +171,7 @@ function _init()
         for i = 0, 3 - y * x % 4 do
           pal(1, split "4,9,6,10" [i + 1])
           sspr(x * 32, y * 32, 32, 32, x * 32 + i, y * 32 + i, s, s)
-          s -= i / 2 + 2
+          s = s - (i / 2 + 2)
         end
       end
     end
@@ -199,8 +199,8 @@ function bbox(e, ky)
     y1 = y2
     y2 = ky
   end
-  x2 -= 1
-  y2 -= 1
+  x2 = x2 - (1)
+  y2 = y2 - (1)
 end
 
 function bull_create(parent, ...)
@@ -294,8 +294,8 @@ end
 
 function bull_visibility(b)
   local bbox, _ENV = bbox, b
-  x += dx
-  y += dy
+  x = x + (dx)
+  y = y + (dy)
   bbox(b)
   if x1 > 132 or x2 < -4 or y2 < 0 or y1 > 120 then
     w = -128
@@ -310,7 +310,7 @@ function bull_update(b)
 
   id = b.id
   if id == 3 then
-    b.x -= cam_sx
+    b.x = b.x - (cam_sx)
     local bull_visibility, _ENV = bull_visibility, b
     f = not f
     if collide_map(x, y + dy) then
@@ -331,18 +331,18 @@ function bull_update(b)
     if c and not collide_map(x + ox, y) then
       if cnt == 0 then
         oy, cnt = -oy, 1
-        x += ox
-        y += dy
+        x = x + (ox)
+        y = y + (dy)
       end
     else
       dy = oy
     end
-    sx += 1
+    sx = sx + (1)
   else
-    b.cnt += 1
+    b.cnt = b.cnt + (1)
     b.r = 0
     if id == 91 then
-      b.dy += .04
+      b.dy = b.dy + (.04)
     elseif id == 97 and b.cnt > 32 then
       b.dy, b.dx = b.dy * .92, sgn(b.dx) * 1.2
     elseif id == 7 and b.cnt > 8 and b.closest then
@@ -354,30 +354,30 @@ function bull_update(b)
       for fb in all(r9_bullet) do
         if intersects(fb, b) then
           b.w = 0
-          fb.w -= 1
+          fb.w = fb.w - (1)
           explo_create(b.x2, b.y, 8)
         end
       end
     end
     if level_collide(b) then
       if any(id, "0,4,7,6,91,97,90") then
-        b.w -= b.w
+        b.w = b.w - (b.w)
       elseif id == 1 and b.w > -128 then
         sfx(5)
         local cam_x, _ENV = cam_x, b
         if dy == 0 or (x + cam_x + w / 2) % 32 <= dx then
           dx, w = -dx, -w
-          x += dx
-          sx += 1
+          x = x + (dx)
+          sx = sx + (1)
         else
           dy, h = -dy, -h
-          y += dy
-          sx += 1
+          y = y + (dy)
+          sx = sx + (1)
         end
       elseif id == 2 then
-        b.w -= min(b.w, 4)
+        b.w = b.w - (min(b.w, 4))
       elseif id == 5 then
-        b.w -= min(b.w, 8)
+        b.w = b.w - (min(b.w, 8))
         if b.w < 8 then
           explo_create(b.x, b.y, 16)
         end
@@ -393,7 +393,7 @@ function bull_update(b)
   if b.w == 0 or b.w <= -128 or ((id == 1 or id == 3) and b.sx > 16 * id) then
     del(t, b)
     if id == 1 then
-      lasers -= 1
+      lasers = lasers - (1)
     elseif any(id, "7,91,97") then
       explo_create(b.x, b.y, -16)
       if id == 7 then
@@ -414,9 +414,9 @@ function e_def(e, k)
   local eid, x, y, x1 = e_local(e)
   e.atn = atan2(r9.x - x, r9.y - y - e_delta_y(e))
   if e.hit > 0 then
-    e.hit -= 1
+    e.hit = e.hit - (1)
   end
-  if e.hp != 0 then
+  if e.hp ~= 0 then
     e.dmg = 0
     for b in all(r9_bullet) do
       --no foreach
@@ -428,15 +428,15 @@ function e_def(e, k)
           end
           e.dmg = g.any(id, "0,7") and 1 or g.force_power * 1.1
         elseif id == 5 then
-          w -= e.hp > 1 and min(w, 8) or 0
+          w = w - (e.hp > 1 and min(w, 8) or 0)
           e.dmg = w // 4 + 2
           break
         end
       end
     end
     e_hit(e)
-    if eid != 15 and eid != 18 and e.tshot > 0 and ((x < 128 or eid == 23)) and e.hp < 99 then
-      e.tshot -= 1
+    if eid ~= 15 and eid ~= 18 and e.tshot > 0 and ((x < 128 or eid == 23)) and e.hp < 99 then
+      e.tshot = e.tshot - (1)
       if eid == 10 or eid == 28 then
         for i = 0, 7 do
           if e.tshot == i * 20 then
@@ -467,7 +467,7 @@ function e_def(e, k)
           for i = 0, 3 do
             bull_create(e_bullet, 96, x, y + shell.delta, 4, 4, -1.5, (i - 1) // 2)
           end
-        elseif eid < 23 and eid != 16 then
+        elseif eid < 23 and eid ~= 16 then
           bull_create(e_bullet, 90, x, y + e_delta_y(e), 2, 2, bsx, bsy)
         end
       end
@@ -477,7 +477,7 @@ function e_def(e, k)
     end
   else
     explo_create(x, y + e_delta_y(e), e.w > 6 and 32 or 24)
-    r9_score += e.score
+    r9_score = r9_score + (e.score)
     if eid == 20 then
       bull_create(e_bullet, abs(e.who), x, y, 4, 4, -cam_sx, 0)
     end
@@ -500,7 +500,7 @@ function e_def(e, k)
 end
 
 function e_delta_y(e)
-  return (e.i and e.id > 20 and (e.id != 23 or e.y == 110)) and shell.delta or 0
+  return (e.i and e.id > 20 and (e.id ~= 23 or e.y == 110)) and shell.delta or 0
 end
 
 function e_draw(e)
@@ -545,7 +545,7 @@ function e_draw(e)
       esd(46, 2, 2, dx > 0)
     end, nil, nil, function()
       --10
-      e.r += (e.tshot < 160 and e.tshot > 110) and -.005 or (e.tshot > 190 and e.r < 0) and .005 or 0
+      e.r = e.r + ((e.tshot < 160 and e.tshot > 110) and -.005 or (e.tshot > 190 and e.r < 0) and .005 or 0)
       pd_rotate(x + (f and 0 or -2), y, e.r, 122.5, 2.5, 3, f)
       pal_d "1,3,3,12,5,6,7,8,6"
       e_legs(e)
@@ -562,7 +562,7 @@ function e_draw(e)
       esd(212)
     end, function()
       local vf = e.r > 0
-      spr(133, x1, y1 + (vf and 24 or 0), 3, 1, f != (y1 % 8 < 4), vf)
+      spr(133, x1, y1 + (vf and 24 or 0), 3, 1, f ~= (y1 % 8 < 4), vf)
       spr(149, x1, y1 + (vf and 0 or 8), 3, 3, f, vf)
     end, function()
       esd(50)
@@ -602,10 +602,10 @@ function e_draw(e)
       esd(58, 2, 1, true)
       if e.tshot < 40 then
         r = 16 + rnd(16)
-        e.h += r
+        e.h = e.h + (r)
         bbox(e)
         sspr(104, 96, 8, 16, x1 + 2, y2, 12, e.h)
-        e.h -= r
+        e.h = e.h - (r)
       end
     end, function()
       esd(188, 4, 1, false, true)
@@ -647,7 +647,7 @@ function e_hit(e)
   if hit > 0 or hp == 99 then
     return
   end
-  if ((id == 30 and dmg > 1) or (id != 30 and dmg > 0)) then
+  if ((id == 30 and dmg > 1) or (id ~= 30 and dmg > 0)) then
     hp = max(hp - dmg)
     if hp > 1 then
       hit = 12
@@ -677,12 +677,12 @@ function e_visible(e)
     i = id == 18 and 1 or idx
     local ws = (2 ^ i & who)
     tshot = ws > 1 and (g.rnd(shot) + 1) // 1 or ws * shot
-    x -= g.cam_x
+    x = x - (g.cam_x)
     if id == 20 then
       f = who < 0
-      x -= (f and 132 or 0)
+      x = x - ((f and 132 or 0))
     elseif id == 22 then
-      y -= i * 8 * g.sgn(copy)
+      y = y - (i * 8 * g.sgn(copy))
     end
   end
 
@@ -703,9 +703,9 @@ function e_visible(e)
       end
       local _ENV = et
       if y < 0 then
-        y -= i * dw
+        y = y - (i * dw)
       else
-        x += i * dw
+        x = x + (i * dw)
       end
     end
   end
@@ -728,8 +728,8 @@ function e_update(e)
       end
     end
 
-    if respawn_t == 0 and e.id != 2 then
-      e.x -= cam_sx
+    if respawn_t == 0 and e.id ~= 2 then
+      e.x = e.x - (cam_sx)
     end
     foreach(missiles, bull_homing)
     local f_exp, g, cam_x, rnd, bbox, map_collide, shell, rot_coord, e_def, _ENV = f_exp, _ENV, cam_x, rnd, bbox, map_collide, shell, rot_coord, e_def, e
@@ -740,7 +740,7 @@ function e_update(e)
         hp = -5 * i
       end
       if hp < 0 then
-        hp += 1
+        hp = hp + (1)
       end
       r, ox = not x1 and .07 * i or (r + .00225) % 1, x
       c, s = rot_coord(r, 40)
@@ -751,12 +751,12 @@ function e_update(e)
       c, s = rot_coord(r + i / 28, 2.5 * i)
       c1 = rot_coord(2 * r + i / 28, 1.5 * i)
       kx, ky = c1 + 4, s + 4 - 2.5 * i
-      x += kx
+      x = x + (kx)
       --this could be like other "snakes"
-      y += ky
+      y = y + (ky)
       e_def(e)
-      x -= kx
-      y -= ky
+      x = x - (kx)
+      y = y - (ky)
       r = (r + .0075) % 1
     elseif (id == 2 and shell.x) or id == 5 then
       hp, mul = (i < 2 or i > 7) and 255 or (cam_x == 1454 and y > 64) and 1 or hp, .003
@@ -780,41 +780,41 @@ function e_update(e)
         end
         dx, dy = (shell.px - x) / 14, (shell.py - y) / 14
         r = atan2(dx, dy)
-        x += dx
+        x = x + (dx)
         if cam_x == 1454 then
-          x += (x < 64 and -7 or 7) * mul * min(i, 5)
+          x = x + ((x < 64 and -7 or 7) * mul * min(i, 5))
         end
-        y += dy
+        y = y + (dy)
       elseif id == 5 and g.c_stage == 1 then
-        x -= 2
+        x = x - (2)
         r = (r + .05) % 1
         if not dy then
           dy = ady // 1 > 24 and -.75 * sgy or 0
         end
         if x < 72 then
-          y += dy
+          y = y + (dy)
         end
       elseif i == 0 then
         if id == 5 or cam_x < 1430 then
           local sk = os % 1 / 44
           if x < 8 or x > 158 or y < 8 or y > 112 then
-            os += .25
-            r += sk
+            os = os + (.25)
+            r = r + (sk)
           --@GregodEl
           elseif rnd() < .05 then
             os = rnd(1)
-            r += sk
+            r = r + (sk)
           end
         else
           pr, r = r, (r + mul) % 1
         end
-        x += (id == 5 and -1 or 1) * cos(r)
-        y += sin(r)
+        x = x + ((id == 5 and -1 or 1) * cos(r))
+        y = y + (sin(r))
       end
       shell.px, shell.py = x, y
       e_def(e)
     elseif id == 3 or id > 20 and id < 29 then
-      x += (cam_x % 60 < 16 and cam_x < 1390) and 0 or g.cam_sx
+      x = x + ((cam_x % 60 < 16 and cam_x < 1390) and 0 or g.cam_sx)
       local w = e_def(e)
       if shell.x1 then
         if id == 3 then
@@ -826,7 +826,7 @@ function e_update(e)
           local v = g.split "180,310,.075,900,1004,.075,1360,1440,.075,1470,1500,.075,310,900,-.075,1010,1350,-.075"
           for i = 1, 18, 3 do
             if v[i] < cam_x and cam_x < v[i + 1] then
-              delta += v[i + 2]
+              delta = delta + (v[i + 2])
               break
             end
           end
@@ -834,16 +834,16 @@ function e_update(e)
           y = 62 + delta
         else
           if (id == 23 or id == 25) and x < 62 * (id == 25 and 1 or 2.2) then
-            x -= .15
+            x = x - (.15)
             y = id == 25 and 76 or (y > 88 and 76 or min(y + .25, 88))
             e_def(e)
           else
-            y1 += shell.delta
-            y2 += shell.delta
+            y1 = y1 + (shell.delta)
+            y2 = y2 + (shell.delta)
             if id == 28 then
               r = (r + .002) % 3
               if x2 < 132 then
-                x += cos(r) / 6
+                x = x + (cos(r) / 6)
               end
               if w then
                 g.do_ending()
@@ -851,7 +851,7 @@ function e_update(e)
             end
           end
         end
-        x += cam_x > 1490 and cos(shell.r) / 4.5 or 0
+        x = x + (cam_x > 1490 and cos(shell.r) / 4.5 or 0)
       end
     elseif g.any(id, "7,13,16,20") then
       if id == 7 then
@@ -859,10 +859,10 @@ function e_update(e)
       else
         dx, dy = (id == 20 and .75 or 1) * (f and .75 or -1), 0
       end
-      x += dx
+      x = x + (dx)
       bbox(e)
-      if id != 16 and map_collide(e) then
-        x -= dx
+      if id ~= 16 and map_collide(e) then
+        x = x - (dx)
         if id == 7 then
           dx = -dx
         else
@@ -870,10 +870,10 @@ function e_update(e)
         end
       end
       r, s = rot_coord(x / 128, id == 13 and 12 or id // 2)
-      if id != 7 then
+      if id ~= 7 then
         if y < 32 and id == 13 then
           r = 65 - y
-          x -= dx
+          x = x - (dx)
           dy = 1.25
           dy = max(dy - .25)
         end
@@ -881,58 +881,58 @@ function e_update(e)
           dy = 1
         end
       end
-      y += dy
+      y = y + (dy)
       e_def(e, s)
       if map_collide(e) then
-        y -= dy
+        y = y - (dy)
       end
     elseif g.any(id, "8,9") then
       f, dy = dsx < 0, ady < 1 and 0 or -.3 * sgy
       dx = ((adx < 48 or tshot < 15) and .8 or 0) * (f and -1 or 1) + (f and .35 or 0)
       bbox(e)
       if map_collide(e) then
-        x -= dx
+        x = x - (dx)
       end
       if y < 96 or adx <= 64 then
-        y += dy
+        y = y + (dy)
       end
       e_def(e)
       if map_collide(e) then
-        y -= dy
+        y = y - (dy)
       end
       if y < 96 and x < 124 then
-        x += dx
+        x = x + (dx)
       else
         dy = 0
       end
     elseif g.any(id, "6,10") then
       if id == 6 or r == 0 then
-        cnt += 1
+        cnt = cnt + (1)
       end
       dx, dy = dx or -.25, 1
       f = dx < 0
       if (id == 10 and r == 0) or (y > 87 and id == 6) then
-        x += dx
+        x = x + (dx)
       end
       bbox(e)
       if map_collide(e) or (x2 < 0 and dx == -.25) then
-        x -= dx
+        x = x - (dx)
         dx = (dx == -.25 and .6 or -.25)
       end
-      y += dy
+      y = y + (dy)
       e_def(e)
       if map_collide(e) then
-        y -= dy
+        y = y - (dy)
       else
         cnt = 0
       end
     elseif id == 11 then
       e_def(e)
       if map_collide(e) then
-        y += y > 64 and -8 or 8
+        y = y + (y > 64 and -8 or 8)
       end
     elseif id == 12 then
-      x -= .75
+      x = x - (.75)
       c = g.abs(cos(x / 26))
       s = max(2, 8 * c)
       e_def(e, 8 * sin(x / 64))
@@ -940,10 +940,10 @@ function e_update(e)
       r = (r + .01) % 4
       c1, s1 = rot_coord(r, .125)
       if id == 14 and r < 3 then
-        x += c1
+        x = x + (c1)
         g.brushes[4][2] = 1974 + c1 * (tshot < 50 and 16 or 0)
       elseif r < 2 then
-        y += s1
+        y = y + (s1)
       end
       if e_def(e) then
         g.do_ending()
@@ -951,11 +951,11 @@ function e_update(e)
     elseif g.any(id, "15,29") then
       if (dx or (dsx < (1 + i % 2 * -1) * 64) and tshot > 0) and hit < 2 then
         dx = f and .4 or -.4 + g.cam_sx
-        y += r
-        x += dx
+        y = y + (r)
+        x = x + (dx)
       end
       if r == 0 then
-        r, f = (y > 10 and -1 or 1) * (id == 15 and .8 or .8 + g.cam_sx), i % 2 != 0
+        r, f = (y > 10 and -1 or 1) * (id == 15 and .8 or .8 + g.cam_sx), i % 2 ~= 0
       elseif id == 29 and dx and ady > 104 then
         g.e_set(e)
       end
@@ -963,15 +963,15 @@ function e_update(e)
     elseif id == 17 then
       r = tshot < 30 and 2 or 0
       e_def(e)
-      y1 += (tshot < 40 and rnd(2) or 0)
+      y1 = y1 + ((tshot < 40 and rnd(2) or 0))
     elseif id == 18 then
       if (not tx and not ty) or adx > 48 or ady > 48 then
         tx = 64 - sgx * (16 + tshot)
         ty = 60 - sgy * (16 + tshot)
       end
       dx, dy = tx > x and .45 or -.2, (hit > 0 and hp < 7) and 2 or (ty > y and .2 or -.2)
-      x += dx
-      y += dy
+      x = x + (dx)
+      y = y + (dy)
       e_def(e)
     end
   end
@@ -1016,7 +1016,7 @@ function explo_draw(e)
     pal_d "1,2,3,1,5,12,7,8,13,6,11,12,13,14,15"
   end
   sspr(0, 96, w, w, x - k / 2, y - k / 2, k, k)
-  frm += .35
+  frm = frm + (.35)
 end
 
 function r9_explode()
@@ -1031,7 +1031,7 @@ function r9_hit(e, screen)
   if not r9.hit and intersects(r9, e) then
     if screen and id < 54 then
       if id == 48 and r9.acc < 1.65 then
-        r9.acc += .15
+        r9.acc = r9.acc + (.15)
         r9_auto = 25
       end
       if id == 49 then
@@ -1042,7 +1042,7 @@ function r9_hit(e, screen)
         force_power = min(force_power + 1, 2)
       end
       del(e_bullet, e)
-      r9_score += 40
+      r9_score = r9_score + (40)
       sfx(2)
     else
       r9_explode()
@@ -1214,7 +1214,7 @@ function _draw()
       print("blast off and strike\nthe evil bydo empire\x2bfh:\x2bec,\x7cj\n\n        0 stage " .. (st + 1) .. " 1\n\x7ch         5 cheat " .. (invincible and " on" or "off") .. "\n\n\n\n\n\n\n\n\n\n\x7cj\x2ac   1.4\n\n\n\n   @2021 BY  tHErOBOz\n   music BY yOURYkIkI", 42, 2, 12)
       print("press 4 to start", 58, 44, t() % 2 + 1)
     else
-      cam_x -= 3
+      cam_x = cam_x - (3)
     end
     for i = 0, 5 do
       camera(-cam_x - i * (16 - cam_x / 8) - (i > 0 and 16 or 22), 0)
@@ -1322,7 +1322,7 @@ function _draw()
     end
     foreach(explos, explo_draw)
     if ending then
-      s_score += s_score < r9_score and 10 or 0
+      s_score = s_score + (s_score < r9_score and 10 or 0)
       print((c_stage == 4 and cam_x > 1550) and "thanks to your\nbrave fighting\nthe bydo empire\nwas annihilated.\nyour name will\nremain in the\nuniverse forever!\n\nthank you for playing\nthe game to the end\n\ntHErOBOz" or "\n\n stage clear! " .. s_score .. "0", 24, 32, 12)
     end
     pd_draw(12, 0, 0)
@@ -1337,12 +1337,12 @@ end
 function _update60()
   if c_stage == 0 then
     if btnp(0) then
-      st -= 1
+      st = st - (1)
     end
     if btnp(1) then
-      st += 1
+      st = st + (1)
     end
-    st %= 4
+    st = st % (4)
     if btnp(5) then
       invincible = not invincible
     end
@@ -1351,9 +1351,9 @@ function _update60()
     end
   else
     if respawn_t > 0 then
-      respawn_t -= .03
+      respawn_t = respawn_t - (.03)
       if respawn_t <= 0 then
-        r9_lives -= 1
+        r9_lives = r9_lives - (1)
         r9_init()
         if r9_lives == 0 then
           _init()
@@ -1368,7 +1368,7 @@ function _update60()
         level_init(true)
       else
         cam_sx, shot_delay, r9_auto = (cam_x < level_fade_out_start or (ending and cam_x < level_end)) and .25 or 0, max(shot_delay - 1), max(r9_auto - 1)
-        cam_x += cam_sx
+        cam_x = cam_x + (cam_sx)
         f_exp(r9, "sx,0,sy,0")
         if ending or cam_x < fl - 32 then
           r9.frm, r9.sx, r9.sy = 0, min(-sgn(r9.x - 3)), abs(r9.y - 64) < 1 and 0 or -sgn(r9.y - fl)
@@ -1390,7 +1390,7 @@ function _update60()
               if status == 2 then
                 sx = 0
               end
-              status += 1 - status % 2
+              status = status + (1 - status % 2)
             end
             r9_shoot()
           elseif btnp(4) then
@@ -1416,26 +1416,26 @@ function _update60()
           end
           local fa, ff = r9.acc, r9.frm
           if btn(2) then
-            r9.sy -= fa
+            r9.sy = r9.sy - (fa)
             r9.frm = min(ff + .5, 6)
           end
           if btn(3) then
-            r9.sy += fa
+            r9.sy = r9.sy + (fa)
             r9.frm = max(ff - .5, -6)
           end
           if btn(0) then
-            r9.sx -= fa
+            r9.sx = r9.sx - (fa)
           end
           if btn(1) then
-            r9.sx += fa
+            r9.sx = r9.sx + (fa)
           end
-          if not btn(2) and not btn(3) and ff != 0 then
-            r9.frm -= sgn(ff) * .5
+          if not btn(2) and not btn(3) and ff ~= 0 then
+            r9.frm = r9.frm - (sgn(ff) * .5)
           end
         end
         do
           local _ENV = r9
-          if sx * sy != 0 then
+          if sx * sy ~= 0 then
             sx, sy = sx * .707, sy * .707
           end
           x, y = mid(3, x + sx, 112), mid(3, y + sy, 112)
@@ -1451,7 +1451,7 @@ function _update60()
 
   function force_update()
     --force_update
-    if force_type != 0 then
+    if force_type ~= 0 then
       f_sign = sgn(force.sx)
       if force.status == 0 then
         force.x = round(r9.x) + force.sx
@@ -1461,7 +1461,7 @@ function _update60()
             max_laser_s = laser_speed * 2
             for j = -1, 1 do
               bull_create(r9_bullet, 1, force.x - f_sign * max_laser_s, force.y + j * max_laser_s, f_sign * laser_speed, -j * laser_speed, f_sign * max_laser_s, -j * max_laser_s)
-              lasers += 1
+              lasers = lasers + (1)
             end
           elseif force_type == 3 and shot_delay % 2 == 1 then
             for d = -1, 1, 2 do
@@ -1470,25 +1470,25 @@ function _update60()
           end
         end
       else
-        force.x += force.sx
+        force.x = force.x + (force.sx)
         bbox(force)
         if level_collide(force) then
           local _ENV = force
-          x -= sx
+          x = x - (sx)
           status = 3
         end
         local dx = abs(r9.x - force.x)
         if force.status == 1 then
           local abs, fx, _ENV = abs, r9.x, force
-          if abs(sx) != 2 then
+          if abs(sx) ~= 2 then
             sx = x > fx and 2 or -2
           end
           if x <= 0 and sx < 0 then
             status, target = 2, 32
-            sx /= -4
+            sx = sx / (-4)
           elseif x >= 120 and sx > 0 then
             status, target = 2, 96
-            sx /= -4
+            sx = sx / (-4)
           end
         else
           if force.status == 2 then
@@ -1517,7 +1517,7 @@ function _update60()
             end
           end
           if level_collide(force) then
-            force.x -= (force.sx > 0 and force.sx or -cam_sx)
+            force.x = force.x - ((force.sx > 0 and force.sx or -cam_sx))
           end
           local dy = abs(force.y - r9.y)
           do
@@ -1529,14 +1529,14 @@ function _update60()
             elseif f.sy == 0 and dy <= 2 then
               sy = 0
             end
-            y += sy
+            y = y + (sy)
             if dy <= 6 and dx <= 12 then
               status = 0
               sx = (x > f.x and 12 or -12)
             end
           end
           if level_collide(force) then
-            force.y -= force.sy
+            force.y = force.y - (force.sy)
           end
           force.y = mid(4, force.y + force.sy, 112)
           bbox(force)

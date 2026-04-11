@@ -44,7 +44,7 @@ function _init()
 end
 
 function playmusic(i, m)
-  if i != 0 and i != 22 then
+  if i ~= 0 and i ~= 22 then
     tracki = i
   else
     tracki = -1
@@ -64,7 +64,7 @@ function readscoreboard()
     local name = ""
     name, addr = readname(addr)
     add(scoreboard, {name = name, hi = peek4(addr), lo = peek4(addr + 4)})
-    addr += 8
+    addr = addr + (8)
   end
   prevname = readname(addr)
 end
@@ -74,7 +74,7 @@ function readname(addr)
   for j = 0, 2 do
     local c = peek(addr)
     name = name .. chr(c < 16 and 97 or c)
-    addr += 1
+    addr = addr + (1)
   end
   return name, addr
 end
@@ -86,7 +86,7 @@ function writescoreboard()
     addr = writename(s.name, addr)
     poke4(addr, s.hi)
     poke4(addr + 4, s.lo)
-    addr += 8
+    addr = addr + (8)
   end
   writename(prevname, addr)
 end
@@ -94,7 +94,7 @@ end
 function writename(name, addr)
   for j = 0, 2 do
     poke(addr, ord(sub(name, j + 1, j + 1)))
-    addr += 1
+    addr = addr + (1)
   end
   return addr
 end
@@ -117,13 +117,13 @@ function updatemenu()
     local i, chara = ti * 3 + 1, #titleitems < 3
     tinext = titletime + 60
     if chara then
-      tinext += #titleitems == 2 and 140 or 70
+      tinext = tinext + (#titleitems == 2 and 140 or 70)
     end
     add(titleitems, {str = titles[i], s = titles[i + 1], smax = titles[i + 2], x = chara and 128 or tileft, y = #titleitems * 12 + 34, f = 0, ft = 5, sb = chara and 0 or 0.5, c = #titlecols})
-    ti += 1
+    ti = ti + (1)
   end
   for t in all(titleitems) do
-    t.ft -= 1
+    t.ft = t.ft - (1)
     if t.ft == 0 then
       t.f = (t.f + 1) % t.smax
       t.ft = 5
@@ -134,10 +134,10 @@ function updatemenu()
         t.c = max(1, t.c - 0.5)
       end
     else
-      t.x -= 0.5
+      t.x = t.x - (0.5)
     end
   end
-  titletime += 1
+  titletime = titletime + (1)
   if titletime >= 1200 then
     titletime, titleitems, ti, tinext = 0, {}, 0, 0
   end
@@ -194,14 +194,14 @@ function updatescores()
     namechrs[i] = ord(sub(scoreboard[newscorei].name, i, i))
   end
   if btnp(2) then
-    namechrs[namechri] -= 1
+    namechrs[namechri] = namechrs[namechri] - (1)
     if namechrs[namechri] == 96 then
       namechrs[namechri] = 122
     end
     sfx(49)
   end
   if btnp(3) then
-    namechrs[namechri] += 1
+    namechrs[namechri] = namechrs[namechri] + (1)
     if namechrs[namechri] == 123 then
       namechrs[namechri] = 97
     end
@@ -213,7 +213,7 @@ function updatescores()
   end
   scoreboard[newscorei].name = prevname
   if btnp(4) or btnp(5) then
-    namechri += 1
+    namechri = namechri + (1)
     if namechri == 4 then
       writescoreboard()
       sfx(48)
@@ -263,15 +263,15 @@ end
 
 function updategame()
   if wint then
-    wint -= 1
+    wint = wint - (1)
     if wint <= 0 then
       -- end level
-      level += 1
+      level = level + (1)
       initlevel(level)
     end
   else
     -- increment player animation frame
-    player.ft -= 1
+    player.ft = player.ft - (1)
     if player.ft <= 0 then
       player.f = (player.f + 1) % 5
       player.ft = 5
@@ -282,16 +282,16 @@ function updategame()
       if bugscreated < bugstotal and #bugs < maxbugs and (not bonus and bonustime == 0) then
         add(bugs, {x = 120, y = 32, f = 0, ft = 5, dir = left, type = 0, stuck = 0, delay = 60, start = true})
         bugsdelay = max(8, 120 - level * 2)
-        bugscreated += 1
+        bugscreated = bugscreated + (1)
       end
       if bonusready and bugscreated == bugstotal and bugsdelay == 0 then
         bonus, bonusready, bonusscore = {x = 116, y = 28}, false, 200
-        bugstotal += 1
+        bugstotal = bugstotal + (1)
       end
     end
     for bug in all(bugs) do
       -- animate bug
-      bug.ft -= 1
+      bug.ft = bug.ft - (1)
       if bug.ft <= 0 then
         bug.f = (bug.f + 1) % 4
         bug.ft = 6
@@ -357,21 +357,21 @@ function updategame()
             end
           end
           -- if changing direction
-          if bug.dir != prevdir then
+          if bug.dir ~= prevdir then
             -- flip sprite if needed
             if bug.dir < 2 then
               bug.flip = bug.dir == 1
             end
-            bug.delay += 2
+            bug.delay = bug.delay + (2)
             if bug.dir == revdir then
-              bug.stuck += 1
+              bug.stuck = bug.stuck + (1)
             end
           end
           -- prevent direction check after delay
           bug.dircheck = nil
           for bug2 in all(bugs) do
             if bug.x < bug2.x + 6 and bug.x + 6 > bug2.x and bug.y < bug2.y + 6 and bug.y + 6 > bug2.y then
-              bug.stuck += 1
+              bug.stuck = bug.stuck + (1)
             end
           end
           if bug.type == 0 and bug.stuck > 60 - level * 2 then
@@ -382,11 +382,11 @@ function updategame()
         end
         if bug.delay == 0 then
           local cx, cy = bug.dir < up and bug.dir * 2 - 1 or 0, bug.dir > right and (bug.dir - 2) * 2 - 1 or 0
-          bug.x += cx * 0.25
-          bug.y += cy * 0.25
+          bug.x = bug.x + (cx * 0.25)
+          bug.y = bug.y + (cy * 0.25)
           if bug.type == 0 and not (bug.x % 8 == 0 and bug.y % 8 == 0) and max(0, rnd(15 - level) // 1) == 0 then
-            bug.x += cx * 0.25
-            bug.y += cy * 0.25
+            bug.x = bug.x + (cx * 0.25)
+            bug.y = bug.y + (cy * 0.25)
           end
           bug.dircheck = true
         end
@@ -403,7 +403,7 @@ function updategame()
         if bonustime > 0 then
           killbug(bug)
           addscore(bonusscore)
-          bonusscore *= 2
+          bonusscore = bonusscore * (2)
         else
           killplayer()
         end
@@ -412,13 +412,13 @@ function updategame()
     local vx = 0
     local vy = 0
     if dying then
-      dying -= 1
+      dying = dying - (1)
       if dying == 450 then
         playmusic(0)
       end
       if dying == 0 or (dying < 400 and btnp(3) or btnp(4)) then
         dying = nil
-        lives -= 1
+        lives = lives - (1)
         if lives == 0 then
           checkscore()
         else
@@ -432,9 +432,9 @@ function updategame()
       vx = btn(0) and -0.5 or (btn(1) and 0.5 or 0)
       vy = btn(2) and -0.5 or (btn(3) and 0.5 or 0)
       -- calculate movement direction
-      if vy != 0 then
+      if vy ~= 0 then
         -- slide left or right until grid aligned
-        if ox != 0 then
+        if ox ~= 0 then
           vy = 0
           if vx == 0 then
             vx = ox < 4.5 and -0.5 or 0.5
@@ -442,9 +442,9 @@ function updategame()
         else
           vx = 0
         end
-      elseif vx != 0 then
+      elseif vx ~= 0 then
         -- slide up or down until grid aligned
-        if oy != 0 then
+        if oy ~= 0 then
           vx = 0
           if vy == 0 then
             vy = oy < 4.5 and -0.5 or 0.5
@@ -469,8 +469,8 @@ function updategame()
       gemc = 0
     end
     if bullet then
-      bullet.x += bullet.vx
-      bullet.y += bullet.vy
+      bullet.x = bullet.x + (bullet.vx)
+      bullet.y = bullet.y + (bullet.vy)
       if issolid(flr(bullet.x), flr(bullet.y)) then
         add(flashes, {x = bullet.x, y = bullet.y, t = 40, ft = 10})
         bullet = nil
@@ -505,13 +505,13 @@ function updategame()
           del(bags, b)
           sfx(55)
           addscore(500)
-        elseif vx != 0 and ((player.dir == 1 and player.x + 2 < b.x) or (player.dir == 0 and player.x - 2 > b.x + 9)) then
+        elseif vx ~= 0 and ((player.dir == 1 and player.x + 2 < b.x) or (player.dir == 0 and player.x - 2 > b.x + 9)) then
           -- push bag
           pushed = true
           local blocked = false
           -- collide with other bags
           for b2 in all(bags) do
-            if b2 != b and not b2.falling and not b2.money and b2.x + 8.5 > b.x and b2.x < b.x + 8.5 and b2.y + 7 > b.y and b2.y < b.y + 7 then
+            if b2 ~= b and not b2.falling and not b2.money and b2.x + 8.5 > b.x and b2.x < b.x + 8.5 and b2.y + 7 > b.y and b2.y < b.y + 7 then
               -- collide with world
               b2.x = mid(b2.x + vx, 3, 115)
               if b2.x == 3 or b2.x == 115 then
@@ -542,10 +542,10 @@ function updategame()
       elseif b.x % 8 == 3 then
         -- check for ground beneath bag
         local yaddr = 0x1b80 + (b.y - 19) * 64
-        local solid = b.y >= 100 or peek(yaddr + b.x // 2 + 2) & 0xf0 != 0
+        local solid = b.y >= 100 or peek(yaddr + b.x // 2 + 2) & 0xf0 ~= 0
         if solid and b.falling then
           -- double check solid ground in case there's a 1 pixel deep floor
-          solid = b.y >= 100 or peek(0x1b80 + (b.y - 20) * 64 + b.x // 2 + 2) & 0xf0 != 0
+          solid = b.y >= 100 or peek(0x1b80 + (b.y - 20) * 64 + b.x // 2 + 2) & 0xf0 ~= 0
         end
         if not solid then
           -- no ground so fall if not already doing so
@@ -578,7 +578,7 @@ function updategame()
         end
         if b.falling == 0 then
           -- fall
-          b.y += 1
+          b.y = b.y + (1)
         end
       end
     end
@@ -607,7 +607,7 @@ function updategame()
         del(gems, g)
         add(delthings, g)
         sfx(56 + gemc)
-        gemc += 1
+        gemc = gemc + (1)
         gemt = 70
         addscore(25)
         if gemc == 8 then
@@ -628,9 +628,9 @@ function updategame()
   end
   for s in all(scoredisplay) do
     if s.y > 12 then
-      s.y -= 0.5
+      s.y = s.y - (0.5)
     end
-    s.t -= 1
+    s.t = s.t - (1)
     if s.t == 0 then
       del(scoredisplay, s)
     end
@@ -697,7 +697,7 @@ function drawgame()
     spr(player.f + (player.dir > 1 and 16 or 0) + (shootdelay > 0 and 5 or 0), player.x - 4 - (flpy and 0 or 1), player.y - 4, 1, 1, flpx, flpy)
   end
   for f in all(flashes) do
-    f.t -= 1
+    f.t = f.t - (1)
     spr(47 - f.t // f.ft, f.x - 3, f.y - 3)
     if f.t <= 0 then
       del(flashes, f)
@@ -750,15 +750,15 @@ function printf(str, x, y, c)
 end
 
 function addscore(n)
-  scorelo += n
+  scorelo = scorelo + (n)
   if scorelo >= 10000 then
     if scorehi == 32767 then
       scorehi = 0
     end
-    scorehi += 1
-    scorelo -= 10000
+    scorehi = scorehi + (1)
+    scorelo = scorelo - (10000)
     if scorehi % 2 == 0 and lives < 5 then
-      lives += 1
+      lives = lives + (1)
     end
   end
   -- set colour for score display
@@ -786,14 +786,14 @@ end
 
 function killbug(bug)
   del(bugs, bug)
-  deadbugs += 1
+  deadbugs = deadbugs + (1)
   add(flashes, {x = bug.x, y = bug.y, t = 80, ft = 20})
   sfx(51)
 end
 
 function issolid(x, y)
   local yaddr = 0x1b80 + (y - 28) * 64
-  return y < 28 or y > 108 or x < 6 or x > 122 or peek(yaddr + x // 2) != 0
+  return y < 28 or y > 108 or x < 6 or x > 122 or peek(yaddr + x // 2) ~= 0
 --&0xf0
 end
 
@@ -818,18 +818,18 @@ function updateload()
       -- carve map tile
       local pos = y * 15 + levelix
       local c = sub(levels[leveli], pos, pos)
-      if c != " " then
+      if c ~= " " then
         levelfuncs[c](levelix * 8 - 5, y * 8 + 28)
       end
     end
     -- copy modified map back from screen
     memcpy(0x1b80, 0x6700, 0x1440)
   end
-  loadtime -= 1
-  leveliy += 6
+  loadtime = loadtime - (1)
+  leveliy = leveliy + (6)
   if leveliy > 9 then
     leveliy = 0
-    levelix += 1
+    levelix = levelix + (1)
   end
   if loadtime == 0 then
     resetlevel()
@@ -856,7 +856,7 @@ end
 
 function initlevel(n)
   if n > 7 then
-    n += 1
+    n = n + (1)
   end
   leveli = n > 7 and max(5, n % 4 + 5) or n + 1
   bugstotal, maxbugs, deadbugs, delthings, flashes, bonusready, scoredisplay, wint = 5 + n, 3, 0, {}, {}, true, {}

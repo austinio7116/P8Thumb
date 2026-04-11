@@ -130,10 +130,10 @@ function _init()
 end
 
 function _update60()
-  t += 1
+  t = t + (1)
   swapped_this_frame = false
-  time_since_input += 1
-  frame_progress += 1
+  time_since_input = time_since_input + (1)
+  frame_progress = frame_progress + (1)
   foreach(lerp_objects, upd_lerpobj)
   if btnp_any() then
     time_since_input = 0
@@ -203,14 +203,14 @@ function convert_to_binary(_num)
   local out = ""
   for i = 0, 5 do
     if cur > 0 then
-      out ..= cur % 2
+      out = out .. (cur % 2)
       cur = flr(cur * 0.5)
     end
   end
   out = sub(out .. "00000", 1, 5)
   local n_out = ""
   for i = #out, 0, -1 do
-    n_out ..= sub(out, i, i)
+    n_out = n_out .. (sub(out, i, i))
   end
   return n_out
 end
@@ -219,19 +219,19 @@ function update_submit()
   local button_pressed = false
   local newx, newy = cursor.cx, cursor.cy
   if btnp "0" then
-    newx -= 1
+    newx = newx - (1)
     button_pressed = true
   end
   if btnp "1" then
-    newx += 1
+    newx = newx + (1)
     button_pressed = true
   end
   if btnp "2" then
-    newy -= 1
+    newy = newy - (1)
     button_pressed = true
   end
   if btnp "3" then
-    newy += 1
+    newy = newy + (1)
     button_pressed = true
   end
   cursor.cx = mid(0, newx, 6)
@@ -322,12 +322,12 @@ function draw_highscores()
   local _y = 4 + min(0, sin(frame_progress * .001 - .2) * 70)
   local oy = _y
   drw_hs_big(23, _y, 1, 6)
-  _y += 30
+  _y = _y + (30)
   for i = 2, 3 do
     drw_hs_big(24, oy + 3 + (i - 1) * 32, i, 4)
-    _y += 28
+    _y = _y + (28)
   end
-  _y += 0
+  _y = _y + (0)
   for i = 4, 8 do
     drw_hs_small(24, _y + 2 + (i - 4) * 19, i, 4)
   end
@@ -431,8 +431,8 @@ function drw_hs_big(_x, _y, _num, _height)
   end
   local _x, number_y = ox - 11, oy - 1
   if _num == 1 then
-    _x += 2
-    number_y -= 1
+    _x = _x + (2)
+    number_y = number_y - (1)
   end
   sspr(sx, sy, sw, sh, _x, number_y)
   if _num == 2 then
@@ -456,10 +456,10 @@ function drw_hs_big(_x, _y, _num, _height)
 end
 
 function rndrect(_x, _y, _w, _h, _rad, _c)
-  _x += _rad
-  _y += _rad
-  _w -= _rad * 2
-  _h -= _rad * 2
+  _x = _x + (_rad)
+  _y = _y + (_rad)
+  _w = _w - (_rad * 2)
+  _h = _h - (_rad * 2)
   rectfill(_x, _y - _rad, _x + _w, _y + _h + _rad, _c)
   rectfill(_x - _rad, _y, _x + _w + _rad, _y + _h, _c)
   circfill(_x, _y, _rad, _c)
@@ -565,7 +565,7 @@ end
 
 function update_shipsel()
   if out_progress >= 0 then
-    out_progress += 1
+    out_progress = out_progress + (1)
   end
   if out_progress == 35 then
     sfx(60)
@@ -576,7 +576,7 @@ function update_shipsel()
   if out_progress and out_progress > 80 then
     start_game()
   end
-  text_draw += 1
+  text_draw = text_draw + (1)
   if frame_progress > 1800 or out_progress >= 0 then
   elseif frame_progress > 1500 then
     if frame_progress % 15 == 0 then
@@ -603,15 +603,15 @@ function update_shipsel()
   end
   local new_pos = shipsel_selection
   if btnp(0) and out_progress < 0 then
-    new_pos -= 1
+    new_pos = new_pos - (1)
   end
   if btnp(1) and out_progress < 0 then
-    new_pos += 1
+    new_pos = new_pos + (1)
   end
   if frame_progress > 1680 then
     new_pos = mid(1, new_pos, 2)
   end
-  if mid(1, new_pos, 3) != shipsel_selection then
+  if mid(1, new_pos, 3) ~= shipsel_selection then
     local ship = ships[shipsel_selection]
     new_lerp(ship, ship.x, -10, .05)
     text_draw = 0
@@ -663,8 +663,8 @@ function draw_shipsel()
   sspr(31, 108, 16, 18, ox, oy)
   sspr(47, 108, 14, 20, ox + width, oy)
   -- shipsel cursor thing
-  oy -= 1
-  ox -= 1
+  oy = oy - (1)
+  ox = ox - (1)
   local sox = sin(t * .01) * 1.1
   local width, height = 16, shipsel_cursor.y
   if ship_sel_ready == false then
@@ -688,7 +688,7 @@ function draw_shipsel()
   end
   if show_nums then
     local text, x, y, c = hcentre("\014" .. sub("000" .. tostr(number), -2), 3, 7)
-    x -= 30
+    x = x - (30)
     print(text, x, y + 1, t % 8 < 3 and 1 or 5)
     print(text, x, y, c)
   end
@@ -729,7 +729,7 @@ function drw_mapbackground(_x)
   for y = -8 * celh, 128, celh * 8 do
     map(celx, cely, sx, y + (t * ry) % (celh * 8), celw, celh)
   end
-  sx += 38
+  sx = sx + (38)
   for y = -8 * celh, 128, celh * 8 do
     map(celx, cely, sx, y + (t * ry) % (celh * 8), celw, celh)
   end
@@ -828,7 +828,7 @@ function lerp(a, b, t)
 end
 
 function easeoutquad(t)
-  t -= 1
+  t = t - (1)
   return 1 - t * t
 end
 
@@ -836,7 +836,7 @@ function easeinoutquad(t)
   if t < .5 then
     return t * t * 2
   end
-  t -= 1
+  t = t - (1)
   return 1 - t * t * 2
 end
 
@@ -884,7 +884,7 @@ function drw_demonstration(_x, _y)
     local index = i * 2 - 1
     sspr(0 + shape_list[index], 39, shape_list[index + 1], 7, x + width, y)
     --+sin(t*.02+i*.1)*1.5)
-    width += shape_list[index + 1] + 1
+    width = width + (shape_list[index + 1] + 1)
   end
   pal(7, 7)
   line(x + 2, y - 3, x + width - 4, y - 3, 6)

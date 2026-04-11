@@ -116,7 +116,7 @@ end, update = function(this)
   if (jump) then
     this.jbuffer = 4
   elseif this.jbuffer > 0 then
-    this.jbuffer -= 1
+    this.jbuffer = this.jbuffer - (1)
   end
   local dash = btn(k_dash) and not this.p_dash
   this.p_dash = btn(k_dash)
@@ -127,12 +127,12 @@ end, update = function(this)
       this.djump = max_djump
     end
   elseif this.grace > 0 then
-    this.grace -= 1
+    this.grace = this.grace - (1)
   end
-  this.dash_effect_time -= 1
+  this.dash_effect_time = this.dash_effect_time - (1)
   if this.dash_time > 0 then
     init_object(smoke, this.x, this.y)
-    this.dash_time -= 1
+    this.dash_time = this.dash_time - (1)
     this.spd.x = appr(this.spd.x, this.dash_target.x, this.dash_accel.x)
     this.spd.y = appr(this.spd.y, this.dash_target.y, this.dash_accel.y)
   else
@@ -154,17 +154,17 @@ end, update = function(this)
       this.spd.x = appr(this.spd.x, input * maxrun, accel)
     end
     --facing
-    if this.spd.x != 0 then
+    if this.spd.x ~= 0 then
       this.flip.x = (this.spd.x < 0)
     end
     -- gravity
     local maxfall = 2
     local gravity = 0.21
     if abs(this.spd.y) <= 0.15 then
-      gravity *= 0.5
+      gravity = gravity * (0.5)
     end
     -- wall slide
-    if input != 0 and this.is_solid(input, 0) and not this.is_ice(input, 0) then
+    if input ~= 0 and this.is_solid(input, 0) and not this.is_ice(input, 0) then
       maxfall = 0.4
       if rnd(10) < 2 then
         init_object(smoke, this.x + input * 6, this.y)
@@ -185,7 +185,7 @@ end, update = function(this)
       else
         -- wall jump
         local wall_dir = (this.is_solid(-3, 0) and -1 or this.is_solid(3, 0) and 1 or 0)
-        if wall_dir != 0 then
+        if wall_dir ~= 0 then
           psfx(2)
           this.jbuffer = 0
           this.spd.y = -2
@@ -201,20 +201,20 @@ end, update = function(this)
     local d_half = d_full * 0.70710678118
     if this.djump > 0 and dash then
       init_object(smoke, this.x, this.y)
-      this.djump -= 1
+      this.djump = this.djump - (1)
       this.dash_time = 4
       has_dashed = true
       this.dash_effect_time = 10
       local v_input = (btn(k_up) and -1 or (btn(k_down) and 1 or 0))
-      if input != 0 then
-        if v_input != 0 then
+      if input ~= 0 then
+        if v_input ~= 0 then
           this.spd.x = input * d_half
           this.spd.y = v_input * d_half
         else
           this.spd.x = input * d_full
           this.spd.y = 0
         end
-      elseif v_input != 0 then
+      elseif v_input ~= 0 then
         this.spd.x = 0
         this.spd.y = v_input * d_full
       else
@@ -229,13 +229,13 @@ end, update = function(this)
       this.dash_accel.x = 1.5
       this.dash_accel.y = 1.5
       if this.spd.y < 0 then
-        this.dash_target.y *= .75
+        this.dash_target.y = this.dash_target.y * (.75)
       end
-      if this.spd.y != 0 then
-        this.dash_accel.x *= 0.70710678118
+      if this.spd.y ~= 0 then
+        this.dash_accel.x = this.dash_accel.x * (0.70710678118)
       end
-      if this.spd.x != 0 then
-        this.dash_accel.y *= 0.70710678118
+      if this.spd.x ~= 0 then
+        this.dash_accel.y = this.dash_accel.y * (0.70710678118)
       end
     elseif dash and this.djump <= 0 then
       psfx(9)
@@ -243,7 +243,7 @@ end, update = function(this)
     end
   end
   -- animation
-  this.spr_off += 0.25
+  this.spr_off = this.spr_off + (0.25)
   if not on_ground then
     if this.is_solid(input, 0) then
       this.spr = 5
@@ -295,8 +295,8 @@ end
 draw_hair = function(obj, facing)
   local last = {x = obj.x + 4 - facing * 2, y = obj.y + (btn(k_down) and 4 or 3)}
   foreach(obj.hair, function(h)
-    h.x += (last.x - h.x) / 1.5
-    h.y += (last.y + 0.5 - h.y) / 1.5
+    h.x = h.x + ((last.x - h.x) / 1.5)
+    h.y = h.y + ((last.y + 0.5 - h.y) / 1.5)
     circfill(h.x, h.y, h.size, 8)
     last = h
   end)
@@ -323,10 +323,10 @@ end, update = function(this)
     end
   -- falling
   elseif this.state == 1 then
-    this.spd.y += 0.5
+    this.spd.y = this.spd.y + (0.5)
     if this.spd.y > 0 and this.delay > 0 then
       this.spd.y = 0
-      this.delay -= 1
+      this.delay = this.delay - (1)
     end
     if this.spd.y > 0 and this.y > this.target.y then
       this.y = this.target.y
@@ -339,7 +339,7 @@ end, update = function(this)
     end
   -- landing
   elseif this.state == 2 then
-    this.delay -= 1
+    this.delay = this.delay - (1)
     this.spr = 6
     if this.delay < 0 then
       destroy_object(this)
@@ -358,7 +358,7 @@ spring = {tile = 18, init = function(this)
   this.hide_for = 0
 end, update = function(this)
   if this.hide_for > 0 then
-    this.hide_for -= 1
+    this.hide_for = this.hide_for - (1)
     if this.hide_for <= 0 then
       this.spr = 18
       this.delay = 0
@@ -368,7 +368,7 @@ end, update = function(this)
     if hit ~= nil and hit.spd.y >= 0 then
       this.spr = 19
       hit.y = this.y - 4
-      hit.spd.x *= 0.2
+      hit.spd.x = hit.spd.x * (0.2)
       hit.spd.y = -3
       hit.djump = max_djump
       this.delay = 10
@@ -381,14 +381,14 @@ end, update = function(this)
       psfx(8)
     end
   elseif this.delay > 0 then
-    this.delay -= 1
+    this.delay = this.delay - (1)
     if this.delay <= 0 then
       this.spr = 18
     end
   end
   -- begin hiding
   if this.hide_in > 0 then
-    this.hide_in -= 1
+    this.hide_in = this.hide_in - (1)
     if this.hide_in <= 0 then
       this.hide_for = 60
       this.spr = 0
@@ -408,7 +408,7 @@ balloon = {tile = 22, init = function(this)
   this.hitbox = {x = -1, y = -1, w = 10, h = 10}
 end, update = function(this)
   if this.spr == 22 then
-    this.offset += 0.01
+    this.offset = this.offset + (0.01)
     this.y = this.start + sin(this.offset) * 2
     local hit = this.collide(player, 0, 0)
     if hit ~= nil and hit.djump < max_djump then
@@ -419,7 +419,7 @@ end, update = function(this)
       this.timer = 60
     end
   elseif this.timer > 0 then
-    this.timer -= 1
+    this.timer = this.timer - (1)
   else
     psfx(7)
     init_object(smoke, this.x, this.y)
@@ -443,7 +443,7 @@ end, update = function(this)
     end
   -- shaking
   elseif this.state == 1 then
-    this.delay -= 1
+    this.delay = this.delay - (1)
     if this.delay <= 0 then
       this.state = 2
       this.delay = 60
@@ -452,7 +452,7 @@ end, update = function(this)
     end
   -- invisible, waiting to reset
   elseif this.state == 2 then
-    this.delay -= 1
+    this.delay = this.delay - (1)
     if this.delay <= 0 and not this.check(player, 0, 0) then
       psfx(7)
       this.state = 0
@@ -461,8 +461,8 @@ end, update = function(this)
     end
   end
 end, draw = function(this)
-  if this.state != 2 then
-    if this.state != 1 then
+  if this.state ~= 2 then
+    if this.state ~= 1 then
       spr(23, this.x, this.y)
     else
       spr(23 + (15 - this.delay) / 5, this.x, this.y)
@@ -489,13 +489,13 @@ smoke = {init = function(this)
   this.spr = 29
   this.spd.y = -0.1
   this.spd.x = 0.3 + rnd(0.2)
-  this.x += -1 + rnd(2)
-  this.y += -1 + rnd(2)
+  this.x = this.x + (-1 + rnd(2))
+  this.y = this.y + (-1 + rnd(2))
   this.flip.x = maybe()
   this.flip.y = maybe()
   this.solids = false
 end, update = function(this)
-  this.spr += 0.2
+  this.spr = this.spr + (0.2)
   if this.spr >= 32 then
     destroy_object(this)
   end
@@ -513,7 +513,7 @@ end, update = function(this)
     init_object(lifeup, this.x, this.y)
     destroy_object(this)
   end
-  this.off += 1
+  this.off = this.off + (1)
   this.y = this.start + sin(this.off / 40) * 2.5
 end}
 add(types, fruit)
@@ -527,7 +527,7 @@ end, update = function(this)
   --fly away
   if this.fly then
     if this.sfx_delay > 0 then
-      this.sfx_delay -= 1
+      this.sfx_delay = this.sfx_delay - (1)
       if this.sfx_delay <= 0 then
         sfx_timer = 20
         sfx(14)
@@ -542,7 +542,7 @@ end, update = function(this)
     if has_dashed then
       this.fly = true
     end
-    this.step += 0.05
+    this.step = this.step + (0.05)
     this.spd.y = sin(this.step) * 0.5
   end
   -- collect
@@ -573,17 +573,17 @@ add(types, fly_fruit)
 lifeup = {init = function(this)
   this.spd.y = -0.25
   this.duration = 30
-  this.x -= 2
-  this.y -= 4
+  this.x = this.x - (2)
+  this.y = this.y - (4)
   this.flash = 0
   this.solids = false
 end, update = function(this)
-  this.duration -= 1
+  this.duration = this.duration - (1)
   if this.duration <= 0 then
     destroy_object(this)
   end
 end, draw = function(this)
-  this.flash += 0.5
+  this.flash = this.flash + (0.5)
   print("1000", this.x - 2, this.y, 7 + this.flash % 2)
 end}
 fake_wall = {tile = 64, if_not_fruit = true, update = function(this)
@@ -614,7 +614,7 @@ key = {tile = 8, if_not_fruit = true, update = function(this)
   local was = flr(this.spr)
   this.spr = 9 + (sin(frames / 30) + 0.5) * 1
   local is = flr(this.spr)
-  if is == 10 and is != was then
+  if is == 10 and is ~= was then
     this.flip.x = not this.flip.x
   end
   if this.check(player, 0, 0) then
@@ -626,12 +626,12 @@ key = {tile = 8, if_not_fruit = true, update = function(this)
 end}
 add(types, key)
 chest = {tile = 20, if_not_fruit = true, init = function(this)
-  this.x -= 4
+  this.x = this.x - (4)
   this.start = this.x
   this.timer = 20
 end, update = function(this)
   if has_key then
-    this.timer -= 1
+    this.timer = this.timer - (1)
     this.x = this.start - 1 + rnd(3)
     if this.timer <= 0 then
       sfx_timer = 20
@@ -643,7 +643,7 @@ end, update = function(this)
 end}
 add(types, chest)
 platform = {init = function(this)
-  this.x -= 4
+  this.x = this.x - (4)
   this.solids = false
   this.hitbox.w = 16
   this.last = this.x
@@ -669,9 +669,9 @@ message = {tile = 86, last = 0, draw = function(this)
   this.text = "-- celeste mountain --#this memorial to those# perished on the climb"
   if this.check(player, 4, 0) then
     if this.index < #this.text then
-      this.index += 0.5
+      this.index = this.index + (0.5)
       if this.index >= this.last + 1 then
-        this.last += 1
+        this.last = this.last + (1)
         sfx(35)
       end
     end
@@ -680,10 +680,10 @@ message = {tile = 86, last = 0, draw = function(this)
       if sub(this.text, i, i) ~= "#" then
         rectfill(this.off.x - 2, this.off.y - 2, this.off.x + 7, this.off.y + 6, 7)
         print(sub(this.text, i, i), this.off.x, this.off.y, 0)
-        this.off.x += 5
+        this.off.x = this.off.x + (5)
       else
         this.off.x = 8
-        this.off.y += 7
+        this.off.y = this.off.y + (7)
       end
     end
   else
@@ -713,7 +713,7 @@ end, draw = function(this)
     spr(96, this.x, this.y)
     spr(97, this.x + 8, this.y)
   elseif this.state == 1 then
-    this.timer -= 1
+    this.timer = this.timer - (1)
     shake = 5
     flash_bg = true
     if this.timer <= 45 and count(this.particles) < 50 then
@@ -728,7 +728,7 @@ end, draw = function(this)
       pause_player = false
     end
     foreach(this.particles, function(p)
-      p.y += p.spd
+      p.y = p.y + (p.spd)
       line(this.x + p.x, this.y + 8 - p.y, this.x + p.x, min(this.y + 8 - p.y + p.h, this.y + 8), 7)
     end)
   end
@@ -759,12 +759,12 @@ end, draw = function(this)
   end
 end}
 flag = {tile = 118, init = function(this)
-  this.x += 5
+  this.x = this.x + (5)
   this.score = 0
   this.show = false
   for i = 1, count(got_fruit) do
     if got_fruit[i] then
-      this.score += 1
+      this.score = this.score + (1)
     end
   end
 end, draw = function(this)
@@ -786,7 +786,7 @@ add(types, flag)
 room_title = {init = function(this)
   this.delay = 5
 end, draw = function(this)
-  this.delay -= 1
+  this.delay = this.delay - (1)
   if this.delay < -30 then
     destroy_object(this)
   elseif this.delay < 0 then
@@ -836,7 +836,7 @@ function init_object(type, x, y)
     local other
     for i = 1, count(objects) do
       other = objects[i]
-      if other ~= nil and other.type == type and other != obj and other.collideable and other.x + other.hitbox.x + other.hitbox.w > obj.x + obj.hitbox.x + ox and other.y + other.hitbox.y + other.hitbox.h > obj.y + obj.hitbox.y + oy and other.x + other.hitbox.x < obj.x + obj.hitbox.x + obj.hitbox.w + ox and other.y + other.hitbox.y < obj.y + obj.hitbox.y + obj.hitbox.h + oy then
+      if other ~= nil and other.type == type and other ~= obj and other.collideable and other.x + other.hitbox.x + other.hitbox.w > obj.x + obj.hitbox.x + ox and other.y + other.hitbox.y + other.hitbox.h > obj.y + obj.hitbox.y + oy and other.x + other.hitbox.x < obj.x + obj.hitbox.x + obj.hitbox.w + ox and other.y + other.hitbox.y < obj.y + obj.hitbox.y + obj.hitbox.h + oy then
         return other
       end
     end
@@ -848,14 +848,14 @@ function init_object(type, x, y)
   obj.move = function(ox, oy)
     local amount
     -- [x] get move amount
-    obj.rem.x += ox
+    obj.rem.x = obj.rem.x + (ox)
     amount = flr(obj.rem.x + 0.5)
-    obj.rem.x -= amount
+    obj.rem.x = obj.rem.x - (amount)
     obj.move_x(amount, 0)
     -- [y] get move amount
-    obj.rem.y += oy
+    obj.rem.y = obj.rem.y + (oy)
     amount = flr(obj.rem.y + 0.5)
-    obj.rem.y -= amount
+    obj.rem.y = obj.rem.y - (amount)
     obj.move_y(amount)
   end
   obj.move_x = function(amount, start)
@@ -863,7 +863,7 @@ function init_object(type, x, y)
       local step = sign(amount)
       for i = start, abs(amount) do
         if not obj.is_solid(step, 0) then
-          obj.x += step
+          obj.x = obj.x + (step)
         else
           obj.spd.x = 0
           obj.rem.x = 0
@@ -871,7 +871,7 @@ function init_object(type, x, y)
         end
       end
     else
-      obj.x += amount
+      obj.x = obj.x + (amount)
     end
   end
   obj.move_y = function(amount)
@@ -879,7 +879,7 @@ function init_object(type, x, y)
       local step = sign(amount)
       for i = 0, abs(amount) do
         if not obj.is_solid(0, step) then
-          obj.y += step
+          obj.y = obj.y + (step)
         else
           obj.spd.y = 0
           obj.rem.y = 0
@@ -887,7 +887,7 @@ function init_object(type, x, y)
         end
       end
     else
-      obj.y += amount
+      obj.y = obj.y + (amount)
     end
   end
   add(objects, obj)
@@ -904,7 +904,7 @@ end
 function kill_player(obj)
   sfx_timer = 12
   sfx(0)
-  deaths += 1
+  deaths = deaths + (1)
   shake = 10
   destroy_object(obj)
   dead_particles = {}
@@ -976,26 +976,26 @@ function _update()
   if frames == 0 and level_index() < 30 then
     seconds = ((seconds + 1) % 60)
     if seconds == 0 then
-      minutes += 1
+      minutes = minutes + (1)
     end
   end
   if music_timer > 0 then
-    music_timer -= 1
+    music_timer = music_timer - (1)
     if music_timer <= 0 then
       music(10, 0, 7)
     end
   end
   if sfx_timer > 0 then
-    sfx_timer -= 1
+    sfx_timer = sfx_timer - (1)
   end
   -- cancel if freeze
   if freeze > 0 then
-    freeze -= 1
+    freeze = freeze - (1)
     return
   end
   -- screenshake
   if shake > 0 then
-    shake -= 1
+    shake = shake - (1)
     camera()
     if shake > 0 then
       camera(-2 + rnd(5), -2 + rnd(5))
@@ -1003,7 +1003,7 @@ function _update()
   end
   -- restart (soon)
   if will_restart and delay_restart > 0 then
-    delay_restart -= 1
+    delay_restart = delay_restart - (1)
     if delay_restart <= 0 then
       will_restart = false
       load_room(room.x, room.y)
@@ -1025,7 +1025,7 @@ function _update()
       sfx(38)
     end
     if start_game then
-      start_game_flash -= 1
+      start_game_flash = start_game_flash - (1)
       if start_game_flash <= -30 then
         begin_game()
       end
@@ -1075,7 +1075,7 @@ function _draw()
   -- clouds
   if not is_title() then
     foreach(clouds, function(c)
-      c.x += c.spd
+      c.x = c.x + (c.spd)
       rectfill(c.x, c.y, c.x + c.w, c.y + 4 + (1 - c.w / 64) * 12, new_bg ~= nil and 14 or 1)
       if c.x > 128 then
         c.x = -c.w
@@ -1104,9 +1104,9 @@ function _draw()
   map(room.x * 16, room.y * 16, 0, 0, 16, 16, 8)
   -- particles
   foreach(particles, function(p)
-    p.x += p.spd
-    p.y += sin(p.off)
-    p.off += min(0.05, p.spd / 32)
+    p.x = p.x + (p.spd)
+    p.y = p.y + (sin(p.off))
+    p.off = p.off + (min(0.05, p.spd / 32))
     rectfill(p.x, p.y, p.x + p.s, p.y + p.s, p.c)
     if p.x > 128 + 4 then
       p.x = -4
@@ -1115,9 +1115,9 @@ function _draw()
   end)
   -- dead particles
   foreach(dead_particles, function(p)
-    p.x += p.spd.x
-    p.y += p.spd.y
-    p.t -= 1
+    p.x = p.x + (p.spd.x)
+    p.y = p.y + (p.spd.y)
+    p.t = p.t - (1)
     if p.t <= 0 then
       del(dead_particles, p)
     end

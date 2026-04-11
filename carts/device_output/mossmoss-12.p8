@@ -86,7 +86,7 @@ function Map_init()
         mset(e, n, SPR_SPIRIT_HIDDEN)
       end
       if key == SPR_SPIRIT or key == 10 then
-        G_spirit_max += 1
+        G_spirit_max = G_spirit_max + (1)
       end
       if key == SPR_LADDER_SPROUT and mget(e, n + 1) == SPR_LADDER_SPROUT then
         mset(e, n, SPR_LADDER_EMPTY)
@@ -153,8 +153,8 @@ function _load_room(n)
   G_room = room_base()
   merge(G_room, n)
   merge(G_room, G_room_defs[n.index] or {})
-  G_room.camera_x += G_room.camera_offset_x or 0
-  G_room.camera_y += G_room.camera_offset_y or 0
+  G_room.camera_x = G_room.camera_x + (G_room.camera_offset_x or 0)
+  G_room.camera_y = G_room.camera_y + (G_room.camera_offset_y or 0)
   G_rooms[G_room.index + 1] = G_room
 end
 
@@ -247,7 +247,7 @@ function init_bubble(n)
 
   function n:update()
     room_index = x // 128 + y // 128 * 8
-    y -= .5
+    y = y - (.5)
     local e = mget(pxl2cel(x), pxl2cel(y - (w + 1)))
     if fget(e, 0) and not fget(e, 5) then
       fx_init_bubble_pop(x, y, 12)
@@ -320,8 +320,8 @@ end
 
 function init_crown(n)
   local _ENV = n
-  y -= 4
-  x += 1
+  y = y - (4)
+  x = x + (1)
   type, w, h, base_y = 8, 2, 2, y
 
   function n:update()
@@ -373,7 +373,7 @@ function _draw_fx(n)
 end
 
 function _update()
-  G_time += 1
+  G_time = G_time + (1)
   cls()
   G_room:update()
   G_room:remove_expired_entities()
@@ -381,7 +381,7 @@ function _update()
     n:update()
   end)
   if G_shake_frames > 0 then
-    G_shake_frames -= 1
+    G_shake_frames = G_shake_frames - (1)
   end
   Map_update()
   reset_pal()
@@ -416,7 +416,7 @@ function _update()
     if G_flash == 1 then
       fx_init_bubble_pop(n, e, 7)
     end
-    G_flash -= 1
+    G_flash = G_flash - (1)
   end
   foreach(G_fx_top, _draw_fx)
   if G_cb_text_until then
@@ -434,8 +434,8 @@ function _draw_actor(d)
     return
   end
   if not (type == 0 and G_freeze > 0) then
-    frame += state.anim_speed and (not (props.climbing and abs(dy) == 0) and state.anim_speed or 0) or abs(dx) * .25
-    frame %= state.frames
+    frame = frame + (state.anim_speed and (not (props.climbing and abs(dy) == 0) and state.anim_speed or 0) or abs(dx) * .25)
+    frame = frame % (state.frames)
   end
   local n, e, t, o = x - 4 + state.x_offset, y - 4 + state.y_offset, state.key + flr(frame), spr_flip_x and not state.ignore_flip
   if type == 7 then
@@ -471,7 +471,7 @@ function fx_init_mossed_text(d, o, n, e, l)
   local t, c, u, i, f = #d, 66 - (#d * 8 - 1) / 2, 60 + (n or 0), {}, 0
   for n = 1, t do
     if e and (n == 1 or sub(d, n - 1, n - 1) == " ") then
-      f += 1
+      f = f + (1)
     end
     i[n] = e and (f - 1) * 18 or (n - 1) * 2
   end
@@ -491,8 +491,8 @@ function fx_init_mossed_text(d, o, n, e, l)
           print("\xe2\x81\xb6w\xe2\x81\xb6t\xe2\x81\xb6o0ff" .. sub(d, e, e), G_room.camera_x + c + (e - 1) * 8, G_room.camera_y + u + sin(a + e * 1.05) * 3, f == e - 1 and (l and 7 or 11) or l and 9 or 3)
         end
       end
-      a += .02
-      n += 1
+      a = a + (.02)
+      n = n + (1)
       yield()
     end
   end)
@@ -556,9 +556,9 @@ function _moss_draw(_ENV)
     pset(grass[n] + e, grass[n + 1] + d, o)
   end
   if fl_spr then
-    fl_frame += 1
+    fl_frame = fl_frame + (1)
     if fl_frame >= 20 and fl_stage < 2 then
-      fl_stage += 1
+      fl_stage = fl_stage + (1)
       fl_frame = 0
     end
     if n and fl_stage == 2 and not fl_done then
@@ -623,8 +623,8 @@ function fx_ambient_sparkle(e, o, n, d)
 end
 
 function _dust_draw(_ENV)
-  x += dx * .2
-  y += dy
+  x = x + (dx * .2)
+  y = y + (dy)
   local n = act >= 15 and (sm and 1 or 2.5) or act >= 10 and (sm and .5 or 2) or act >= 5 and (sm and -1 or 1.5) or (sm and -1 or 1)
   circfill(x, y, n, clr)
 end
@@ -638,17 +638,17 @@ end
 function fx_init_dust_cloud(f, e, o, d, r, l)
   local t, i = split "-4,-1,2,4", split "6,7,13,7"
   for n = 1, 4 do
-    e += d and 0 or t[n]
-    o += d and t[n] or 0
+    e = e + (d and 0 or t[n])
+    o = o + (d and t[n] or 0)
     fx_init_dust_single(f or i[n], e, o, r, l)
   end
 end
 
 function _bubble_draw(_ENV)
-  x += dx * .7
-  y += dy * .7
-  dx *= .92
-  dy *= .92
+  x = x + (dx * .7)
+  y = y + (dy * .7)
+  dx = dx * (.92)
+  dy = dy * (.92)
   circfill(x, y, rv and (act < 5 and 1 or .8) or (act < 5 and .8 or 1), clr)
 end
 
@@ -668,7 +668,7 @@ function _fx_init_particles(e, o, d)
   end
   add(d or G_fx, {draw = function(e)
     for e in all(n) do
-      e.act -= 1
+      e.act = e.act - (1)
       if e.act < 0 then
         del(n, e)
       else
@@ -717,21 +717,21 @@ function room_base()
           if o & 1 == 1 then
             local o = f & 64 ~= 0
             if not o then
-              mossable_surfaces_count += 1
+              mossable_surfaces_count = mossable_surfaces_count + (1)
             else
-              void_moss_count += 1
+              void_moss_count = void_moss_count + (1)
             end
             local f = n .. ":" .. e .. ":" .. t
             mossable_surfaces[f] = {celx = n, cely = e, flag_bit = t, is_void = o, tile_key = d}
           end
           o = o >> 1
-          t += 1
+          t = t + (1)
         end
       end
     end
     if mossable_surfaces_count > 0 then
       is_mappable = true
-      G_mossable_rooms += 1
+      G_mossable_rooms = G_mossable_rooms + (1)
     end
   end
 
@@ -763,13 +763,13 @@ function room_base()
       sfx(_msfx, 1)
       fx_init_moss(n, e)
       if d.is_void then
-        void_moss_count -= 1
+        void_moss_count = void_moss_count - (1)
         if void_moss_count == 0 then
           G_player:celebrate()
           set_win()
         end
       else
-        mossable_surfaces_count -= 1
+        mossable_surfaces_count = mossable_surfaces_count - (1)
         if mossable_surfaces_count == 0 then
           self:set_well_mossed()
         end
@@ -838,17 +838,17 @@ function room_base()
       for n in all(n) do
         local _ENV = n
         local n = max(abs(tx - x) + abs(ty - y), .01)
-        x += (tx - x) / n * .2
-        y += (ty - y) / n * .2
+        x = x + ((tx - x) / n * .2)
+        y = y + ((ty - y) / n * .2)
         if rnd() < .03 then
           tx, ty = self:_random_point()
         end
         local n, e = x - G_player.x, y - G_player.y
         if abs(n) + abs(e) < 24 then
-          x += sgn(n) * .4
-          y += sgn(e) * .4
+          x = x + (sgn(n) * .4)
+          y = y + (sgn(e) * .4)
         end
-        p += .008
+        p = p + (.008)
         pset(x + sin(G_time * .008 + o) * 4, y + cos(G_time * .006 + o) * 3, sin(p) > .1 and 10 or 1)
       end
     end})
@@ -862,8 +862,8 @@ function room_base()
       end
       for o = #n, 1, -1 do
         local _ENV = n[o]
-        phase += speed
-        y -= drift_speed
+        phase = phase + (speed)
+        y = y - (drift_speed)
         if phase >= 1 then
           del(n, _ENV)
         else
@@ -1024,14 +1024,14 @@ function init_player(n)
       if btnp(4) then
         G_freeze = 0
       else
-        G_freeze -= 1
+        G_freeze = G_freeze - (1)
         return
       end
     elseif is_hidden then
       return
     end
     for e, n in next, timers do
-      n -= 1
+      n = n - (1)
       timers[e] = n > 0 and n or nil
     end
     if timers.crown_celebrate == 1 then
@@ -1040,7 +1040,7 @@ function init_player(n)
     if timers.moss_celebrate or timers.crown_celebrate then
       dy = 0
       if props.grounded then
-        y -= 2
+        y = y - (2)
       end
       self:set_state(STATE_PLAYER_CELEBRATE, true)
       return
@@ -1097,7 +1097,7 @@ function init_player(n)
           dy = 1.2
         elseif props.ceiling_mossing then
           dy = btn(3) and 1.5 or -2
-          dash.dx *= 2
+          dash.dx = dash.dx * (2)
         else
           dy = btn(3) and 1.5 or 0
           self:set_state(STATE_PLAYER_AIR_DASH)
@@ -1200,7 +1200,7 @@ function init_player(n)
     end
     local n = _get_overlaps(7)[1]
     if n then
-      G_spirits_collected += 1
+      G_spirits_collected = G_spirits_collected + (1)
       timers.spirit_flash, G_freeze = 7, 7
       fx_init_bubble_pop(x, y, 7, true)
       fx_init_dust_cloud(7, n.x, n.y + 2, true)
@@ -1253,7 +1253,7 @@ function init_player(n)
         n = self:_move_axis(true, t)
       end
       local n = d and min(1, dy - e) or max(-1, dy - e)
-      e += n
+      e = e + (n)
       if n ~= 0 and self:_move_step(false, n, d) then
         o = true
         break
@@ -1317,7 +1317,7 @@ function init_player(n)
         self:set_state(STATE_PLAYER_JUMP)
         timers.dash_cooldown = nil
         if dash.active then
-          dash.dx *= .2
+          dash.dx = dash.dx * (.2)
           dy = max(0, dy)
         end
       elseif props.mossing then
@@ -1333,7 +1333,7 @@ function init_player(n)
         end
       end
     end
-    idle_timer += 1
+    idle_timer = idle_timer + (1)
     if abs(dx) > 0 or abs(dy) > 0 then
       idle_timer = 0
     end
@@ -1343,7 +1343,7 @@ function init_player(n)
     local o, e = n > 0, 0
     while abs(e) < abs(n) do
       local n = o and min(1, n - e) or max(-1, n - e)
-      e += n
+      e = e + (n)
       if self:_move_step(d, n, o) then
         return true
       end
@@ -1363,7 +1363,7 @@ function init_player(n)
       end
 
       if not n and e and props.grounded and (dx > 0 and not self:_is_solid_cell(x + (G_in_void and 2 or 0), t, true) or dx < 0 and not self:_is_solid_cell(x - (G_in_void and 3 or 1), t, true)) then
-        y += o
+        y = y + (o)
         return true
       end
       if n then
@@ -1400,9 +1400,9 @@ function init_player(n)
       return true
     end
     if n then
-      x += o
+      x = x + (o)
     else
-      y += o
+      y = y + (o)
     end
   end
 
@@ -1446,7 +1446,7 @@ function init_player_dash()
   function n:decay()
     if active then
       if abs(dx) > 0 then
-        dx *= PLAYER_DASH_DX_DECAY
+        dx = dx * (PLAYER_DASH_DX_DECAY)
         if abs(dx) < .15 then
           self:stop()
         end
@@ -1476,7 +1476,7 @@ function init_player_dash()
     end
     if active and grounded and not n.grounded then
       should_full_boost = false
-      dx *= .8
+      dx = dx * (.8)
     end
     self:decay()
   end
@@ -1516,14 +1516,14 @@ function hud_leaf(e, o)
   add(G_fx_top, {draw = function(r)
     local d, t = _hud_layout()
     local d, t = d + 31, t + 10
-    n += 1
+    n = n + (1)
     local f = (n / 28) ^ 2
     circfill(e + (d - e) * f, o + (t - o) * f, 2, 11)
     if n >= 28 then
       fx_init_dust_cloud(11, d, t, false, false, G_fx_top)
       sfx(SFX_THUD)
       screen_shake_vert()
-      G_leaves_collected += 1
+      G_leaves_collected = G_leaves_collected + (1)
       convert_next_stair()
       destroy(r)
     end
@@ -1601,7 +1601,7 @@ function _walk_to_stair(n, e, t)
   local o, d = mget(n, e), n .. ":" .. e
   if o == SPR_STAIR then
     mset(n, e, SPR_STAIR_FILLED)
-    G_stairs_converted += 1
+    G_stairs_converted = G_stairs_converted + (1)
     G_last_stair_cx, G_last_stair_cy = n, e
     fx_init_dust_cloud(7, cel2pxl(n) + 6, cel2pxl(e))
     sfx(30, 2)
@@ -1633,7 +1633,7 @@ function init_void_spirit(e, n)
   local _ENV = e
   type, w, h = 9, 3, 3
   index, base_y, x = n, 9 * n - 55 - G_void_offset, 547 + rnd(50)
-  G_void_offset += (5.2 + (n - 1) * .7) ^ 2 / (2 * GRAVITY)
+  G_void_offset = G_void_offset + ((5.2 + (n - 1) * .7) ^ 2 / (2 * GRAVITY))
   draw = draw_ambient_sparkle
 
   function e:update()

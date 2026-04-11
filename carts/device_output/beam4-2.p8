@@ -159,9 +159,9 @@ function update_sparkles()
   for i = #sparkles, 1, -1 do
     local s = sparkles[i]
     if s.t < 0 then
-      s.t += .05
+      s.t = s.t + (.05)
     else
-      s.t += rnd(.05)
+      s.t = s.t + (rnd(.05))
       if s.t >= 1 then
         del(sparkles, s)
       end
@@ -217,7 +217,7 @@ function u_bird()
         end
         mark_bird_freed(x, y)
         if birds > 0 then
-          birds -= 1
+          birds = birds - (1)
         end
         if is "cave,cave2,cave3" then
           multi_sfx [[61]]
@@ -228,15 +228,15 @@ function u_bird()
     end
   end
   for e in all(fly) do
-    e.ex += e.d
-    e.ey -= e.d + .5
+    e.ex = e.ex + (e.d)
+    e.ey = e.ey - (e.d + .5)
     if e.age < 4 then
-      e.age += .01
+      e.age = e.age + (.01)
     end
     if is "cave,cave2,cave3" and e.age > 4 then
       e.sp = 0
     elseif e.sp < 43.8 and e.sp > 1 then
-      e.sp += .2
+      e.sp = e.sp + (.2)
     else
       e.sp = 40
     end
@@ -551,7 +551,7 @@ function upd_storm()
   if p.x < -454 then
     n = 3.5
   end
-  flashdown -= n
+  flashdown = flashdown - (n)
   if flashdown <= 3 then
     if not is "cave,cave3" then
       flash = true
@@ -604,32 +604,32 @@ function p_inputs()
   elseif btn(3) then
     i_y = 1
   end
-  p.velocity_x += i_x * p.ac
-  p.velocity_y += i_y * p.ac
-  p.velocity_x *= .8
-  p.velocity_y *= .8
+  p.velocity_x = p.velocity_x + (i_x * p.ac)
+  p.velocity_y = p.velocity_y + (i_y * p.ac)
+  p.velocity_x = p.velocity_x * (.8)
+  p.velocity_y = p.velocity_y * (.8)
   local c_s = sqrt(p.velocity_x ^ 2 + p.velocity_y ^ 2)
   if c_s > p.m_speed then
     local ratio = p.m_speed / c_s
-    p.velocity_x *= ratio
-    p.velocity_y *= ratio
+    p.velocity_x = p.velocity_x * (ratio)
+    p.velocity_y = p.velocity_y * (ratio)
   end
   if shoes then
     if btn(5) and not p.idle then
       if sho < 1.6 then
-        sho += .01
+        sho = sho + (.01)
       end
-      p.velocity_x *= sho
-      p.velocity_y *= sho
+      p.velocity_x = p.velocity_x * (sho)
+      p.velocity_y = p.velocity_y * (sho)
     else
       sho = 1
     end
   end
-  p.x += p.velocity_x
+  p.x = p.x + (p.velocity_x)
   if collide() then
     p.x = lx
   end
-  p.y += p.velocity_y
+  p.y = p.y + (p.velocity_y)
   if collide() then
     p.y = ly
   end
@@ -642,7 +642,7 @@ function p_anim()
       p.d_left, p.d_right, p.d_up, p.d_down, p.idle = unpack_tfnsplit "-t-,-f-,-f-,-f-,-f-"
       if t - p.anim > .09 then
         p.anim = t
-        p.sp += sho
+        p.sp = p.sp + (sho)
         if p.sp > 69 then
           p.sp = 64
         end
@@ -651,7 +651,7 @@ function p_anim()
       p.d_right, p.d_up, p.d_down, p.d_left, p.idle = unpack_tfnsplit "-t-,-f-,-f-,-f-,-f-"
       if t - p.anim > .09 then
         p.anim = t
-        p.sp += sho
+        p.sp = p.sp + (sho)
         if p.sp > 69 then
           p.sp = 64
         end
@@ -661,7 +661,7 @@ function p_anim()
       p.d_up, p.d_right, p.d_down, p.d_left, p.idle = unpack_tfnsplit "-t-,-f-,-f-,-f-,-f-"
       if t - p.anim > .09 then
         p.anim = t
-        p.spyup += sho
+        p.spyup = p.spyup + (sho)
         if p.spyup > 85 then
           p.spyup = 80
         end
@@ -671,7 +671,7 @@ function p_anim()
       p.d_down, p.d_right, p.d_up, p.d_left, p.idle = unpack_tfnsplit "-t-,-f-,-f-,-f-,-f-"
       if t - p.anim > .09 then
         p.anim = t
-        p.spdown += sho
+        p.spdown = p.spdown + (sho)
         if p.spdown > 101 then
           p.spdown = 96
         end
@@ -876,9 +876,9 @@ function wksnd()
   local pmg = mget((p.x + 1) / 8, (p.y + 4) / 8)
   if not p.idle and ftsteps and trans < 1 then
     if shoes and btn(5) then
-      wtime += 1.4
+      wtime = wtime + (1.4)
     else
-      wtime += 1
+      wtime = wtime + (1)
     end
     if wtime > 18 then
       if fget(pmg, 5) then
@@ -928,8 +928,8 @@ function plr()
     end
   end
   for e in all(danim) do
-    e.age += 2
-    e.y -= .5
+    e.age = e.age + (2)
+    e.y = e.y - (.5)
     no_flash_pal()
     spr((cave or cave2) and 75 or 26, e.x, e.y)
     if e.age > 30 then
@@ -951,7 +951,7 @@ end
 
 function u_ripple()
   for r in all(rips) do
-    r.rad += .08
+    r.rad = r.rad + (.08)
     if r.rad > 10 then
       del(rips, r)
     end
@@ -979,7 +979,7 @@ end
 
 function rip_action()
   local rn = rnd(2) - 1
-  d += 1
+  d = d + (1)
   if d > 22 then
     add(rips, {x = p.x + rn, y = p.y + (rn - .5), rad = 1, col = 7})
     d = 0
@@ -990,7 +990,7 @@ cts = 0
 
 function intro_cam()
   if cts < 256 then
-    cts += .5
+    cts = cts + (.5)
   else
     intro = false
   end
@@ -1835,7 +1835,7 @@ function overlays()
     multi_rect [[212,220,213,221,15]]
   end
   if wspr <= 239.6 then
-    wspr += .2
+    wspr = wspr + (.2)
   else
     wspr = 238
   end
@@ -1902,9 +1902,9 @@ function wpart_update()
     add(parts, {x = 503 + rnd(18), y = 70 + rnd(2), r = rnd(4), c = 15, l = 3, speed = .3})
   end
   for p in all(parts) do
-    p.y -= p.speed
-    p.l -= .1
-    p.r -= .03
+    p.y = p.y - (p.speed)
+    p.l = p.l - (.1)
+    p.r = p.r - (.03)
     if p.l < 2.8 then
       p.c = 7
     end
@@ -1924,7 +1924,7 @@ r = 0
 
 function w_rip_action(wx, ww, wy)
   local km = rnd(2) - 1
-  r += 1
+  r = r + (1)
   if r > 20 then
     add(rips, {x = rnd(ww) + wx, y = wy + km, rad = 2, col = 7})
     r = 0
@@ -2024,7 +2024,7 @@ end
 
 function transfer()
   if trans > 0 then
-    trans -= .75
+    trans = trans - (.75)
     circfill(vidx + 64, vidy + 64, trans * 3, 1)
   end
 end
@@ -2059,7 +2059,7 @@ function beam(nm, col, xs, ys, pt, wh, xa, xy)
     spr(49, xs - 4, ys - 4)
     rectfill(xs - 1, ys - 2, xs + 1, ys + 1, rnd {col, wh, col})
   end
-  throb -= .005
+  throb = throb - (.005)
   for i = 1, pt do
     circfill(i * xa + xs, i * xy + ys, rnd(throb), rnd {col, wh, col})
     if throb < 1 then
@@ -2099,9 +2099,9 @@ function chest()
     multi_sfx [[15,-1,0,8]]
   end
   if mirror then
-    t += 1
+    t = t + (1)
     if t <= 100 then
-      em -= .2
+      em = em - (.2)
       spr(114, 960, em)
       if em < 288 then
         em = 288
@@ -2272,14 +2272,14 @@ function cave_col_sw(nm)
     multi_pal [[5,2]]
     multi_sfx [[3,1]]
     if grow > 0 then
-      grow -= 2
+      grow = grow - (2)
     end
   end
 end
 
 function info_1()
   if mget((p.x + 4) / 8, p.y / 8) == 51 then
-    d += 1
+    d = d + (1)
     camera()
     multi_rectfill [[73, 13, 124, 48, 2]]
     multi_pal [[9,1
@@ -2318,7 +2318,7 @@ end
 
 function enter_dark_drw(c)
   if btn(4) and menu_glow then
-    rect_y -= 1
+    rect_y = rect_y - (1)
     rectfill(vidx, vidy + 127, vidx + 300, rect_y, c)
     max_sparkles = abs(vidy + 127 - rect_y) * 1.1
   else
@@ -2361,7 +2361,7 @@ function bm_chg(sp, sx, sy, sc, chg_num)
     pal()
   end
   if beam_go[chg_num] and bt[chg_num] < 21 then
-    bt[chg_num] += .5
+    bt[chg_num] = bt[chg_num] + (.5)
   end
   bm_indicator(chg_num)
 end
@@ -2415,7 +2415,7 @@ function dark_light(x, y, g, ng)
 end
 
 function grow_light(xs, ys, col, wh)
-  grow -= 1.5
+  grow = grow - (1.5)
   if grow > 0 then
     max_sparkles = 200
     if grow < 11 then
@@ -2533,9 +2533,9 @@ function packb(a)
   local v, p = 0, 1
   for i = 1, #a do
     if a[i] then
-      v += p
+      v = v + (p)
     end
-    p *= 2
+    p = p * (2)
   end
   return v
 end
@@ -2573,9 +2573,9 @@ function pack_birds(s)
   local v, p = 0, 1
   for i = s, s + 15 do
     if bird_freed[i] then
-      v += p
+      v = v + (p)
     end
-    p *= 2
+    p = p * (2)
   end
   return v
 end
@@ -2583,7 +2583,7 @@ end
 function unpack_birds(v, s)
   for i = s, s + 15 do
     bird_freed[i] = v % 2 > 0
-    v //= 2
+    v = v // (2)
   end
 end
 
@@ -2607,7 +2607,7 @@ function sv()
   if intro or not is "game1,cave,cave2,cave3,cave4,woods1,mtn,gameover" then
     return
   end
-  svt += 1
+  svt = svt + (1)
   if svt < 60 then
     return
   end

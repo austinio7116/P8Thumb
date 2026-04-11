@@ -42,17 +42,17 @@ function _update()
     lclk, rclk = btnp "5", btnp "4"
   end
   if title then
-    cx += cvx
-    cy += cvy
+    cx = cx + (cvx)
+    cy = cy + (cvy)
     if cx % 256 == 0 then
-      cvx *= -1
+      cvx = cvx * (-1)
     end
     if cy % 127 == 0 then
-      cvy *= -1
+      cvy = cvy * (-1)
     end
     if btnp "0" or btnp "1" then
-      diff += btnp() ~ -2
-      diff %= 5
+      diff = diff + (btnp() ~ -2)
+      diff = diff % (5)
       sfx "18"
     end
     add(pc, deli(btnp "4" and pc, 1))
@@ -79,8 +79,8 @@ function _update()
       return
     end
   end
-  cf += 1
-  cf %= 60
+  cf = cf + (1)
+  cf = cf % (60)
   ip()
   if ls then
     poke "0x5f2d"
@@ -89,7 +89,7 @@ function _update()
       music "63"
     end
     if rclk then
-      ban ^^= 240
+      ban = ban ~ (240)
     end
     return
   end
@@ -97,7 +97,7 @@ function _update()
   z = split "5,10,15,30,30,60,60,60,60,60,60" [tot // 50]
   aspl "pos,asc,sele"
   upc, hbld, selh, selb, hunit, idl, idlm = cf % z, g(bldgs, mx8, my8, {})
-  res1.t += .03333
+  res1.t = res1.t + (.03333)
   if cf % 30 == 19 then
     for tx = 0, 19 do
       for ty = 0, 12 do
@@ -120,7 +120,7 @@ function _update()
     if norm(b.p1, b, typ.ps) then
       del(prj, b)
       for u in all(units) do
-        if u.ap != b.p1[3] and int(u.r, {b.x, b.y, b.x, b.y}, typ.aoe) then
+        if u.ap ~= b.p1[3] and int(u.r, {b.x, b.y, b.x, b.y}, typ.aoe) then
           dmg(typ, u)
           if typ.aoe == 0 then
             break
@@ -236,7 +236,7 @@ function _draw()
     p "var=hlv"
   elseif hlv.f then
     circ(hlv.typ, hlv.x, min(hlv.f / dt, 4), hlv.c)
-  elseif mid(dt, .1, .25) != dt and hlv.r then
+  elseif mid(dt, .1, .25) ~= dt and hlv.r then
     rect(unpack(hlv.r))
   end
   dm()
@@ -276,11 +276,11 @@ function cpy(typ, _ENV)
 end
 
 local function pay(typ, dir, _ENV)
-  r -= typ.r * dir
-  g -= typ.g * dir
-  b -= typ.b * dir
+  r = r - (typ.r * dir)
+  g = g - (typ.g * dir)
+  b = b - (typ.b * dir)
   if typ.unit then
-    pop += dir
+    pop = pop + (dir)
   end
 end
 
@@ -300,7 +300,7 @@ local function rb(b)
   reg(x, y, b.h8 or reg(x, y - 1), b.w8 or reg(x + 1, y, b.h8 or reg(x + 1, y - 1)))
   if not b.ct and not b.farm then
     qdm "d"
-    b.pres.reqs |= b.bmap
+    b.pres.reqs = b.pres.reqs | (b.bmap)
   end
 end
 
@@ -324,7 +324,7 @@ local function box(_ENV)
   r, x8, y8, dmgd, ai, ap, pres = {x - w / 2 - 1, y - h / 2 - 1, x + w / 2, y + h / 2, 8}, x // 8, y // 8, hp < mh, gl.ais[ply], ply | 9, gl.res[ply]
   k, hu = x8 | y8 << 8, not ai
   if not ct then
-    hp += typ.hp - mh
+    hp = hp + (typ.hp - mh)
     mh = typ.hp
   end
   return _ENV
@@ -352,9 +352,9 @@ local function sr(fn, x, y, n, na)
     for dy = -n, n do
       local xx, yy = x + dx, y + dy
       if min(xx, yy) >= 0 and xx < 48 and yy < 32 and (na or acc(xx, yy)) then
-        e = e or dx | dy != 0
+        e = e or dx | dy ~= 0
         if fn then
-          fn {xx, yy, d = dx & dy != 0 and 1.4 or 1, k = xx | yy << 8}
+          fn {xx, yy, d = dx & dy ~= 0 and 1.4 or 1, k = xx | yy << 8}
         end
       end
     end
@@ -383,8 +383,8 @@ end
 function norm(it, _ENV, f)
   local dx, dy = it[1] - x, it[2] - y
   _d, dir = dist(dx, dy) + .0001, gl.sgn(dx)
-  x += dx * f / _d
-  y += dy * f / _d
+  x = x + (dx * f / _d)
+  y = y + (dy * f / _d)
   return _d < 1
 end
 
@@ -398,12 +398,12 @@ function bd()
 end
 
 function dmg(typ, to)
-  to.hp -= typ.atk * dmt[typ.atk_typ .. to.def]
+  to.hp = to.hp - (typ.atk * dmt[typ.atk_typ .. to.def])
   if to.st.idl or to.st.y then
     w(to)
   end
-  to.conv += typ.conv
-  if to.ai and to.grp != "atk" then
+  to.conv = to.conv + (typ.conv)
+  if to.ai and to.grp ~= "atk" then
     to.ai.deft = t()
     mvg(to.ai.p1, to.x, to.y, "atk")
   end
@@ -415,7 +415,7 @@ function dmg(typ, to)
     sfx "34"
     hi {105 + to.x / 20.21, 107 + to.y / 21.33, 3, 14}
     alert = hlt
-    hlt += 2.5
+    hlt = hlt + (2.5)
   end
 end
 
@@ -438,11 +438,11 @@ end
 function prod(_ENV, b, m)
   pay(b, 1, pres)
   q = q or p("qty=0", b, b.t * m)
-  q.qty += 1
+  q.qty = q.qty + (1)
 end
 
 function unit(t, _x, _y, _ply, _ct, _disc, _hp)
-  tot += 1
+  tot = tot + (1)
   local _typ = typs[t] or t
   local _ENV = add(units, p([[dir=1
 lp=1
@@ -861,9 +861,9 @@ idx=15
 txt=⁶h²5ᶜabaskets:ᶜ7 increase worker⁶g⁴mgathering efficiency.
 ptx=24
 pty=80]], ant, function(_ENV)
-    cap //= .72
-    spd *= 1.12
-    gr *= .9
+    cap = cap // (.72)
+    spd = spd * (1.12)
+    gr = gr * (.9)
   end), p([[t=10
 r=10
 g=10
@@ -1275,8 +1275,8 @@ txt=⁶h²5ᶜamantis upgr.:ᶜ7 increase mantis⁶g⁴mconversion rate and hp b
 ptx=62
 pty=88]], monk, function(_ENV)
     spd = .286
-    hp *= 1.25
-    conv *= 1.25
+    hp = hp * (1.25)
+    conv = conv * (1.25)
   end), p([[t=40
 r=20
 g=0
@@ -1300,8 +1300,8 @@ idx=16
 txt=⁶h²5ᶜabeetle upgr.:ᶜ7 increase beetle⁶g⁴mattack and hp by 15%
 ptx=25
 pty=88]], beetle, function(_ENV)
-    atk *= 1.15
-    hp *= 1.15
+    atk = atk * (1.15)
+    hp = hp * (1.15)
   end), p([[t=30
 r=10
 g=10
@@ -1313,8 +1313,8 @@ idx=17
 txt=⁶h²5ᶜaspider upgr.:ᶜ7 increase spider⁶g⁴mattack and hp by 20%
 ptx=16
 pty=88]], spider, function(_ENV)
-    atk *= 1.2
-    hp *= 1.2
+    atk = atk * (1.2)
+    hp = hp * (1.2)
   end)}
   mound.prod = {p([[t=12
 r=12
@@ -1327,8 +1327,8 @@ idx=18
 txt=⁶h²5ᶜafarm upgr.:ᶜ7 increase farm growth⁶g⁴mrate and lifespan.
 ptx=60
 pty=80]], farm, function(_ENV)
-    gr *= 1.15
-    mcyc //= .6
+    gr = gr * (1.15)
+    mcyc = mcyc // (.6)
   end)}
   brks.prod = {warant, archer, p([[t=10
 r=9
@@ -1352,9 +1352,9 @@ idx=20
 txt=⁶h²5ᶜaarmy ant upgr.:ᶜ7 increase army⁶g⁴mant hp+attack by 33%
 ptx=43
 pty=88]], warant, function(_ENV)
-    atk *= 1.333
+    atk = atk * (1.333)
     los = 30
-    hp *= 1.333
+    hp = hp * (1.333)
   end), p([[t=10
 r=15
 g=0
@@ -1366,8 +1366,8 @@ idx=21
 txt=⁶h²5ᶜaacid-spitting ant upgr.:ᶜ7⁶g⁴mincrease its hp+attack by 25%
 ptx=34
 pty=88]], archer, function(_ENV)
-    atk *= 1.25
-    hp *= 1.25
+    atk = atk * (1.25)
+    hp = hp * (1.25)
   end)}
   castle.prod = {p [[var=cat
 txt=⁶h²5ᶜ9caterpillar: ᶜ7ranged unit, very⁶g⁴mgood vs buildings.
@@ -1589,7 +1589,7 @@ local function gd(u, r, dr)
   local wayp
   if not dr then
     wayp, x, y = dpath(u, "d")
-    dr = (not wayp or g(bldgs, x, y, {}).ply != u.ply) and units[u.ply]
+    dr = (not wayp or g(bldgs, x, y, {}).ply ~= u.ply) and units[u.ply]
   end
   u.st = p([[t=drop
 drop=1
@@ -1614,7 +1614,7 @@ end
 function tick(u)
   u.on, u.upd, wayp, ut = int(box(u).r, {cx, cy, cx + 128, cy + 104}, 0), u.id % z == upc, u.st.typ, u.typ
   if u.hp <= 0 and u.a then
-    tot -= 1
+    tot = tot - (1)
     u.st, u.dead, u.fmr, u.a = p "t=dead", ut.d
     del(sel, u, u.bldg and rb(u), u.on and sfx(ut.ds))
     if ut.l then
@@ -1623,7 +1623,7 @@ function tick(u)
       dms.r[t.k] = t
       qdm "r"
     elseif u.qn then
-      npl -= 1
+      npl = npl - (1)
       if npl == 1 or u == hq then
         ls, sel = min(u.ply, 2), {}
         music "56"
@@ -1632,13 +1632,13 @@ function tick(u)
         end
       end
     elseif ut.drop and not u.ct then
-      u.pres.pl -= ut.drop
+      u.pres.pl = u.pres.pl - (ut.drop)
     elseif u.unit then
-      u.pres.pop -= 1
+      u.pres.pop = u.pres.pop - (1)
     end
   end
   if u.dead then
-    u.dead += 1
+    u.dead = u.dead + (1)
     del(u.dead == 60 and units, u)
     return
   end
@@ -1655,7 +1655,7 @@ function tick(u)
   local ux, uy, t, los, agg_d, agg_u = u.x, u.y, u.st.x, ut.los, 9999, u.q and pr(u)
   if u.farm then
     local _ENV = u
-    if fmr and fmr.st.farm != u or exp then
+    if fmr and fmr.st.farm ~= u or exp then
       fmr = nil
     end
   end
@@ -1675,7 +1675,7 @@ function tick(u)
     _ENV[u.st.t](u)
   end
   if ut.hl and u.dmgd then
-    u.hp += heal[u.ply].qty
+    u.hp = u.hp + (heal[u.ply].qty)
   end
   if int(u.r, {mx, my, mx, my}, 1) and (not hunit or hunit.hu) then
     hunit = u
@@ -1706,7 +1706,7 @@ function tick(u)
         if u.st.idl > 10 then
           idl = u
         end
-        u.st.idl += 1
+        u.st.idl = u.st.idl + (1)
       elseif ut.idl and not u.q then
         idlm = u
       end
@@ -1731,11 +1731,11 @@ function tick(u)
     end
     if u.st.agg and u.atk then
       for _ENV in all(units) do
-        if ap != u.ap or u.mnk and dmgd and not bldg then
+        if ap ~= u.ap or u.mnk and dmgd and not bldg then
           local d = dist(ux - x, uy - y)
           if a and d <= los then
             if bldg then
-              d += u.sg and bldg == 1 and -999 or 999
+              d = d + (u.sg and bldg == 1 and -999 or 999)
             end
             if d < agg_d then
               agg_u, agg_d = _ENV, d
@@ -1778,12 +1778,12 @@ function du(_ENV)
     local bar = ct / typ.ct
     line(fw - 1, us "0,0,0,5")
     line(fw * bar, 0, 14)
-    sx += bar // -.5 * fw
+    sx = sx + (bar // -.5 * fw)
     if bar <= .15 then
       return
     end
   elseif ufps then
-    sx += f // ufps % fr * fw
+    sx = sx + (f // ufps % fr * fw)
   end
   pal {selc or pres.col, 2, 3, 4, farm and selc or 5, us "6,7,8,9,10,11,12,13,0"}
   sspr(sx, sy, w, h, 1, 1, w, h, not typ.f and dir == typ.sdir)
@@ -1805,7 +1805,7 @@ end
 
 local function collect(_ENV, r)
   if res and res.typ == r then
-    res.qty += 1
+    res.qty = res.qty + (1)
   else
     res = p("qty=1", r)
   end
@@ -1816,7 +1816,7 @@ end
 
 function drop(_ENV)
   if res then
-    pres[res.typ] += res.qty / typ.gr
+    pres[res.typ] = pres[res.typ] + (res.qty / typ.gr)
   end
   st.idl, res = 11
   if st.farm then
@@ -1834,12 +1834,12 @@ function frm(u)
     rt(u)
   elseif gl.cf == 0 then
     if ready then
-      fres -= 1
-      sproff += 1
+      fres = fres - (1)
+      sproff = sproff + (1)
       collect(u, "r")
       if fres < 1 then
         gd(u)
-        cyc += 1
+        cyc = cyc + (1)
         exp, ready = cyc >= typ.mcyc
         if exp and ai then
           cyc, exp = 0, pay(gl.ren, 1, pres)
@@ -1848,7 +1848,7 @@ function frm(u)
       end
       u.st.farm = _ENV
     else
-      fres += typ.gr
+      fres = fres + (typ.gr)
       sproff, ready = fres * 2, fres >= 9
     end
   end
@@ -1863,7 +1863,7 @@ function atk(u)
       if cf % typ.atk_freq == u.id % typ.atk_freq then
         if e.ap == u.ap then
           if typ.mnk and e.dmgd then
-            e.hp += 1
+            e.hp = e.hp + (1)
             if u.on then
               sfx "20"
             end
@@ -1877,8 +1877,8 @@ function atk(u)
             if e.qn then
               e.hp = 0
             else
-              e.pres.pop -= 1
-              u.pres.pop += 1
+              e.pres.pop = e.pres.pop - (1)
+              u.pres.pop = u.pres.pop + (1)
               e.ply, e.conv = u.ply, 0
             end
             del(e.sqd, e)
@@ -1887,7 +1887,7 @@ function atk(u)
         end
       end
     elseif u.hu and viz[e.k] or typ.los >= d or e.disc then
-      ga(u, e.k != u.st.k and e)
+      ga(u, e.k ~= u.st.k and e)
     elseif not u.st.typ then
       rt(u)
     end
@@ -1898,21 +1898,21 @@ function bld(u)
   if cf % 30 == 0 then
     local _ENV = u.st.x
     if ct then
-      ct += 1
-      mh += hpr
-      hp += hpr
+      ct = ct + (1)
+      mh = mh + (hpr)
+      hp = hp + (hpr)
       if ct >= typ.ct then
         ct = nil
         rb(_ENV, u.hu and sfx "26")
         if drop then
-          pres.pl += 5
+          pres.pl = pres.pl + (5)
         elseif farm then
           gf(u, _ENV)
         end
       end
     elseif dmgd and pres.b >= 1 then
-      hp += 2
-      pres.b -= .1
+      hp = hp + (2)
+      pres.b = pres.b - (.1)
     else
       rt(u)
       sr(function(t)
@@ -1936,7 +1936,7 @@ function gth(u)
       gd(u, r)
     end
   elseif cf == u.id then
-    f += res1.diff * u.ap // 33 * 5
+    f = f + (res1.diff * u.ap // 33 * 5)
     local n = g(rtiles, x, y, f) - 1
     collect(u, r)
     if t < 112 and (n == f // 3 or n == f // 1.25) then
@@ -1953,19 +1953,19 @@ end
 
 function pr(_ENV)
   local bld = q.typ
-  q.x -= .03333
+  q.x = q.x - (.03333)
   if q.x <= 0 then
     if bld.x then
       local _ENV = bld
-      gl.res1.techs |= tmap
+      gl.res1.techs = gl.res1.techs | (tmap)
       x(typ.p1)
       sfx "33"
       if up and up < 1 then
-        up += 1
-        r *= 1.75
-        g *= 2
-        b *= 2
-        t *= 1.5
+        up = up + (1)
+        r = r * (1.75)
+        g = g * (2)
+        b = b * (2)
+        t = t * (1.5)
         done = nil
       end
     else
@@ -1977,7 +1977,7 @@ function pr(_ENV)
       end
     end
     if q.qty > 1 then
-      q.qty -= 1
+      q.qty = q.qty - (1)
       q.x = bld.t
     else
       q = nil
@@ -1992,14 +1992,14 @@ end
 function cam()
   local b = btn()
   if b > 255 then
-    b >>= 8
+    b = b >> (8)
   end
   local dx, dy = (b & 2) - (b & 1) * 2, (b & 8) / 4 - (b & 4) / 2
-  if dget "0" != 2 or ls then
+  if dget "0" ~= 2 or ls then
     amx, amy = stat "32", stat "33"
   else
-    amx += dx
-    amy += dy
+    amx = amx + (dx)
+    amy = amy + (dy)
     dx, dy = amx // 128 * 2, amy // 128 * 2
   end
   cx, cy, amx, amy = mid(cx + dx, 256), mid(cy + dy, ls and 128 or 151), mid(amx, 126), mid(amy, 126)
@@ -2144,7 +2144,7 @@ function dmap()
         end, unpack(pt))
       end
     end
-    cdq.c += 1
+    cdq.c = cdq.c + (1)
     cdq.typ, cdq.p2 = cdq.p2, {}
     if cdq.c == 9 then
       dmaps[cdq.x], cdq = cdq.p1
@@ -2205,7 +2205,7 @@ y=0
 x=32767]], st)}
 
   local function path(s, f, e)
-    while s.typ != st do
+    while s.typ ~= st do
       add(f, {s.typ[1] * 8 + 4, s.typ[2] * 8 + 4}, 1)
       asc[s.typ.k | gk], s = {e = e, unpack(f)}, t[s.p.k]
     end
@@ -2223,7 +2223,7 @@ x=32767]], st)}
     end
     sh = fr[m]
     fr[m], sh.d = fr[frl], 1
-    frl -= 1
+    frl = frl - (1)
     local pt = sh.typ
     local f = asc[pt.k | gk] or (pt.k == g.k or sh.x <= max(d)) and {e = 1}
     if f then
@@ -2233,7 +2233,7 @@ x=32767]], st)}
       local ob, x = t[n.k], sh.y + n.d
       if not ob then
         ob = {y = 32767, typ = n, x = dist(n[1] - g[1], n[2] - g[2])}
-        frl += 1
+        frl = frl + (1)
         fr[frl], t[n.k] = ob, ob
       end
       if not ob.d and ob.y > x then
@@ -2250,14 +2250,14 @@ end
 function pres(r, x, y, z)
   local oop = res1.pop >= res1.pl
   for i, k in inext, split "r,g,b,pop" do
-    local newx, v = 0, i != 4 and min(r[k] // 1, 99) or z and "\xc2\xb3b \xc2\xb3i" .. res1.pop .. "/\xe2\x81\xb6x9 \xe2\x81\xb6-#\xe2\x81\xb6x1.\xe2\x81\xb4h\xc2\xb25\xe2\x81\xb6x0 \xe2\x81\xb6x4\xe2\x81\xb6-#\xe2\x81\xb56f" .. min(res1.pl, 99) or oop and r[k] or 0
+    local newx, v = 0, i ~= 4 and min(r[k] // 1, 99) or z and "\xc2\xb3b \xc2\xb3i" .. res1.pop .. "/\xe2\x81\xb6x9 \xe2\x81\xb6-#\xe2\x81\xb6x1.\xe2\x81\xb4h\xc2\xb25\xe2\x81\xb6x0 \xe2\x81\xb6x4\xe2\x81\xb6-#\xe2\x81\xb56f" .. min(res1.pl, 99) or oop and r[k] or 0
     if z and i == 3 then
       newx = -2
-      v ..= " \xc2\xb3c\xe2\x81\xb6t\xe2\x81\xb4f\xe1\xb6\x9c5\xe2\x81\xb6-#|"
+      v = v .. (" \xc2\xb3c\xe2\x81\xb6t\xe2\x81\xb4f\xe1\xb6\x9c5\xe2\x81\xb6-#|")
     end
     pspl((i == 4 and oop and r.pop or res1[k] < flr(v)) and "1,2,3,4,5,6,10")
-    if v != 0 or z then
-      newx += ?"\xc2\xb27 " .. v, x, y, rc[k]
+    if v ~= 0 or z then
+      newx = newx + (?"\xc2\xb27 " .. v, x, y, rc[k])
       spr(129 + i, x, y)
       x = newx + (z or 1)
     end
@@ -2284,7 +2284,7 @@ end
 
 function sp(x)
   fsel(function(u)
-    x += 13
+    x = x + (13)
     if x > 100 then
       unspr "133,84,121"
       print("\xe2\x81\xb6jmu\xe2\x81\xb4f\xe1\xb6\x9c1\xe2\x81\xb6x2...\0")
@@ -2302,7 +2302,7 @@ end
 function dm()
   local x, hc = 0, hbtn and hbtn.cost
   for i, sec in inext, split(sel1 and sel1.hu and (sel1.bldg and "17,24,61,26" or "17,17,68,26") or "102,26") do
-    pspl(i % 2 != 0 and "1,2,3,15")
+    pspl(i % 2 ~= 0 and "1,2,3,15")
     palt(5, not (hc and dget "1" == 0 or cy == 151))
     camera(x)
     unspr "129,0,104"
@@ -2310,7 +2310,7 @@ function dm()
     line(sec - 4, us "105,3,105,7")
     rectfill(sec - 4, us "106,3,108,4")
     rectfill(sec, us "108,0,128")
-    x -= sec
+    x = x - (sec)
     cp()
   end
   if sel1 then
@@ -2341,7 +2341,7 @@ portf=9]], function()
                 if cpy(b, res1) and (not q or q.typ == b and q.qty < 9) then
                   sfx "2"
                   if b.bldg then
-                    to_bld = b != to_bld and b
+                    to_bld = b ~= to_bld and b
                     return
                   end
                   prod(sel1, b, 1)
@@ -2359,7 +2359,7 @@ portf=9]], function()
               if q.qty == 1 then
                 sel1.q = nil
               else
-                q.qty -= 1
+                q.qty = q.qty - (1)
               end
               sfx "18"
             end, b.x and 24 or ?"\xe1\xb6\x9c7\xe2\x81\xb6j8r\xe2\x81\xb4iX" .. q.qty and 20, 107, q.x / b.t, 5, 12)
@@ -2435,7 +2435,7 @@ function save()
   local function draw(v)
     for i = 0, 8, 4 do
       pset(ptr % 128, ptr // 128, v >> i & 15)
-      ptr += 1
+      ptr = ptr + (1)
     end
   end
 
@@ -2462,10 +2462,10 @@ function lg()
   serial(us "0x802,0x9000,0x4000")
 
   local function px(n)
-    n -= 1
+    n = n - (1)
     if n >= 0 then
       local v1, v2, v3 = peek(ptr, 3)
-      ptr += 3
+      ptr = ptr + (3)
       return v1 | v2 << 4 | v3 << 8, px(n)
     end
   end
@@ -2544,14 +2544,14 @@ function aif(ai)
         end
       end
       if adv and not hold then
-        ai.boi += 2
+        ai.boi = ai.boi + (2)
       end
     end
   end
   for u in all(units) do
     if u.ai == ai then
       if add(aiu, u).ant then
-        ants += 1
+        ants = ants + (1)
         if u.st.idl then
           miner(u, bgnxt and "b" or "r")
           bgnxt = not bgnxt
@@ -2581,7 +2581,7 @@ function aif(ai)
       end
     end
 
-    if u.rs != r and r and del(av, u) then
+    if u.rs ~= r and r and del(av, u) then
       bal = 0
       miner(u, r)
     end
@@ -2592,13 +2592,13 @@ function aif(ai)
     elseif u.qn and ants < res.diff * 13.5 or ut.mil and u.bop < ut.mb and res.pop < res.diff * 26 then
       local b, h = u.prod[u.lp]
       foreach(split "r,g,b", function(k)
-        h = h or hold and b[k] != 0 and res[k] - b[k] < hold[k]
+        h = h or hold and b[k] ~= 0 and res[k] - b[k] < hold[k]
       end)
       if not u.q and not h and cpy(b, res) then
         prod(u, b, split "5,1,1" [res.diff])
-        u.lp %= ut.units
-        u.lp += 1
-        res.tot += 1
+        u.lp = u.lp % (ut.units)
+        u.lp = u.lp + (1)
+        res.tot = res.tot + (1)
       end
     end
   end

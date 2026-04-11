@@ -37,7 +37,7 @@ function unpack_gfx(src)
   src = src.bytes
   for i = 0, #src - 1 do
     poke(addr, ord(src, i + 1))
-    addr += 1
+    addr = addr + (1)
     if addr > 0x4e00 + 64 * offset - 1 then
       addr = 0x0
     end
@@ -73,7 +73,7 @@ function start_state()
     if ttl < 0 or btnp(4) or btnp(5) then
       next_state(menu_state)
     end
-    ttl -= 1
+    ttl = ttl - (1)
   end, function()
     cls()
     pal()
@@ -112,13 +112,13 @@ function menu_state()
     return "mouse sensitivity" .. bar .. "slow"
   end}, height = 14, sel = 1, max = 2, back = "select", next = function(menus, sel)
     if sel == 1 and mouse_ttl == 0 then
-      keyboard_mode += 1
+      keyboard_mode = keyboard_mode + (1)
       if keyboard_mode > 1 then
         keyboard_mode = 0
       end
       switch_scheme(keyboard_mode)
     elseif sel == 2 then
-      mouse_acc += 1
+      mouse_acc = mouse_acc + (1)
       if mouse_acc > 8 then
         mouse_acc = 1
       end
@@ -130,13 +130,13 @@ function menu_state()
   end}}, 0
   local active_menu = menus.select
   return function()
-    if stat(38) != 0 then
+    if stat(38) ~= 0 then
       mouse_ttl = 30
       mouse_x = mid(mouse_x + stat(38) / mouse_acc, 0, 126)
       mouse_y = mid(mouse_y + stat(39) / mouse_acc, 0, 126)
     end
     if mouse_ttl > 0 then
-      mouse_ttl -= 1
+      mouse_ttl = mouse_ttl - (1)
       switch_scheme(0)
     end
     anm_ttl = (anm_ttl + 1) % 48
@@ -148,16 +148,16 @@ function menu_state()
           active_sel = i
         end
       end
-      if prev_sel != active_sel then
+      if prev_sel ~= active_sel then
         sfx(0)
       end
     else
       if btnp(2) then
-        active_sel -= 1
+        active_sel = active_sel - (1)
         sfx(0)
       end
       if btnp(3) then
-        active_sel += 1
+        active_sel = active_sel + (1)
         sfx(0)
       end
       active_sel = mid(active_sel, 1, active_menu.max)
@@ -234,7 +234,7 @@ end
 function fadetoblack_state(...)
   local args, fade_ttl = {...}, 32
   return function()
-    fade_ttl -= 1
+    fade_ttl = fade_ttl - (1)
     if fade_ttl < 0 then
       next_state(unpack(args))
     end
@@ -258,11 +258,11 @@ function stats_state(skill, id, level_time, kills, monsters, secrets, all_secret
     if ttl > 600 or btnp(4) or btnp(5) then
       next_state(credits_state)
     end
-    ttl += 1
-    msg_ttl += 1
+    ttl = ttl + (1)
+    msg_ttl = msg_ttl + (1)
     if msg_ttl > 15 and max_msg < #msgs then
       sfx(0)
-      max_msg += 1
+      max_msg = max_msg + (1)
       msg_ttl = 0
       if not msgs[max_msg] then
         max_msg = min(max_msg + 1, #msgs)
@@ -279,7 +279,7 @@ function stats_state(skill, id, level_time, kills, monsters, secrets, all_secret
           printb("\xe2\x98\x85", x - 8, y, rnd() > 0.5 and 11 or 10)
           printb("\xe2\x98\x85", x + #s * 4, y, rnd() > 0.5 and 11 or 10)
         end
-        y += 10
+        y = y + (10)
       end
     end
   end
@@ -298,7 +298,7 @@ function launch_state(skill, id)
       memcpy(0x8000, 0x0, 0x4300)
       load("#poom_1", nil, skill .. "," .. id)
     end
-    launch_ttl -= 1
+    launch_ttl = launch_ttl - (1)
   end, function()
     cls()
     draw_gfx(loading_gfx)
@@ -307,7 +307,7 @@ function launch_state(skill, id)
     local texty = 40
     printb(s, 63 - #s * 2, texty, 15)
     local x, y = _maps_loc[id * 2 - 1], _maps_loc[id * 2]
-    if x != -1 then
+    if x ~= -1 then
       rect(63 - #s * 2 - 2, texty - 2, 63 + #s * 2, texty + 6, 15)
       local xanchor = mid(x < 64 and 63 - #s * 2 - 2 or 63 + #s * 2, 32, 96)
       line(xanchor, texty + 6, xanchor, y, 15)
@@ -325,12 +325,12 @@ function credits_state()
     if ttl > 3000 or btnp(4) or btnp(5) then
       next_state(start_state)
     end
-    ttl += 1
+    ttl = ttl + (1)
   end, function()
     cls()
     draw_gfx(loading_gfx)
     local i = flr(#_credits * ttl / 1200)
-    if i != creditsi then
+    if i ~= creditsi then
       t = {}
       creditsi = i
     end
@@ -338,7 +338,7 @@ function credits_state()
     local sp = ""
     for i = 1, #s do
       t[i] = t[i] or -rnd()
-      t[i] += 0.08
+      t[i] = t[i] + (0.08)
       local st = fadein
       for k = 1, 30 do
         st = st .. sub(s, i, i)
@@ -364,7 +364,7 @@ function slicefade_state(...)
     r[i], h[i] = 0.05 + rr, 0
   end
   return function()
-    ttl -= 1
+    ttl = ttl - (1)
     if ttl < 0 or btnp(4) or btnp(5) then
       next_state(unpack(args))
     end

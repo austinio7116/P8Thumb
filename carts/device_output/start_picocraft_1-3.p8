@@ -23,7 +23,7 @@ function _init()
 end
 
 function _update()
-  t += 1
+  t = t + (1)
   mx, my, mb, oldmx, oldmy = stat(32), stat(33), stat(34), mx, my
   mbtn1, mbtn2, mbtn1r = m_pressed(mb, 0x01), m_pressed(mb, 0x02)
   curscene:update()
@@ -137,10 +137,10 @@ function updmenu()
   else
     dmnu = 0
     if btnp(2) then
-      dmnu -= 1
+      dmnu = dmnu - (1)
     end
     if btnp(3) then
-      dmnu += 1
+      dmnu = dmnu + (1)
     end
     selmnu = mid(1, dmnu + selmnu, 4)
     if mx ~= oldmx or my ~= oldmy then
@@ -148,7 +148,7 @@ function updmenu()
     end
     if btn(5) or mbtn1 and mbclick() then
       _ENV[curmenu[selmnu].action]()
-      if selmnu != 2 then
+      if selmnu ~= 2 then
         sfx(4)
       end
     end
@@ -303,7 +303,7 @@ function updcred()
       hidescn, t, nextscn = true, 0, menuscn
     end
     if mb & 1 ~= 1 then
-      yt += 1
+      yt = yt + (1)
     end
     if t % 3 == 0 then
       add_ash_part()
@@ -363,7 +363,7 @@ function unpack_map()
   off = 0xd01 + 4 * 2
   for i = 1, lvl - 1 do
     local len = peek2(i * 2 + 0xcff)
-    off += len
+    off = off + (len)
   end
   px9_decomp(0, 0, off, mget, mset)
   --share with next cartrigde
@@ -382,8 +382,8 @@ function px9_decomp(x0, y0, src, vget, vset)
     -- find position and move
     -- to head of the list
     local v, i = l[1], 1
-    while v != val do
-      i += 1
+    while v ~= val do
+      i = i + (1)
       v, l[i] = l[i], v
     end
     l[1] = val
@@ -406,22 +406,22 @@ function px9_decomp(x0, y0, src, vget, vset)
   function getval(bits)
     if cache_bits < 8 then
       -- cache next 8 bits
-      cache_bits += 8
+      cache_bits = cache_bits + (8)
       --cache+=@src>>cache_bits
       --src+=1
       --decomp from str
-      cache += (str and ord(src, pos) or peek(pos)) >> cache_bits
+      cache = cache + ((str and ord(src, pos) or peek(pos)) >> cache_bits)
       --dho
-      pos += 1
+      pos = pos + (1)
     --dho
     end
     -- shift requested bits up
     -- into the integer slots
-    cache <<= bits
+    cache = cache << (bits)
     local val = cache & 0xffff
     -- remove the integer bits
-    cache ^^= val
-    cache_bits -= bits
+    cache = cache ~ (val)
+    cache_bits = cache_bits - (bits)
     return val
   end
 
@@ -429,9 +429,9 @@ function px9_decomp(x0, y0, src, vget, vset)
   function gnp(n)
     local bits = 0
     repeat
-      bits += 1
+      bits = bits + (1)
       local vv = getval(bits)
-      n += vv
+      n = n + (vv)
     until vv < (1 << bits) - 1
     return n
   end
@@ -446,7 +446,7 @@ function px9_decomp(x0, y0, src, vget, vset)
   end
   for y = y0, y0 + h_1 do
     for x = x0, x0 + w - 1 do
-      splen -= 1
+      splen = splen - (1)
       if (splen < 1) then
         splen, predict = gnp "1", not predict
       end
@@ -469,14 +469,14 @@ end
 --theroboz rotation
 function pd_rotate(x, y, rot, mx, my, w, flp, scale)
   scale = scale or 1
-  w *= scale * 4
+  w = w * (scale * 4)
   local cs, ss = cos(rot) * .125 / scale, sin(rot) * .125 / scale
   local sx, sy = mx + cs * -w, my + ss * -w
   local hx = flp and -w or w
   local halfw = -w
   for py = y - w, y + w do
     tline(x - hx, py, x + hx, py, sx - ss * halfw, sy + cs * halfw, cs, ss)
-    halfw += 1
+    halfw = halfw + (1)
   end
 end
 
@@ -484,7 +484,7 @@ end
 --particles and easing fn
 function updatepart()
   for p in all(parts) do
-    p.t += 1
+    p.t = p.t + (1)
     if p.t > p.tmax then
       del(parts, p)
     end
@@ -504,7 +504,7 @@ function add_ash_part()
 end
 
 function update_ash(self)
-  self.y -= 1
+  self.y = self.y - (1)
   self.tet = self.tet % 1 + 0.01
 end
 

@@ -207,7 +207,7 @@ end
 function u_s_finishlevel()
   u_mouse()
   if game.fly > 35 then
-    game.fly += .1 * (37 - game.fly)
+    game.fly = game.fly + (.1 * (37 - game.fly))
   end
   local h = ccol(mouse.x, mouse.y, 2, 2, 18, game.fly + 36, 92, 9)
   if h then
@@ -226,7 +226,7 @@ function u_s_finishlevel()
         game.drw = d_s_load
       end
       if game.won then
-        game.level += 1
+        game.level = game.level + (1)
       end
     end
   end
@@ -320,21 +320,21 @@ end
 
 function u_sundrop()
   for i, sun in pairs(suns) do
-    sun.t -= 1
+    sun.t = sun.t - (1)
     if sun.group == "drop" then
-      sun.a += 0.01
+      sun.a = sun.a + (0.01)
       if sun.y < sun.yf then
-        sun.y += sun.v
-        sun.x += 0.1 * cos(sun.a)
+        sun.y = sun.y + (sun.v)
+        sun.x = sun.x + (0.1 * cos(sun.a))
       end
       if sun.a == 1 then
         sun.a = 0
       end
     elseif sun.group == "sflw" then
       if sun.y < sun.yf then
-        sun.x += 0.2 * cos(sun.a)
-        sun.y += sun.v
-        sun.v += 0.25
+        sun.x = sun.x + (0.2 * cos(sun.a))
+        sun.y = sun.y + (sun.v)
+        sun.v = sun.v + (0.25)
       end
     end
     local c = ccol(mouse.x, mouse.y, 2, 2, sun.x, sun.y, 8, 8)
@@ -342,7 +342,7 @@ function u_sundrop()
       mouse.canclick = true
       if mouse.click == 1 then
         del(suns, suns[i])
-        game.sun += 10
+        game.sun = game.sun + (10)
       end
     end
     if sun.t < 0 then
@@ -354,7 +354,7 @@ end
 function u_plantbuyer()
   for i = 1, #buyplant do
     if buyplant[i].cd then
-      buyplant[i].cdt -= 1
+      buyplant[i].cdt = buyplant[i].cdt - (1)
       if buyplant[i].cdt < 0 then
         buyplant[i].cd = false
         buyplant[i].cdt = buyplant[i].cdtmax
@@ -379,7 +379,7 @@ function u_putplantonboard()
     end
     if mouse.canclick and mouse.click == 1 then
       board[mouse.gy][mouse.gx] = mouse.whichplant
-      game.sun -= buyplant[mouse.whichplant].price
+      game.sun = game.sun - (buyplant[mouse.whichplant].price)
       buyplant[mouse.whichplant].cd = true
       buyplant[mouse.whichplant].cd = true
       c_plants(mouse.whichplant, mouse.gx, mouse.gy)
@@ -402,7 +402,7 @@ function u_shovel()
       mouse.onshovel = false
     end
     if mouse.shovel then
-      if mouse.ongrid and mouse.click == 1 and board[mouse.gy][mouse.gx] != 10 and board[mouse.gy][mouse.gx] != 0 then
+      if mouse.ongrid and mouse.click == 1 and board[mouse.gy][mouse.gx] ~= 10 and board[mouse.gy][mouse.gx] ~= 0 then
         board[mouse.gy][mouse.gx] = 0
         for i = 1, #allplants do
           for j, p in pairs(allplants[i]) do
@@ -427,7 +427,7 @@ function u_peashooter(p)
     end
   end
   if p.zol then
-    p.t -= 1
+    p.t = p.t - (1)
     if p.t < 0 then
       c_peas("norm", p.x, p.y, p.lane)
       p.t = p.tmax
@@ -440,7 +440,7 @@ end
 
 function u_peas()
   for i, pea in pairs(peas) do
-    pea.x += pea.v
+    pea.x = pea.x + (pea.v)
     if pea.x > 130 then
       peas[i] = nil
     end
@@ -448,7 +448,7 @@ function u_peas()
       local h = ccol(pea.x, pea.y, pea.wh, pea.wh, z.x, z.y, 11, 22)
       if h then
         del(peas, pea)
-        z.health -= pea.dmg
+        z.health = z.health - (pea.dmg)
         z.c = 7
         if pea.g == "snow" then
           z.etmax = 60
@@ -462,7 +462,7 @@ function u_peas()
 end
 
 function u_sunflower(s)
-  s.t -= 1
+  s.t = s.t - (1)
   if s.t < 0 then
     c_sflwdrop(s.x, s.y)
     s.t = s.tmax
@@ -470,7 +470,7 @@ function u_sunflower(s)
 end
 
 function u_cherrybomb(c)
-  c.t -= 1
+  c.t = c.t - (1)
   if c.t <= 0 then
     local clr = {}
     for n = 1, 30 do
@@ -482,7 +482,7 @@ function u_cherrybomb(c)
     for i, z in pairs(zombies) do
       local h = ccol(c.x - 14, c.y - 16, 42, 48, z.x, z.y, 14, 22)
       if h and (z.lane >= (c.lane - 1) and z.lane <= (c.lane + 1)) then
-        z.health -= c.dmg
+        z.health = z.health - (c.dmg)
       end
     end
     del(cbmb, c)
@@ -495,14 +495,14 @@ end
 
 function u_potmine(p)
   if p.t > 0 then
-    p.t -= 1
+    p.t = p.t - (1)
   else
     p.health = 100
     for j, z in pairs(zombies) do
       local h = ccol(p.x, p.y, p.w, p.h, z.x, z.y, 14, 22)
       if p.t == 0 then
         if h and z.lane == p.lane then
-          z.health -= p.dmg
+          z.health = z.health - (p.dmg)
           del(ptmn, p)
           board[p.gy][p.gx] = 0
           local c = {2, 4, 10, 15}
@@ -525,7 +525,7 @@ function u_snowpea(s)
     end
   end
   if s.zol then
-    s.t -= 1
+    s.t = s.t - (1)
     if s.t < 0 then
       c_peas("snow", s.x, s.y, s.lane)
       s.t = s.tmax
@@ -542,7 +542,7 @@ function u_chomper(c)
       if c.lane == z.lane then
         local h = ccol(c.x, c.y, c.w + 14, c.h, z.x, z.y + 10, 2, 2)
         if h and (z.jumped == nil or z.jumped == true) then
-          c.prept -= 1
+          c.prept = c.prept - (1)
           if c.prept < 0 then
             del(zombies, z)
             c.t = c.tmax
@@ -552,7 +552,7 @@ function u_chomper(c)
       end
     end
   else
-    c.t -= 1
+    c.t = c.t - (1)
   end
 end
 
@@ -563,7 +563,7 @@ function u_repeater(r)
     end
   end
   if r.zol then
-    r.t -= 1
+    r.t = r.t - (1)
     if r.t == 0 or r.t == 10 then
       c_peas("norm", r.x, r.y, r.lane)
     end
@@ -600,9 +600,9 @@ function u_zombies(z)
     z.a = 0.02
     z.na = 0.1
   end
-  if (z.which != "p" and not z.h) or (z.which == "p" and not z.jumping and not z.h) then
-    z.v += z.a
-    z.x -= (z.na + 0.1 * cos(z.v)) / z.fv
+  if (z.which ~= "p" and not z.h) or (z.which == "p" and not z.jumping and not z.h) then
+    z.v = z.v + (z.a)
+    z.x = z.x - ((z.na + 0.1 * cos(z.v)) / z.fv)
     if z.v > 1 then
       z.v = 0
     end
@@ -625,19 +625,19 @@ function u_zombies(z)
           z.hp = z.il[k]
         end
       end
-      if z.hp != nil then
+      if z.hp ~= nil then
         z.h = ccol(z.hp.x, z.hp.y, z.hp.w, z.hp.h, z.x, z.y + 10, 2, 2)
       else
         z.h = false
       end
     end
   end
-  if z.h and z.hp != nil then
-    if z.which != "p" or (z.jumped) then
-      z.et -= 1
+  if z.h and z.hp ~= nil then
+    if z.which ~= "p" or (z.jumped) then
+      z.et = z.et - (1)
       z.eating = true
       if z.et <= 0 then
-        z.hp.health -= 1
+        z.hp.health = z.hp.health - (1)
         z.hp.c = 7
         z.et = z.etmax
       end
@@ -659,7 +659,7 @@ function u_lawnmower(l)
     end
   end
   if l.go then
-    l.x += l.v
+    l.x = l.x + (l.v)
   end
   if l.x > 130 then
     del(lwmw, l)
@@ -710,15 +710,15 @@ function ui_progbar()
   local fnmax = 0
   local snmax = 0
   for i = 1, 4 do
-    fn += game.modes[1][i]
-    fnmax += levels[game.level][i]
-    if levels[game.level][9] != nil then
-      sn += game.modes[3][i]
-      snmax += levels[game.level][i + 8]
+    fn = fn + (game.modes[1][i])
+    fnmax = fnmax + (levels[game.level][i])
+    if levels[game.level][9] ~= nil then
+      sn = sn + (game.modes[3][i])
+      snmax = snmax + (levels[game.level][i + 8])
     end
   end
   a = 50 * (fn / fnmax)
-  if levels[game.level][9] != nil then
+  if levels[game.level][9] ~= nil then
     a = 25 * (fn / fnmax) + 25 * (sn / snmax)
   end
   nrectfill(70, 116, 56, 10, 1)
@@ -739,7 +739,7 @@ function ui_progbar()
   end
   ospr(1, 10, 64, 9, 9, 72 + a + os, 117, 6, 6)
   ospr(1, 96, 0, 11, 16, 74, 117, 4, 8)
-  if levels[game.level][9] != nil then
+  if levels[game.level][9] ~= nil then
     ospr(1, 96, 0, 11, 16, 97, 117, 4, 8)
   end
 end
@@ -753,7 +753,7 @@ function d_lawn()
       local yy = {xi, xp, xi, xp, xi}
       local xxx = 10 + 14 * (x - 1)
       local yyy = 32 + 16 * (y - 1)
-      if yy[y][x] != 0 then
+      if yy[y][x] ~= 0 then
         sspr(yy[y][x], 112, 14, 16, 10 + 14 * (x - 1), 32 + 16 * (y - 1), 14, 16)
       end
       if (board[y][x] == 10) then
@@ -782,9 +782,9 @@ function d_wavecome()
   if game.waveprep then
     if game.wt > 0 then
       if game.wy > 60 then
-        game.wy += .1 * (62 - game.wy)
+        game.wy = game.wy + (.1 * (62 - game.wy))
       end
-      game.wt -= 1
+      game.wt = game.wt - (1)
       local a = "huge wave of zombies incoming!"
       oprint(a, ctx(a, 2), game.wy, 0, 8)
     else
@@ -862,7 +862,7 @@ function d_shovel()
     if mouse.shovel then
       nrect2(115, 2, 11, 19, 10)
     end
-    if mouse.shovel and mouse.ongrid and board[mouse.gy][mouse.gx] != 10 and board[mouse.gy][mouse.gx] != 0 then
+    if mouse.shovel and mouse.ongrid and board[mouse.gy][mouse.gx] ~= 10 and board[mouse.gy][mouse.gx] ~= 0 then
       rect(9 + 14 * (mouse.gx - 1), 31 + 16 * (mouse.gy - 1), 10 + 14 * mouse.gx, 32 + 16 * mouse.gy, 7)
     end
   end
@@ -890,7 +890,7 @@ function d_zombies(z)
   sort(zombies, lanecomp)
   local offset = 0
   local offw = 0
-  z.anit += 1
+  z.anit = z.anit + (1)
   z.sx = 8
   z.sy = 64
   z.ox = 0
@@ -933,9 +933,9 @@ end
 
 function p_cbmbexp()
   for i, e in pairs(cbmbexp) do
-    e.x += e.vx
-    e.y += e.vy
-    e.r -= 0.5
+    e.x = e.x + (e.vx)
+    e.y = e.y + (e.vy)
+    e.r = e.r - (0.5)
     if e.r < 0 then
       cbmbexp[i] = nil
     end
@@ -946,7 +946,7 @@ end
 
 function p_powie()
   for i, p in pairs(powies) do
-    p.t -= 1
+    p.t = p.t - (1)
     oprint("powie!", p.x, p.y, 7, 8)
     if p.t < 0 then
       powies[i] = nil
@@ -956,9 +956,9 @@ end
 
 function p_ptmnexp()
   for j, p in pairs(ptmnp) do
-    p.r -= 0.4
-    p.x += 2 * cos(p.a)
-    p.y += 2 * (-abs(sin(p.a)))
+    p.r = p.r - (0.4)
+    p.x = p.x + (2 * cos(p.a))
+    p.y = p.y + (2 * (-abs(sin(p.a))))
     if p.r < 0 then
       ptmnp[j] = nil
     end
@@ -969,7 +969,7 @@ end
 
 function p_spudow()
   for i, s in pairs(spudows) do
-    s.t -= 1
+    s.t = s.t - (1)
     ospr(0, 52, 39, 11, 13, s.x + 6, s.y, 11, 13)
     oprint("spudow!", s.x, s.y, 4, 15)
     if s.t < 0 then
@@ -983,7 +983,7 @@ function d_lawnmower(l)
 end
 
 function a_peashooter(p)
-  p.anit += 1
+  p.anit = p.anit + (1)
   if p.anit > 15 then
     p.sy = 13
   else
@@ -999,7 +999,7 @@ function a_peashooter(p)
 end
 
 function a_sunflower(p)
-  p.anit += 1
+  p.anit = p.anit + (1)
   if p.anit > 15 then
     p.sy = 13
   else
@@ -1029,7 +1029,7 @@ function a_wallnut(p)
   local l = {4, 5}
   local r = {8, 9}
   local os = 0
-  p.anit += 1
+  p.anit = p.anit + (1)
   if p.anit > 30 then
     os = 1
   end
@@ -1051,8 +1051,8 @@ function a_potmine(p)
   if p.t == 0 then
     p.sy = 26
     if p.anit > 0 then
-      p.anit -= 1
-      if p.anit <= (25) and p.anit != (10 or 11 or 12) then
+      p.anit = p.anit - (1)
+      if p.anit <= (25) and p.anit ~= (10 or 11 or 12) then
         line(p.x + 5, p.y + 4, p.x + 5, p.y + 5, 8)
       --ovalfill(p.x+4,p.y+3,p.x+6,p.y+6,8)
       end
@@ -1067,7 +1067,7 @@ function a_potmine(p)
 end
 
 function a_snowpea(p)
-  p.anit += 1
+  p.anit = p.anit + (1)
   if p.anit > 15 then
     p.sy = 13
   else
@@ -1083,7 +1083,7 @@ function a_snowpea(p)
 end
 
 function a_chomper(p)
-  p.anit += 1
+  p.anit = p.anit + (1)
   if p.prept == p.preptmax and p.t <= 0 then
     p.sx = 74
     if p.anit > 15 then
@@ -1091,7 +1091,7 @@ function a_chomper(p)
     else
       p.sy = 0
     end
-  elseif p.prept != p.preptmax and p.t <= 0 then
+  elseif p.prept ~= p.preptmax and p.t <= 0 then
     if p.prept > 15 then
       p.sy = 26
     else
@@ -1112,7 +1112,7 @@ function a_chomper(p)
 end
 
 function a_repeater(p)
-  p.anit += 1
+  p.anit = p.anit + (1)
   if p.anit > 15 then
     p.sy = 13
   else
@@ -1145,9 +1145,9 @@ end
 
 function a_pz(z)
   if z.jumping then
-    z.y -= z.yoffset
-    z.yoffset -= 0.5
-    z.x -= 1
+    z.y = z.y - (z.yoffset)
+    z.yoffset = z.yoffset - (0.5)
+    z.x = z.x - (1)
     if z.y >= (24 + 16 * (z.lane - 1)) then
       z.y = 24 + 16 * (z.lane - 1)
       z.jumping = false
@@ -1185,7 +1185,7 @@ function a_fz(z)
 end
 
 function a_kill_zombie(z)
-  z.anit -= 1
+  z.anit = z.anit - (1)
   local os = 0
   if z.die == "n" then
     if z.which == "p" then
@@ -1310,7 +1310,7 @@ function sort(list, comp)
     local j = i
     while j > 1 and comp(list[j - 1], list[j]) do
       list[j], list[j - 1] = list[j - 1], list[j]
-      j -= 1
+      j = j - (1)
     end
   end
 end
@@ -1322,7 +1322,7 @@ end
 -->8
 --creates
 function c_sundrop()
-  sundrop.t -= 1
+  sundrop.t = sundrop.t - (1)
   if sundrop.t < 0 then
     newsun = {group = "drop", x = flr(rnd(90) + 10), y = 28, v = 0.25, yf = flr(rnd(70) + 38), a = 0, t = 1200,}
     add(suns, newsun)
@@ -1382,13 +1382,13 @@ end
 --level stuff
 function read_level()
   for i = 1, #levels[game.level] do
-    game.az += levels[game.level][i]
+    game.az = game.az + (levels[game.level][i])
   end
   game.progmax = game.az
   for j = 1, 4 do
     game.modes[1][j] = levels[game.level][j]
     game.modes[2][j] = levels[game.level][j + 4]
-    if levels[game.level][9] != nil then
+    if levels[game.level][9] ~= nil then
       game.modes[3][j] = levels[game.level][j + 8]
       game.modes[4][j] = levels[game.level][j + 12]
     end
@@ -1398,7 +1398,7 @@ end
 function change_modes()
   game.hmz = 0
   for a = 1, 4 do
-    game.hmz += game.modes[game.mn][a]
+    game.hmz = game.hmz + (game.modes[game.mn][a])
   end
   if game.hmz == 0 and #zombies == 0 and #kzs == 0 then
     if game.az == 0 then
@@ -1407,7 +1407,7 @@ function change_modes()
       game.upd = u_s_finishlevel
       game.drw = d_s_finishlevel
     else
-      game.mn += 1
+      game.mn = game.mn + (1)
       game.ztmin = 150
       game.ztmax = 600
       if game.mn % 2 == 0 then
@@ -1423,7 +1423,7 @@ end
 function waves()
   if game.mn == 2 or game.mn == 4 then
     if game.waveprep then
-      game.wzt -= 1
+      game.wzt = game.wzt - (1)
       if game.wzt == 0 then
         if game.level > 1 then
           c_zombies("f")
@@ -1457,12 +1457,12 @@ function spawn_zombies()
   end
   for a = 1, 4 do
     if game.modes[game.mn][a] > 0 then
-      hmt += 1
+      hmt = hmt + (1)
       add(wntz, a)
     end
   end
   if game.zt > 0 then
-    game.zt -= 1
+    game.zt = game.zt - (1)
   end
   if game.az > 0 and hmt > 0 and game.zt <= 0 then
     for i = 1, min(game.hmz, game.howmany) do
@@ -1470,12 +1470,12 @@ function spawn_zombies()
         game.zct = game.zctmax
       end
       wnz = ceil(rnd(hmt))
-      game.mz += 1
-      game.modes[game.mn][wntz[wnz]] -= 1
-      game.az -= 1
+      game.mz = game.mz + (1)
+      game.modes[game.mn][wntz[wnz]] = game.modes[game.mn][wntz[wnz]] - (1)
+      game.az = game.az - (1)
       c_zombies(wtz[wntz[wnz]])
     end
-    game.zt += game.ztmin + flr(rnd(game.ztmax - game.ztmin))
+    game.zt = game.zt + (game.ztmin + flr(rnd(game.ztmax - game.ztmin)))
   end
 end
 

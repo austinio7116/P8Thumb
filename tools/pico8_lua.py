@@ -67,14 +67,18 @@ STMT_KEYWORDS = {
 }
 
 # Compound assignment operators (PICO-8 dialect extensions to Lua).
-COMPOUND_OPS = {'+=', '-=', '*=', '/=', '%=', '^=', '..=', '//='}
+COMPOUND_OPS = {'+=', '-=', '*=', '/=', '%=', '^=', '..=', '//=',
+                '|=', '&=', '<<=', '>>=', '^^='}
 
 # Operators we need to recognise. Order matters — longer matches
 # first so '..=' beats '..' beats '.', '==' beats '=', etc.
 MULTI_CHAR_OPS = [
-    '..=', '...', '//=', '..', '//', '<<', '>>',
+    # 3-char first (longest match wins)
+    '..=', '...', '//=', '<<=', '>>=', '^^=',
+    # 2-char
+    '..', '//', '<<', '>>', '^^',
     '==', '~=', '!=', '<=', '>=', '::',
-    '+=', '-=', '*=', '/=', '%=', '^=',
+    '+=', '-=', '*=', '/=', '%=', '^=', '|=', '&=',
 ]
 
 
@@ -503,6 +507,8 @@ def rewrite_compound_assigns(tokens: List[Token]) -> List[Token]:
         op_text = t.text[:-1]                  # strip trailing '='
         if op_text == '..':
             op_text = '..'                     # ..= → ..
+        elif op_text == '^^':
+            op_text = '~'                      # ^^= → ~ (Lua XOR)
         rhs_start = i + 1
         rhs_end = _find_expr_end(tokens, rhs_start, stop_on_newline=True)
         # Build the LHS / RHS textual chunks.
@@ -723,8 +729,12 @@ def rewrite_pico8_to_lua(src: str) -> str:
     # already-expanded form so the inserted "end" doesn't truncate
     # an unfinished compound.
     tokens = rewrite_compound_assigns(tokens)
-    tokens = rewrite_if_do_blocks(tokens)
-    tokens = rewrite_shorthand_if_while(tokens)
+    # NOTE: rewrite_if_do_blocks and rewrite_shorthand_if_while are
+    # DISABLED. shrinko8 -U already long-forms all if statements,
+    # and post_fix_lua handles the residual `if cond do` → `then`.
+    # The shorthand-if rewriter has a known false-positive on multi-
+    # clause conditions like `if (a) or (b) then` where it treats
+    # the first `)` as the end of the shorthand condition.
     return _emit_with_spacing(tokens)
 
 

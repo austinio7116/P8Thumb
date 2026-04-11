@@ -28,7 +28,7 @@ aligncirc, inputhints = 0, true
 -->8
 -- gameplay
 function _update()
-  framect += 1
+  framect = framect + (1)
   -- if framect==3 then
   -- 	 extcmd("rec")
   --	end
@@ -48,7 +48,7 @@ end
 
 function updateticker()
   if tickermsg then
-    tickerx -= 1
+    tickerx = tickerx - (1)
     if tickerx < -#tickermsg * 4 then
       tickermsg = nil
       if #tickerqueue > 0 then
@@ -143,16 +143,16 @@ function updateplaceball()
   else
     local p = white.pos
     if btn(0) then
-      p[1] -= 1
+      p[1] = p[1] - (1)
     end
     if btn(1) then
-      p[1] += 1
+      p[1] = p[1] + (1)
     end
     if btn(2) then
-      p[2] -= 1
+      p[2] = p[2] - (1)
     end
     if btn(3) then
-      p[2] += 1
+      p[2] = p[2] + (1)
     end
     local w = tablew / 2 - ballrad
     local l = tablel / 2 - ballrad
@@ -199,16 +199,16 @@ function updateaim()
   else
     -- player logic
     -- aim/power
-    cueang -= xinp * 0.01 * xinpfactor
+    cueang = cueang - (xinp * 0.01 * xinpfactor)
     if btn(4) then
       if btn(3) then
-        cuepow += 1
+        cuepow = cuepow + (1)
       end
       if btn(2) then
-        cuepow -= 1
+        cuepow = cuepow - (1)
       end
     else
-      campitch -= yinp * 0.008
+      campitch = campitch - (yinp * 0.008)
     end
     cuepow = clamp(cuepow, cuemin, cuemax)
     -- shoot
@@ -325,9 +325,9 @@ function updatesim()
     end
     -- move balls forward
     for ball in all(balls) do
-      ball.pos += ball.vel * substep
+      ball.pos = ball.pos + (ball.vel * substep)
     end
-    step -= substep
+    step = step - (substep)
     -- resolve collision
     if colball then
       if colball2 then
@@ -337,11 +337,11 @@ function updatesim()
         local iv1 = -coln * i / 2
         -- 			local iv2= coln*i/2
         -- update balls
-        colball.vel += iv1
-        colball2.vel -= iv1
+        colball.vel = colball.vel + (iv1)
+        colball2.vel = colball2.vel - (iv1)
         --+=iv2
-        bbct += 1
-        bbint -= i
+        bbct = bbct + (1)
+        bbint = bbint - (i)
         -- track first ball hit 
         if not firsthit then
           if colball == white then
@@ -358,9 +358,9 @@ function updatesim()
         -- impulse vector
         local iv = coln * i
         -- update ball
-        colball.vel += iv
-        btct += 1
-        btint += i
+        colball.vel = colball.vel + (iv)
+        btct = btct + (1)
+        btint = btint + (i)
       else
         -- ball-sink edge collision
         del(balls, colball)
@@ -373,10 +373,10 @@ function updatesim()
           firstsunk = firstsunk or colball
           if colball.typ == "overs" then
             sunkover = true
-            overct -= 1
+            overct = overct - (1)
           else
             sunkunder = true
-            underct -= 1
+            underct = underct - (1)
           end
         end
       end
@@ -574,9 +574,9 @@ function ballball(b1, b2)
   -- line circle intersection
   local r = ballrad * 2
   -- need to scale down to avoid numeric overflow
-  p /= 8
-  v /= 8
-  r /= 8
+  p = p / (8)
+  v = v / (8)
+  r = r / (8)
   local t = linecirc(p, v, r)
   if not t then
     return
@@ -593,23 +593,23 @@ end
 function getinput()
   local xi, yi = 0, 0
   if btn(0) then
-    xi -= 1
+    xi = xi - (1)
   end
   if btn(1) then
-    xi += 1
+    xi = xi + (1)
   end
   if not btn(4) then
     if btn(2) then
-      yi -= 1
+      yi = yi - (1)
     end
     if btn(3) then
-      yi += 1
+      yi = yi + (1)
     end
   end
   if (xinp < 0 and xi >= 0) or (xinp > 0 and xi <= 0) then
     xinp = 0
   else
-    xinp += xi * 0.04
+    xinp = xinp + (xi * 0.04)
   end
   xinp = clamp(xinp, -1, 1)
   yinp = yinp * .9 + yi * .1
@@ -632,7 +632,7 @@ function gamelost(reason, foul)
   winner = otherplayer
   local msg = player.name .. " lost - " .. reason
   if foul then
-    msg ..= " (" .. foul .. ")"
+    msg = msg .. (" (" .. foul .. ")")
   end
   showtickermsg(msg)
   gamedone()
@@ -666,7 +666,7 @@ end
 
 function updatemenu()
   -- demo game after 100s
-  menutimer += 1
+  menutimer = menutimer + (1)
   if menutimer > 3000 then
     demo()
   end
@@ -693,12 +693,12 @@ end
 
 function domenu(ct)
   if btnp(2) and menuoption > 1 then
-    menuoption -= 1
+    menuoption = menuoption - (1)
     menutimer = 0
     sfx(11)
   end
   if btnp(3) and menuoption < ct then
-    menuoption += 1
+    menuoption = menuoption + (1)
     menutimer = 0
     sfx(11)
   end
@@ -764,11 +764,11 @@ end
 function smoothmovecam(targetcam, targetzoom, targetfov, targetang)
   if targetang then
     local delta = targetang - camang
-    delta -= flr(delta)
+    delta = delta - (flr(delta))
     if delta > 0.5 then
-      delta -= 1
+      delta = delta - (1)
     end
-    camang += delta * angf
+    camang = camang + (delta * angf)
   end
   if targetcam then
     cam = cam * 0.8 + targetcam * 0.2
@@ -820,15 +820,15 @@ function updatesimcam()
       local p = ball.xfrm
       local ballzoom = (max(abs(p[1]), abs(p[2])) + 10) * fov / 55 - p[3] + camzoom
       zoom = max(zoom, ballzoom)
-      center += ball.pos
-      ct += 1
+      center = center + (ball.pos)
+      ct = ct + (1)
     end
   end
   -- move cam towards center if
   local centercam = false
   -- any balls are moving
   if ct > 0 then
-    center /= ct
+    center = center / (ct)
     -- table center is closer to center of moving balls
     -- than the camera is.
     if center:length() < (cam - center):length() then
@@ -841,12 +841,12 @@ function updatesimcam()
   -- move camera towards center
   -- with smoothing.
   if centercam then
-    centercamf += 0.02
+    centercamf = centercamf + (0.02)
   else
-    centercamf -= 0.02
+    centercamf = centercamf - (0.02)
   end
   centercamf = clamp(centercamf, 0, 1)
-  cam *= (1 - centercamf * 0.1)
+  cam = cam * ((1 - centercamf * 0.1))
   -- adjust zoom
   -- zoom out fast. zoom back in slow.
   local zoomf = zoom > camzoom and 0.125 or 0.04
@@ -858,7 +858,7 @@ function drawpostgame()
   --targetcam,targetzoom,targetfov,targetang)
   smoothmovecam(vec(), 200, 80)
   campitch = campitch * 0.95 + -0.15 * 0.05
-  camang += 0.001
+  camang = camang + (0.001)
   -- draw table
   rendertable(true)
   -- draw ui
@@ -881,7 +881,7 @@ function drawmenu()
   fov = fov * 0.975 + 80 * 0.025
   campitch = campitch * 0.95 + -0.19 * 0.05
   camzoom = camzoom * 0.95 + 200 * 0.05
-  camang += 0.001
+  camang = camang + (0.001)
   cam = cam * 0.95
   -- draw table
   rendertable(false)
@@ -953,7 +953,7 @@ function rendertable(drawcue)
       -- in back to front order.
       local i = 1
       while i <= #vis and b.xfrm[3] < vis[i].xfrm[3] do
-        i += 1
+        i = i + (1)
       end
       add(vis, b, i)
     end
@@ -987,7 +987,7 @@ function rendertable(drawcue)
   if drawcue then
     local d = ballrad
     if mode == mode_aim then
-      d += cuepow
+      d = d + (cuepow)
     end
     cammat = cammat * translate(cuepos) * rotz(cueang) * rotx(-0.02) * translate(0, d, 0)
     transformverts(cueverts, cammat)
@@ -1063,9 +1063,9 @@ hinty = -10
 
 function drawinputhints()
   if (mode == mode_aim or mode == mode_placeball) and inputhints and not player.npc then
-    hinty += 2
+    hinty = hinty + (2)
   else
-    hinty -= 2
+    hinty = hinty - (2)
   end
   hinty = clamp(hinty, -10, 4)
   if hinty <= -10 then
@@ -1168,7 +1168,7 @@ function renderpoly(poly)
         -- reached bottom of poly      
         end
         pl = l
-        l += 1
+        l = l + (1)
         if l > #ssv then
           l = 1
         end
@@ -1186,7 +1186,7 @@ function renderpoly(poly)
         -- reached bottom of poly
         end
         pr = r
-        r -= 1
+        r = r - (1)
         if r <= 0 then
           r = #ssv
         end
@@ -1202,9 +1202,9 @@ function renderpoly(poly)
     if rrx >= lrx then
       rectfill(lrx, y, rrx, y)
     end
-    lx += lxd
-    rx += rxd
-    y += 1
+    lx = lx + (lxd)
+    rx = rx + (rxd)
+    y = y + (1)
   end
 end
 
@@ -1605,7 +1605,7 @@ function makeballs()
       if coll == 0 then
         black = ball
       end
-      i += 1
+      i = i + (1)
     end
   end
 end
@@ -1731,8 +1731,8 @@ end
 -- r+d*result intersects l1-l2
 function rayline(r, d, l1, l2)
   -- transform relative to l1
-  r -= l1
-  l2 -= l1
+  r = r - (l1)
+  l2 = l2 - (l1)
   -- line tangent and normal
   local p = l2:normalised()
   local n = vec(-p[2], p[1])

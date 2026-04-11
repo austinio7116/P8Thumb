@@ -124,7 +124,7 @@ end
 
 function update_load()
   if loading then
-    loading += 1
+    loading = loading + (1)
     if loading == 180 then
       load(cartname)
     end
@@ -222,8 +222,8 @@ end
 function update_mouse()
   m_lastx, m_lasty = mx, my
   if joystick then
-    mdirx += tonum(btn(1)) - tonum(btn(0))
-    mdiry += tonum(btn(3)) - tonum(btn(2))
+    mdirx = mdirx + (tonum(btn(1)) - tonum(btn(0)))
+    mdiry = mdiry + (tonum(btn(3)) - tonum(btn(2)))
     mx, my = mdirx, mdiry + camy
     mlwp, mlp = mlp, btn(5)
   else
@@ -321,16 +321,16 @@ function decompress(E, e, o, c)
     if E[d] == "&" then
       local c, e = 0, 0
       repeat
-        c += 1
+        c = c + (1)
       until E[d + c] == "&"
       e = tonum(sub(E, d + 1, d + c - 1))
       for d = 1, e do
-        n ..= "0"
+        n = n .. ("0")
       end
-      d += c + 1
+      d = d + (c + 1)
     else
-      n ..= E[d]
-      d += 1
+      n = n .. (E[d])
+      d = d + (1)
     end
   end
   for d = 0, #n - 1 do
@@ -462,7 +462,7 @@ function draw_select()
       local c = {x = 24, y = 72 + d * 8, w = 8, h = 1}
       if m_inside(c) then
         pal(7, 7)
-        n += 4
+        n = n + (4)
       end
       draw_text(E[d], 24 - n, 72 + d * 8)
       pal(7, 7)
@@ -476,7 +476,7 @@ end
 
 function update_prog()
   a = min(a + .005, 1)
-  p += .0001
+  p = p + (.0001)
   if a > 0 then
     w = lerp(0, 15, 1 + 3 * (a - 1) ^ 3 + 2 * (a - 1) ^ 2)
   end
@@ -540,7 +540,7 @@ function draw_score()
   for E = 30, 26, -1 do
     local E = tostr(dget(E))
     print(E, 112 - #E * 4, 34 + d, 6)
-    d += 7
+    d = d + (7)
   end
   rectfill(0, 22, 127, 30, 13)
   draw_text("run ended", 8, 24)
@@ -609,7 +609,7 @@ function get_item(d)
   for E = 1, E do
     upgrade(d)
   end
-  uid += 1
+  uid = uid + (1)
   return d
 end
 
@@ -674,7 +674,7 @@ function draw_item(d)
   if how_page == 2 then
     line(2, n - 1, E - 2, n - 1, 1)
     local E = E - 4
-    E *= d.t / d.tcd
+    E = E * (d.t / d.tcd)
     if E > .5 then
       line(2, n - 1, 2 + E, n - 1, 7)
     end
@@ -692,9 +692,9 @@ function get_ntype(d)
 end
 
 function upgrade(d, E)
-  d.iv += d.add
-  d.v += d.add
-  d.level += 1
+  d.iv = d.iv + (d.add)
+  d.v = d.v + (d.add)
+  d.level = d.level + (1)
   d.shake = 10
   del(items, E)
 end
@@ -704,19 +704,19 @@ function draw_displaybox()
     local d = m_hover_targ
     local n, E, c, e = d.x + d.w * 8, d.y, d.w * 8, d.h * 8
     if n + 70 > 127 then
-      n -= 72
-      E += e + 1
+      n = n - (72)
+      E = E + (e + 1)
       if E + 56 > 127 + camy then
-        n -= c
-        E -= 58
+        n = n - (c)
+        E = E - (58)
         if E < 0 + camy then
           E = 0 + camy
         end
         if n < 0 then
-          n += 72
-          E -= e + 1
+          n = n + (72)
+          E = E - (e + 1)
           if n + 70 > 127 then
-            n -= 70 - c + 2
+            n = n - (70 - c + 2)
           end
           if E < 0 + camy then
             E = 0 + camy
@@ -726,11 +726,11 @@ function draw_displaybox()
         n = 0
       end
     elseif E + 56 > 126 + camy then
-      n -= c
-      E -= 58
+      n = n - (c)
+      E = E - (58)
       if E < 0 + camy then
         E = 0 + camy
-        n += c
+        n = n + (c)
       end
     elseif E < 0 + camy then
       E = 0 + camy
@@ -763,7 +763,7 @@ function draw_displaybox()
     line(5, 48, 66, 48, 13)
     local E = ""
     for d in all(d.tags) do
-      E ..= d .. " "
+      E = E .. (d .. " ")
     end
     print(E, 5, 49)
     camera()
@@ -810,7 +810,7 @@ end
 function update_pages()
   if how_page == 2 then
     for d in all(items) do
-      d.t += 1
+      d.t = d.t + (1)
       if d.t == d.cd then
         d.t = 0
         d.shake = 10
@@ -821,12 +821,12 @@ function update_pages()
   end
   local d = how_utimer
   if how_page == 4 then
-    how_utimer += 1
+    how_utimer = how_utimer + (1)
     if d < 60 then
       return
     end
     if d < 120 then
-      items[2].x += .4
+      items[2].x = items[2].x + (.4)
       return
     end
     if d == 120 then
@@ -841,8 +841,8 @@ function update_pages()
       return
     end
     if d < 360 then
-      items[1].y -= .5
-      items[1].tm -= 2
+      items[1].y = items[1].y - (.5)
+      items[1].tm = items[1].tm - (2)
     end
     if d == 360 then
       set_page4()
@@ -1028,7 +1028,7 @@ function init_extra_items()
     local E = get_item(E[d])
     E.x = n[d] - 6
     E.y = c[d] + 2
-    E.tm -= d * 6
+    E.tm = E.tm - (d * 6)
     add(items, E)
   end
 end
@@ -1092,7 +1092,7 @@ function update_intro()
 end
 
 function update_logo()
-  intro_timer += 1
+  intro_timer = intro_timer + (1)
   if intro_timer > 240 then
     intro_state = "splash"
     intro_timer = 0

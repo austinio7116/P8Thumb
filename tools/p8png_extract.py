@@ -42,6 +42,8 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pico8_lua import rewrite_pico8_to_lua
 
+LUAC54 = Path(__file__).resolve().parent / "luac54"
+
 
 # -----------------------------------------------------------------------
 # 1. PNG → 32 KB cart bytes (steganographic decode)
@@ -830,28 +832,94 @@ def main():
     dst_dir.mkdir(parents=True, exist_ok=True)
 
     n_ok = n_fail = 0
+    has_luac = LUAC54.exists()
+    if not has_luac:
+        print("warn: tools/luac54 not found — skipping bytecode "
+              "precompilation. Build it with: gcc -O2 -DLUA_32BITS=1 "
+              "-Ilua lua/luac.c lua/*.c -lm -o tools/luac54",
+              file=sys.stderr)
+
     for png in sorted(src_dir.glob("*.p8.png")):
         stem = png.name[:-len(".p8.png")]
-        out_p8 = dst_dir / f"{stem}.p8"
+        out_p8  = dst_dir / f"{stem}.p8"
         out_bmp = dst_dir / f"{stem}.bmp"
+        out_luac = dst_dir / f"{stem}.luac"
+        out_rom  = dst_dir / f"{stem}.rom"
         try:
-            # 1. shrinko8 unminify → .p8 (handles PNG decode + PXA
-            #    decompression + tokenize + parse + emit-unminified
-            #    in one shot).
+            # 1. shrinko8 unminify → .p8
             shrinko8_unminify(png, out_p8)
 
-            # 2. Light post-fix for the rare leftovers.
+            # 2. Post-fix dialect operators + string escapes
             text = out_p8.read_text(encoding="latin-1")
             text = post_fix_lua(text)
-            out_p8.write_text(text, encoding="latin-1")
 
-            # 3. Build the BMP label thumbnail from the visible PNG.
+            # 3. Extract the __lua__ section for further rewriting
+            lines = text.split('\n')
+            lua_lines = []
+            in_lua = False
+            for line in lines:
+                if line.strip() == '__lua__':
+                    in_lua = True
+                    continue
+                if line.strip().startswith('__') and in_lua:
+                    in_lua = False
+                    continue
+                if in_lua:
+                    lua_lines.append(line)
+            lua_src = '\n'.join(lua_lines)
+
+            # 4. Token-based rewrite: != → ~=, compound assigns, binary literals
+            lua_clean = rewrite_pico8_to_lua(lua_src)
+
+            # 5. Write the cleaned .p8 (still needed for ROM sections + fallback)
+            # Replace __lua__ content with the cleaned version
+            out_lines = []
+            in_lua = False
+            lua_written = False
+            for line in lines:
+                if line.strip() == '__lua__':
+                    in_lua = True
+                    out_lines.append(line)
+                    out_lines.append(lua_clean)
+                    lua_written = True
+                    continue
+                if line.strip().startswith('__') and in_lua:
+                    in_lua = False
+                    out_lines.append(line)
+                    continue
+                if not in_lua:
+                    out_lines.append(line)
+            out_p8.write_text('\n'.join(out_lines), encoding="latin-1")
+
+            # 6. Precompile to bytecode if luac54 is available
+            if has_luac:
+                # Write pure Lua source to a temp file for luac
+                tmp_lua = dst_dir / f"{stem}_tmp.lua"
+                tmp_lua.write_text(lua_clean, encoding="latin-1")
+                result = subprocess.run(
+                    [str(LUAC54), "-s", "-o", str(out_luac), str(tmp_lua)],
+                    capture_output=True, text=True)
+                tmp_lua.unlink()
+                if result.returncode != 0:
+                    err = result.stderr.strip() or result.stdout.strip()
+                    print(f"  WARN luac: {stem}: {err}", file=sys.stderr)
+                    out_luac.unlink(missing_ok=True)
+
+            # 7. Extract binary ROM (17 KB: gfx + gff + map + sfx + music)
+            # from the cart bytes via the PNG steganography
+            cart_bytes = png_to_cart_bytes(png)
+            out_rom.write_bytes(cart_bytes[:0x4300])
+
+            # 8. BMP label thumbnail
             write_label_bmp(out_bmp, png)
 
-            print(f"  ok  {png.name}")
+            luac_ok = out_luac.exists() if has_luac else False
+            print(f"  ok  {png.name}"
+                  f"  [luac:{'✓' if luac_ok else '✗'}]")
             n_ok += 1
         except Exception as e:
             print(f"  ERR {png.name}: {e}", file=sys.stderr)
+            import traceback; traceback.print_exc()
             n_fail += 1
 
     print(f"\n{n_ok} ok, {n_fail} failed", file=sys.stderr)

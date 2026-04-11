@@ -29,7 +29,7 @@ end
 -- timers
 function dec_if_active(timer_name)
   if get_timer(timer_name) > 0 then
-    timers[timer_name] -= 1
+    timers[timer_name] = timers[timer_name] - (1)
     return true
   end
   return false
@@ -170,7 +170,7 @@ function _init()
         local room_idx = room_index(rx, ry)
         add(card_rooms, room_idx)
         card_ranks[room_idx] = rank
-        rank += 1
+        rank = rank + (1)
       end
     end)
   end)
@@ -282,16 +282,16 @@ function _update()
     update_menu()
     return
   end
-  frame_count += 1
+  frame_count = frame_count + (1)
   if frame_count >= 30 then
     frame_count = 0
-    seconds += 1
+    seconds = seconds + (1)
     if (seconds >= 60) then
       seconds = 0
-      minutes += 1
+      minutes = minutes + (1)
     end
   end
-  room_frames += 1
+  room_frames = room_frames + (1)
   dialogs = {}
   talking_npc = nil
   --check_current_room()
@@ -299,7 +299,7 @@ function _update()
   if not is_timer_active "p_hurt" then
     local p_center = vec2(p_bounds.x + p_bounds.w / 2, p_bounds.y + p_bounds.h - 1)
     local room_x, room_y = p_center.x // 128, p_center.y // 128
-    if room_x != current_room.x or room_y != current_room.y then
+    if room_x ~= current_room.x or room_y ~= current_room.y then
       load_room(room_x, room_y)
     end
   end
@@ -332,7 +332,7 @@ function _update()
   -- update_room_objects()
   was_carrying = carrying()
   foreach(room_objects, function(obj)
-    if (obj.update != nil) then
+    if (obj.update ~= nil) then
       obj:update()
     end
   end)
@@ -348,7 +348,7 @@ function _draw()
   draw_room()
   -- draw_room_objects()
   foreach(room_objects, function(obj)
-    if obj.draw != nil then
+    if obj.draw ~= nil then
       obj:draw()
     end
   end)
@@ -367,12 +367,12 @@ function _draw()
     elseif p_vertigo > 7 then
       sprite = 10
       if frame_count % 15 > 6 then
-        sprite += 1
+        sprite = sprite + (1)
       end
     else
       sprite = 8
       if p_walking and frame_count % 6 > 3 then
-        sprite += 1
+        sprite = sprite + (1)
       end
     end
     spr(sprite, round(p_bounds.x) - 1, round(p_bounds.y), (p_bounds.w + 2) / 8, p_bounds.h / 8, p_facing == 0)
@@ -382,7 +382,7 @@ function _draw()
   end
   -- draw_room_objects()
   foreach(room_objects, function(obj)
-    if obj.draw_over != nil then
+    if obj.draw_over ~= nil then
       obj:draw_over()
     end
   end)
@@ -513,7 +513,7 @@ end
 
 function draw_menu_item(text, item_index, y)
   local x, text = x_centred(text), (menu_item == item_index) and "\x5ei" .. text or text
-  print(text, x, y, (menu_item != item_index or blink(4)) and 6 or 7)
+  print(text, x, y, (menu_item ~= item_index or blink(4)) and 6 or 7)
 end
 
 function x_centred(text)
@@ -595,13 +595,13 @@ function process_vertical(grounded)
     p_vel.y = move_towards(p_vel.y, p_jump_force, p_jump_acc)
     -- why is that ?
     if p_vel.y < 0 then
-      p_vel.y /= 2
+      p_vel.y = p_vel.y / (2)
     end
   end
   if not btn(jump_btn) and is_timer_active "p_jump_frames" then
     timers.p_jump_frames = 0
     if p_vel.y < 0 then
-      p_vel.y /= 2
+      p_vel.y = p_vel.y / (2)
     end
   end
 end
@@ -666,7 +666,7 @@ function apply_gravity(grounded)
     return
   end
   if not grounded then
-    p_vel.y += gravity
+    p_vel.y = p_vel.y + (gravity)
   -- if falling and on ground, freeze y velocity
   elseif p_vel.y > 0 then
     p_vel.y = 0
@@ -684,7 +684,7 @@ function apply_vel_x()
     -- if there's no collision
     if not collides6(translated(p_sub_bounds, step_x, 0), 0) then
       -- move by that increment
-      p_sub_bounds.x += step_x
+      p_sub_bounds.x = p_sub_bounds.x + (step_x)
       -- if that's the last step...
       if i == abs(amt_x) then
         -- try to move by the fractionnal part
@@ -693,7 +693,7 @@ function apply_vel_x()
         -- if there's still no collision...
         if not collides6(rem_bounds, 0) then
           -- ...apply fractional part to subpixel bounds
-          p_sub_bounds.x += rem_x
+          p_sub_bounds.x = p_sub_bounds.x + (rem_x)
         end
       end
     -- if there's a collision
@@ -711,12 +711,12 @@ function apply_vel_y()
   local amt_y = step_y * round(abs(p_vel.y))
   for i = 0, abs(amt_y) do
     if check_y(step_y) then
-      p_sub_bounds.y += step_y
+      p_sub_bounds.y = p_sub_bounds.y + (step_y)
       -- subpixel check
       if i == abs(amt_y) then
         local rem_y = p_vel.y - amt_y
         if check_y(rem_y) then
-          p_sub_bounds.y += rem_y
+          p_sub_bounds.y = p_sub_bounds.y + (rem_y)
         else
           p_sub_bounds.y = round(p_sub_bounds.y)
         end
@@ -744,7 +744,7 @@ function hurt_player()
     p_vel.x = 0
     timers.shake = shake_dur
     sfx(31)
-    deaths += 1
+    deaths = deaths + (1)
   end
 end
 
@@ -839,7 +839,7 @@ end, [5] = function(x, y)
         local px = x0 + sin(angle / res) * d
         local py = y0 + cos(angle / res) * d
         local flags = fget(mget(px / 8, py / 8))
-        if (flags & 1) != 0 or (flags & 2) != 0 then
+        if (flags & 1) ~= 0 or (flags & 2) ~= 0 then
           pset(px, py, current_theme.lamp)
           break
         end
@@ -929,7 +929,7 @@ end,
       return
     end
     if breaking > 0 then
-      breaking -= 1
+      breaking = breaking - (1)
       if breaking == 0 then
         mset(mx, my, 0)
         broken = true
@@ -1069,7 +1069,7 @@ current_theme = themes.dirt
 
 function load_room(room_x, room_y)
   for _, obj in ipairs(room_objects) do
-    if obj.reset != nil then
+    if obj.reset ~= nil then
       obj.reset()
     end
   end
@@ -1083,9 +1083,9 @@ function load_room(room_x, room_y)
   teleporter_index = 0
   foreach_room_tile(room_x, room_y, function(mx, my)
     local fn = tile_fns[mget(mx, my)]
-    if fn != nil then
+    if fn ~= nil then
       local ret = fn(mx * 8, my * 8, mx, my)
-      if ret != nil then
+      if ret ~= nil then
         add(room_objects, ret)
       end
     end
@@ -1106,7 +1106,7 @@ end
 
 function load_theme(name)
   local theme = themes[name]
-  if theme != nil then
+  if theme ~= nil then
     current_theme = theme
     pal(0, current_theme.bg, 1)
     pal(1, current_theme.wall, 1)
@@ -1195,7 +1195,7 @@ function create_ray_en(x, y)
       if en.beam_on then
         beam(en)
       end
-      wait += 1
+      wait = wait + (1)
       if wait >= wait_frame_count then
         en.shoot = false
         en.angle_to_target = nil
@@ -1205,8 +1205,8 @@ function create_ray_en(x, y)
       vision_cone(en)
     end
     -- update_charge(en)
-    if en.angle_to_target != nil and not en.shoot then
-      charge += 1
+    if en.angle_to_target ~= nil and not en.shoot then
+      charge = charge + (1)
       if charge < charge_frame_count then
         add(charge_particles, {d = rnd() * 3 + 13, angle = rnd(), speed = rnd() * 2 + 2})
       else
@@ -1223,14 +1223,14 @@ function create_ray_en(x, y)
     end
     for i = #charge_particles, 1, -1 do
       local particle = charge_particles[i]
-      particle.d -= particle.speed
+      particle.d = particle.d - (particle.speed)
       if particle.d <= 0 then
         del(charge_particles, particle)
       end
     end
     -- update_expl(en)
     if en.expl > 0 then
-      en.expl -= 1
+      en.expl = en.expl - (1)
       if rect_circ_col(p_bounds, en.expl_pos, en.expl_r) then
         hurt_player()
       end
@@ -1262,7 +1262,7 @@ function beam(ray_en)
     end
     return hit_something or d_squared >= ray_en.beam_lgth * ray_en.beam_lgth
   end)
-  ray_en.beam_distance += ray_en.beam_speed
+  ray_en.beam_distance = ray_en.beam_distance + (ray_en.beam_speed)
 end
 
 function vision_cone(ray_en)
@@ -1275,7 +1275,7 @@ function vision_cone(ray_en)
   local angles = {}
   local cone_width = 0.002
   add(angles, base_angle)
-  if ray_en.angle_to_target != nil then
+  if ray_en.angle_to_target ~= nil then
     add(angles, base_angle - cone_width)
     add(angles, base_angle + cone_width)
   end
@@ -1312,7 +1312,7 @@ function traverse(x0, y0, x1, y1, should_break)
   local max = 128
   local count = 0
   while true do
-    count += 1
+    count = count + (1)
     if count >= max then
       break
     end
@@ -1324,12 +1324,12 @@ function traverse(x0, y0, x1, y1, should_break)
     end
     local e2 = 2 * err
     if e2 >= dy then
-      err += dy
-      x0 += sx
+      err = err + (dy)
+      x0 = x0 + (sx)
     end
     if e2 <= dx then
-      err += dx
-      y0 += sy
+      err = err + (dx)
+      y0 = y0 + (sy)
     end
   end
 end
@@ -1377,7 +1377,7 @@ function is_step_active(pattern)
     return true
   end
   local step = (stat(56) // 44) % #pattern
-  return split(pattern, '')[step + 1] != "-"
+  return split(pattern, '')[step + 1] ~= "-"
 end
 
 function create_v_ray_en(x, y, pattern)
@@ -1431,7 +1431,7 @@ function register_door(x, y, mx, my, color, tile)
       visible = false
       mset(mx, my, 0)
     end
-    if not visible and opened_doors[color] != true then
+    if not visible and opened_doors[color] ~= true then
       visible = true
       mset(mx, my, tile)
     end
@@ -1472,7 +1472,7 @@ function btn_check_collision(bounds, color)
 end
 
 function carrying()
-  return p_carried != nil
+  return p_carried ~= nil
 end
 
 function register_spawner(x, y, secundary)
@@ -1510,7 +1510,7 @@ function new_carriable(type, x, y, w, h)
         p_carried = nil
         -- avoid getting stuck in walls
         while collides(self.bounds, 0) do
-          self.bounds.x += (p_facing == 0 and 1 or -1)
+          self.bounds.x = self.bounds.x + ((p_facing == 0 and 1 or -1))
         end
         self.sub_bounds.x = self.bounds.x
       end
@@ -1531,7 +1531,7 @@ function new_carriable(type, x, y, w, h)
 
   function carriable:apply_gravity()
     if not self:is_grounded() then
-      self.vel.y += gravity
+      self.vel.y = self.vel.y + (gravity)
     else
       self.vel.y = 0
     end
@@ -1552,11 +1552,11 @@ function new_carriable(type, x, y, w, h)
     local amt_y = step_y * round(abs(self.vel.y))
     for i = 0, abs(amt_y) do
       if self:check_y(step_y) then
-        self.sub_bounds.y += step_y
+        self.sub_bounds.y = self.sub_bounds.y + (step_y)
         if i == abs(amt_y) then
           local rem_y = self.vel.y - amt_y
           if self:check_y(rem_y) then
-            self.sub_bounds.y += rem_y
+            self.sub_bounds.y = self.sub_bounds.y + (rem_y)
           else
             self.sub_bounds.y = round(self.sub_bounds.y)
           end
@@ -1633,7 +1633,7 @@ function card_count()
   local sum = 0
   for _, b in pairs(collected_cards) do
     if b then
-      sum += 1
+      sum = sum + (1)
     end
   end
   return sum
@@ -1662,7 +1662,7 @@ end
 
 function over_breakable_only()
   local x1, x2, y = round(p_bounds.x) / 8, round(p_bounds.x + p_bounds.w - 1) / 8, round(p_bounds.y + p_bounds.h) / 8
-  return mget(x1, y) != 2 and mget(x2, y) != 2 and mget(x1, y) != 3 and mget(x2, y) != 3
+  return mget(x1, y) ~= 2 and mget(x2, y) ~= 2 and mget(x1, y) ~= 3 and mget(x2, y) ~= 3
 end
 
 dialog_data = {[7] = {yellow = "this is the garden|stay as long as you want", red = "this whole place|it's not so bad after all", blue = "i like this place|the sun comes in",}, [11] = {purple = "you can keep the lamp|i'm staying here"}, [19] = {yellow = "this building?|it was a factory|before the kaboom||now we're trapped|under the debris"}, [24] = {spider = "it's you again|how long did i sleep?|feels like an eternity"}, [26] = {blue = "you've made it|to the warp zone", red = "beyond this door|there's only void",}, [15] = {blue = "you came here|to get repaired?|that's what we do"}}
@@ -1694,12 +1694,12 @@ function register_talker(x, y, name)
 
   function talker:next_dialog()
     local room_dialogs = dialog_data[room_index(current_room.x, current_room.y)]
-    local npc_dials = room_dialogs != nil and room_dialogs[self.name]
-    local dials = npc_dials != nil and split(npc_dials, "|") or nil
-    if dials != nil then
-      self.dialog_index += 1
+    local npc_dials = room_dialogs ~= nil and room_dialogs[self.name]
+    local dials = npc_dials ~= nil and split(npc_dials, "|") or nil
+    if dials ~= nil then
+      self.dialog_index = self.dialog_index + (1)
       local txt = obfuscate(dials[self.dialog_index])
-      self.dialog_index %= #dials + 1
+      self.dialog_index = self.dialog_index % (#dials + 1)
       return txt
     end
   end
@@ -1707,7 +1707,7 @@ function register_talker(x, y, name)
   function talker:update()
     local d = center_dist_squared(self.bounds, p_bounds)
     if self.showing_dialog then
-      self.counter += 1
+      self.counter = self.counter + (1)
       if d > 800 or self.counter > 60 then
         self.showing_dialog = false
         talking_npc = nil
@@ -1722,7 +1722,7 @@ function register_talker(x, y, name)
   end
 
   function talker:draw_dialog()
-    if self.showing_dialog and self.dialog_text != nil then
+    if self.showing_dialog and self.dialog_text ~= nil then
       local x0 = x + 4 - #self.dialog_text * 2
       local rx1 = current_room.x * 128 + 4
       local rx2 = ((current_room.x * 128) + 124) - (#self.dialog_text * 4)
@@ -1763,14 +1763,14 @@ function register_unlock_y(y)
 end
 
 function register_unlock_x(x)
-  if y_to_unlock != nil then
+  if y_to_unlock ~= nil then
     clear_room(vec2(x, y_to_unlock))
   end
 end
 
 function register_teleporter(x, y)
   local b = new_bounds(x, y)
-  teleporter_index += 1
+  teleporter_index = teleporter_index + (1)
   local index = teleporter_index
   local collides = false
   local teleporting = 0
@@ -1784,7 +1784,7 @@ function register_teleporter(x, y)
         sfx(36)
       end
     else
-      teleporting -= 1
+      teleporting = teleporting - (1)
       if (teleporting > 25 and not btn(4)) or not collides then
         teleporting = 0
       elseif teleporting == 25 then

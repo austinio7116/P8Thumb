@@ -130,7 +130,7 @@ function _update60()
   local old_gs, temp
   old_gs = game.state
   -- update state, check input
-  framedelay -= 1
+  framedelay = framedelay - (1)
   if (framedelay == 0) then
     twoframe = (twoframe + 1) % 2
     --two frame anims
@@ -149,8 +149,8 @@ function _update60()
   frame60 = (frame60 + 1) % 60
   move_stars(stars_direction)
   if (btnp(0)) then
-    if (cartnum == 1 and game.state == gs_showcarts) or (game.state != gs_showcarts) then
-      game.state -= 1
+    if (cartnum == 1 and game.state == gs_showcarts) or (game.state ~= gs_showcarts) then
+      game.state = game.state - (1)
       if game.state == gs_showcarts then
         cartnum = #cart
       end
@@ -159,7 +159,7 @@ function _update60()
         game.state = gs_thanks
       end
     elseif (game.state == gs_showcarts) then
-      cartnum -= 1
+      cartnum = cartnum - (1)
       poop = stars_direction
       stars_direction = flr(rnd(8))
       if stars_direction == poop then
@@ -168,8 +168,8 @@ function _update60()
     end
   --end
   elseif (btnp(1)) then
-    if (cartnum == #cart) or (game.state != gs_showcarts) then
-      game.state += 1
+    if (cartnum == #cart) or (game.state ~= gs_showcarts) then
+      game.state = game.state + (1)
       if game.state == gs_showcarts then
         cartnum = 1
       end
@@ -178,7 +178,7 @@ function _update60()
         game.state = gs_title
       end
     elseif (game.state == gs_showcarts) then
-      cartnum += 1
+      cartnum = cartnum + (1)
       poop = stars_direction
       stars_direction = flr(rnd(8))
       if stars_direction == poop then
@@ -190,7 +190,7 @@ function _update60()
   end
   -- if btn
   -- change music on state change
-  if (old_gs != game.state) then
+  if (old_gs ~= game.state) then
     if (game.state == gs_showcarts) then
       music(6)
     elseif (game.state == gs_title) then
@@ -436,15 +436,15 @@ function sprint(_str, _x, _y, _c, _c2, _c3)
   local i, num
   palt(0, false)
   -- make sure black is solid
-  if _c != nil then
+  if _c ~= nil then
     pal(7, _c)
   end
   -- instead of white, draw this
-  if _c2 != nil then
+  if _c2 ~= nil then
     pal(6, _c2)
   end
   -- instead of light gray, draw this
-  if _c3 != nil then
+  if _c3 ~= nil then
     pal(5, _c3)
   end
   -- instead of dark gray, draw this
@@ -463,15 +463,15 @@ function sprintc(_str, _y, _c, _c2, _c3)
   _x = 63 - (flr(#_str * 8) / 2)
   palt(0, false)
   -- make sure black is solid
-  if _c != nil then
+  if _c ~= nil then
     pal(7, _c)
   end
   -- instead of white, draw this
-  if _c2 != nil then
+  if _c2 ~= nil then
     pal(6, _c2)
   end
   -- instead of light gray, draw this
-  if _c3 != nil then
+  if _c3 ~= nil then
     pal(5, _c3)
   end
   -- instead of dark gray, draw this
@@ -488,7 +488,7 @@ end
 function sprintxy(_str, _x, _y, _c)
   local i, num
   --palt(0,false) -- make sure black is solid
-  if _c != nil then
+  if _c ~= nil then
     pal(7, _c)
   end
   -- instead of white, draw this
@@ -508,15 +508,15 @@ function dsprintxy(_str, _x, _y, _c, _c2, _c3)
   local i, num, sx, sy
   palt(0, false)
   -- make sure black is solid
-  if _c != nil then
+  if _c ~= nil then
     pal(7, _c)
   end
   -- instead of white, draw this
-  if _c2 != nil then
+  if _c2 ~= nil then
     pal(6, _c2)
   end
   -- instead of light gray, draw this
-  if _c3 != nil then
+  if _c3 ~= nil then
     pal(5, _c3)
   end
   -- instead of dark gray, draw this

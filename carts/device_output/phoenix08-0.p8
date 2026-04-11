@@ -180,7 +180,7 @@ function update_titles()
   end
   -- counters
   titlecounter = (titlecounter + 1) % 1000
-  titlecounter2 += 1
+  titlecounter2 = titlecounter2 + (1)
   if btnp(4) then
     if titlemode == tm_scoring then
       titlemode = tm_normal
@@ -219,14 +219,14 @@ function draw_titles()
     local y = 34
     spr(140, 40, y, 2, 2)
     prints("20-80", 64, y + 5, 8)
-    y += 18
+    y = y + (18)
     spr(8, 33, y, 2, 2)
     spr(8, 44, y, 2, 2, true, false)
     prints("200", 64, y + 5, 8)
-    y += 18
+    y = y + (18)
     spr(106, 36, y, 3, 2)
     prints("100-800", 64, y + 5, 8)
-    y += 18
+    y = y + (18)
     spr(212, 44, y + 4)
     prints("1000-9000", 64, y + 5, 8)
   end
@@ -277,7 +277,7 @@ end
 function game_resetlevel(advance)
   -- advance?
   if advance then
-    level += 1
+    level = level + (1)
     -- level properties
     birdspeedmultiplier = 1
     formationx = 0
@@ -403,7 +403,7 @@ function game_formation_reset()
   maxformationspeed = 1
   for e in all(entities) do
     if e.type == et_phoenix then
-      if e.state != phs_egg then
+      if e.state ~= phs_egg then
         entity_setstate(e, phs_unspawning)
       end
     end
@@ -424,7 +424,7 @@ function game_update()
   -- #########
   -- formation
   -- #########
-  if gamestate != s_levelstart then
+  if gamestate ~= s_levelstart then
     -- allow for double (or faster anyway) speed
     local loops = 1
     if birdspeedmultiplier == 2 and gstatecount % 2 == 0 then
@@ -437,8 +437,8 @@ function game_update()
           -- =============
           -- phoenix level
           -- =============
-          formationy += formationspeed
-          formationspeed += formationdir / 20
+          formationy = formationy + (formationspeed)
+          formationspeed = formationspeed + (formationdir / 20)
           if phoenixnearbottom then
             formationdir = 1
             formationspeed = 1.5
@@ -463,7 +463,7 @@ function game_update()
           end
           -- gradually drop down
           if gstatecount > 400 and gstatecount % 45 == 1 then
-            maxformationspeed += 0.1
+            maxformationspeed = maxformationspeed + (0.1)
             if maxformationspeed >= 2 then
               maxformationspeed = 1
             end
@@ -472,7 +472,7 @@ function game_update()
           -- ==========
           -- bird level
           -- ==========
-          formationx += formationdir * formationspeed
+          formationx = formationx + (formationdir * formationspeed)
           -- prevent rounding errors since we must know that each complete formation cycle takes 339 game cycles
           if abs(formationx) < 0.1 and formationdir == 1 then
             --printh("formation return length="..formationcounter)
@@ -480,7 +480,7 @@ function game_update()
             formationcounter = 0
           else
             -- more of a debugging tool to prove that the formation takes 339 cycles
-            formationcounter += 1
+            formationcounter = formationcounter + (1)
           end
           -- note: these values give an exact formation return cycle of 339 moves
           if formationx <= -14 then
@@ -511,25 +511,25 @@ function game_update()
         end
         -- count/ flags
         if e.type == et_bird then
-          countbirds += 1
+          countbirds = countbirds + (1)
           if e.state == bs_diving then
-            countdiving += 1
+            countdiving = countdiving + (1)
           end
         elseif e.type == et_phoenix then
           if e.y > 100 or e.y < -10 then
             phoenixnearbottom = true
           end
           if e.state == phs_formation then
-            counthatched += 1
+            counthatched = counthatched + (1)
           end
         end
         if not e.active then
           del(entities, e)
           -- counts
           if e.type == et_bullet then
-            countbullets -= 1
+            countbullets = countbullets - (1)
           elseif e.type == et_bomb then
-            countbombs -= 1
+            countbombs = countbombs - (1)
           end
         end
       end
@@ -543,7 +543,7 @@ function game_update()
       if levelresolved == 1 then
         -- scroll stars in from top
         for s in all(stars) do
-          s.y -= 140
+          s.y = s.y - (140)
         end
         if level == 1 then
           message = "player 1"
@@ -580,14 +580,14 @@ function game_update()
     end
     -- add formation
     if formationdelaytime > 0 then
-      formationdelaytime -= 1
+      formationdelaytime = formationdelaytime - (1)
       if formationdelaytime == 0 then
         game_formation_create()
         gstatecount = 1
       end
     end
     -- double bird speed?
-    if (countbirds == 1 or (countbirds < 4 + round and gstatecount > 900)) and levelresolved != 5 then
+    if (countbirds == 1 or (countbirds < 4 + round and gstatecount > 900)) and levelresolved ~= 5 then
       birdspeedmultiplier = 2
     end
     -- particles
@@ -626,7 +626,7 @@ function game_update()
     -- lost life
     -- #########
     if gstatecount >= 15 and not phoenixnearbottom then
-      lives -= 1
+      lives = lives - (1)
       if lives == 0 then
         game_setstate(s_gameover)
       else
@@ -649,9 +649,9 @@ function game_update()
   player.displayscore = move(player.displayscore, player.score, 2)
   -- counters
   if nextsfxtime > 0 then
-    nextsfxtime -= 1
+    nextsfxtime = nextsfxtime - (1)
   end
-  gstatecount += 1
+  gstatecount = gstatecount + (1)
 end
 
 function game_draw()
@@ -677,7 +677,7 @@ function game_draw()
       end
       clip()
       if n > 20 then
-        n -= 20
+        n = n - (20)
         rectfill(64 - n * 4, 3 + 64 - n * 6, 63 + n * 4, 3 + 64 + n * 6, 0)
       end
     end
@@ -756,7 +756,7 @@ end
 function player_update(s)
   -- dying?
   if s.state == ps_dying then
-    s.statecount += 1
+    s.statecount = s.statecount + (1)
     if s.statecount >= 120 and countdiving == 0 then
       game_setstate(s_lostlife)
     end
@@ -765,17 +765,17 @@ function player_update(s)
   -- speed
   local speed = s.speed
   if player.shieldtime > 0 then
-    speed *= 0.33
+    speed = speed * (0.33)
   end
   -- move
   local oldx = s.x
   if input.left then
-    s.x -= speed
+    s.x = s.x - (speed)
   elseif input.right then
-    s.x += speed
+    s.x = s.x + (speed)
   end
   s.x = mid(5, s.x, 123)
-  s.moved = s.x != oldx
+  s.moved = s.x ~= oldx
   -- fire
   if input.fire2hit and countbullets < maxplayerbullets and player.shieldtime <= 0 then
     bullet_add(s)
@@ -802,7 +802,7 @@ function player_update(s)
           -- destroy
           e:destroy()
           -- low score to discourage use of shiled as a weapon
-          if e.type != et_bomb then
+          if e.type ~= et_bomb then
             player_scoreadd(2)
           end
         else
@@ -825,9 +825,9 @@ function player_update(s)
     end
   end
   -- counters
-  s.statecount += 1
+  s.statecount = s.statecount + (1)
   if s.shieldtime > -240 then
-    s.shieldtime -= 1
+    s.shieldtime = s.shieldtime - (1)
   end
 end
 
@@ -859,9 +859,9 @@ end
 
 function player_scoreadd(v)
   local oldscore = player.score
-  player.score += v
+  player.score = player.score + (v)
   if (player.score >= 1000 and oldscore < 1000) or (player.score >= 2000 and oldscore < 2000) then
-    lives += 1
+    lives = lives + (1)
     -- sfx
     sfx(sfx_bonuslife)
   end
@@ -886,12 +886,12 @@ end
 
 function particles_update()
   for p in all(particles) do
-    p.x += p.dx
-    p.y += p.dy
-    p.dy += 0.03
+    p.x = p.x + (p.dx)
+    p.y = p.y + (p.dy)
+    p.dy = p.dy + (0.03)
     --0.05
-    p.r -= 0.04
-    p.ttl -= 1
+    p.r = p.r - (0.04)
+    p.ttl = p.ttl - (1)
     if p.ttl <= 0 or p.r <= 0 then
       del(particles, p)
     end
@@ -911,9 +911,9 @@ end
 
 function stars_update()
   for s in all(stars) do
-    s.y += s.speed
+    s.y = s.y + (s.speed)
     if s.y > 148 then
-      s.y -= 168
+      s.y = s.y - (168)
       if s.spr then
         s.x = rnd(112)
       end
@@ -1001,7 +1001,7 @@ function bird_update(s)
     -- next instruction?
     while (true) do
       if s.divepatterncounter == 0 then
-        s.divepatternpos += 1
+        s.divepatternpos = s.divepatternpos + (1)
         if s.divepatternpos > #s.divepattern then
           -- back into formation
           entity_setstate(s, bs_formation)
@@ -1052,7 +1052,7 @@ function bird_update(s)
           end
         end
       end
-      if s.divepatterncounter != 0 then
+      if s.divepatterncounter ~= 0 then
         break
       end
     end
@@ -1066,7 +1066,7 @@ function bird_update(s)
         -- drop
         -- ----
         local speed = 1
-        s.y += speed * sgn(s.divepatterncounter)
+        s.y = s.y + (speed * sgn(s.divepatterncounter))
         -- animation
         s.frame = 32
         -- counter
@@ -1076,7 +1076,7 @@ function bird_update(s)
           -- finished so reset rotation
           s.rotation = 0
         else
-          s.rotation += 0.25 * sgn(s.divepatterncounter)
+          s.rotation = s.rotation + (0.25 * sgn(s.divepatterncounter))
         end
       elseif s.diveinstuction == "m" then
         -- ------------------------------------
@@ -1085,8 +1085,8 @@ function bird_update(s)
         dx = -sin(s.rotation / 8)
         dy = -cos(s.rotation / 8)
         local speed = 1
-        s.x += dx * speed
-        s.y += dy * speed
+        s.x = s.x + (dx * speed)
+        s.y = s.y + (dy * speed)
         -- animation
         s.frame = 32
         -- counter
@@ -1095,15 +1095,15 @@ function bird_update(s)
         s.divepatterncounter = move(s.divepatterncounter, 0, speed)
         -- rotate?
         if s.diveparam1 then
-          s.rotation += s.diveparam1
+          s.rotation = s.rotation + (s.diveparam1)
         end
       elseif s.diveinstuction == "s" then
         -- ----
         -- soar
         -- ----
         local speed = 1
-        s.x += speed * sgn(s.divepatterncounter)
-        s.y -= speed
+        s.x = s.x + (speed * sgn(s.divepatterncounter))
+        s.y = s.y - (speed)
         -- animation
         s.frame = anim_bird_soaring[soaringframe]
         -- set rotation in case we need to switch moves (and to assist with animation)
@@ -1118,7 +1118,7 @@ function bird_update(s)
         -- -----------------------------
         -- walking (as per in formation)
         -- -----------------------------
-        s.x += sgn(s.divepatterncounter) * formationspeed
+        s.x = s.x + (sgn(s.divepatterncounter) * formationspeed)
         -- animation
         s.frame = anim_bird_formation[walkingframe]
         -- counter
@@ -1126,19 +1126,19 @@ function bird_update(s)
       end
     end
     -- debug
-    s.divedebugcounter += 1
+    s.divedebugcounter = s.divedebugcounter + (1)
     add(s.divedebugpoints, {s.x, s.y})
   end
   -- drop bomb
   -- note: by using gstatecount, the same bird is more likely to drop multiple bombs, like in the arcade version
   local n = iif(s.state == bs_diving, 2, 20)
-  if not demo and s.state != bs_spawning and gstatecount % 30 < 10 and rnd(n) < 1 then
+  if not demo and s.state ~= bs_spawning and gstatecount % 30 < 10 and rnd(n) < 1 then
     bomb_add(s, 2)
   end
   -- hit rectangle (centred)
   s.hitrect = rectc(s.x, s.y, s.hitwidth, 8)
   -- counters
-  s.statecount += 1
+  s.statecount = s.statecount + (1)
 end
 
 function bird_draw(s)
@@ -1153,7 +1153,7 @@ function bird_draw(s)
     -- rotated dive (1 or 2-frames)
     f = ({32, 36, 40, 36, 32, 36, 40, 36})[rotation]
     if s.frame == 33 then
-      f += 2
+      f = f + (2)
     end
     flipx = ({false, false, false, false, false, true, true, true})[rotation]
     flipy = ({false, false, false, true, true, true, false, false})[rotation]
@@ -1176,7 +1176,7 @@ end
 
 -- birds
 function birds_dive()
-  if countdiving > level or player.state != ps_normal then
+  if countdiving > level or player.state ~= ps_normal then
     return
   end
   -- initialise
@@ -1193,8 +1193,8 @@ function birds_dive()
       -- dive
       entity_setstate(e, bs_diving)
       e.divepattern = pattern
-      added += 1
-      countdiving += 1
+      added = added + (1)
+      countdiving = countdiving + (1)
       -- perfect circle (just for the hell of it)?
       if rnd(20) < 1 then
         e.divepattern = {"a,2", "m,339,0.02359"}
@@ -1273,7 +1273,7 @@ function phoenix_update(s)
       entity_setstate(s, phs_formation)
     else
       -- slow down
-      speed *= 0.15
+      speed = speed * (0.15)
       -- animation
       s.spawnwidth = 2
       s.frame = anim_phoenix_hatching[i]
@@ -1303,7 +1303,7 @@ function phoenix_update(s)
     end
     -- random change of direction
     if rnd(100) < 1 + round * 3 then
-      s.xdir *= -1
+      s.xdir = s.xdir * (-1)
     end
     -- drop bomb
     -- note: by using gstatecount, the same bird is more likely to drop multiple bombs, like in the arcade version
@@ -1318,8 +1318,8 @@ function phoenix_update(s)
     end
   end
   -- always moving side-to-side
-  s.x += speed
-  s.speed += s.xdir / 20
+  s.x = s.x + (speed)
+  s.speed = s.speed + (s.xdir / 20)
   s.speed = mid(-s.maxspeed, s.speed, s.maxspeed)
   if s.x >= 110 - s.maxspeed * 10 then
     s.xdir = -1
@@ -1329,18 +1329,18 @@ function phoenix_update(s)
   -- y position is always fixed relative to start position
   s.y = s.fy + formationy
   while (s.y > 128) do
-    s.y -= 140
+    s.y = s.y - (140)
   end
   -- hit rectangle
   if s.state == phs_formation then
     -- left aligned
     local sx, w = s.x - 10, 20
     if s.leftwingspawntime > 0 then
-      sx += 8
-      w -= 8
+      sx = sx + (8)
+      w = w - (8)
     end
     if s.rightwingspawntime > 0 then
-      w -= 8
+      w = w - (8)
     end
     s.hitrect = rectl(sx, s.y - 4, w, 8)
   else
@@ -1348,12 +1348,12 @@ function phoenix_update(s)
     s.hitrect = rectc(s.x, s.y, s.hitwidth, 8)
   end
   -- counters
-  s.statecount += 1
+  s.statecount = s.statecount + (1)
   if s.leftwingspawntime > 0 then
-    s.leftwingspawntime -= 1
+    s.leftwingspawntime = s.leftwingspawntime - (1)
   end
   if s.rightwingspawntime > 0 then
-    s.rightwingspawntime -= 1
+    s.rightwingspawntime = s.rightwingspawntime - (1)
   end
 end
 
@@ -1370,13 +1370,13 @@ function phoenix_draw(s)
     else
       f = -1
     end
-    if f != -1 then
+    if f ~= -1 then
       spr(f, x, y, 1, 2)
     end
-    x += 8
+    x = x + (8)
     -- body
     spr(s.frame + 1, x, y, 1, 2)
-    x += 8
+    x = x + (8)
     -- right wing
     if s.rightwingspawntime == 0 then
       f = s.frame + 2
@@ -1386,7 +1386,7 @@ function phoenix_draw(s)
     else
       f = -1
     end
-    if f != -1 then
+    if f ~= -1 then
       spr(f, x, y, 1, 2, flipx, false)
     end
   elseif s.spawnwidth == 2 then
@@ -1411,11 +1411,11 @@ function bullet_add(player)
   local s = {type = et_bullet, active = true, x = player.x, y = player.y - 1, speed = 5, collisionradius = 1, draw = bullet_draw, update = bullet_update, testcollisions = bullet_testcollisions}
   add(entities, s)
   -- count
-  countbullets += 1
+  countbullets = countbullets + (1)
 end
 
 function bullet_update(s)
-  s.y -= s.speed
+  s.y = s.y - (s.speed)
   -- hit rectangle (centred)
   s.hitrect = rectc(s.x, s.y, 2, 4)
   -- finished?
@@ -1494,10 +1494,10 @@ function bullet_testcollisions(s)
           s.active = false
           -- fireball?
           if e.leftwingspawntime <= 0 and e.rightwingspawntime <= 0 then
-            sc *= 8
+            sc = sc * (8)
             fireball_add(e, sc .. "0")
           else
-            sc *= 2
+            sc = sc * (2)
           end
           -- score
           player_scoreadd(sc)
@@ -1524,7 +1524,7 @@ function fireball_add(e, text)
 end
 
 function fireball_update(s)
-  s.dist += 3
+  s.dist = s.dist + (3)
   if s.dist > 130 then
     s.active = false
   end
@@ -1571,23 +1571,23 @@ function mothership_update(s)
   if s.alienactive then
     if gamestate == s_playing then
       if s.statecount < 68 then
-        s.y += 1
+        s.y = s.y + (1)
       elseif s.statecount % 100 == 99 then
-        s.y += 1
+        s.y = s.y + (1)
       end
     elseif gamestate == s_lostlife then
       -- move up a bit if too low
       if s.y > 70 then
-        s.y -= 1
+        s.y = s.y - (1)
       end
     end
   end
   -- centre belt
   if s.statecount % 3 == 0 then
     for b in all(s.belt) do
-      b.x += 1
+      b.x = b.x + (1)
       if b.x > 112 then
-        b.x -= 108
+        b.x = b.x - (108)
       end
     end
   end
@@ -1605,7 +1605,7 @@ function mothership_update(s)
   s.hitrect = rectc(s.x, s.y, s.hitwidth, s.h)
   s.alienhitrect = rectc(s.x, s.y - 2, 8, 12)
   -- counters
-  s.statecount += 1
+  s.statecount = s.statecount + (1)
 end
 
 function mothership_draw(s)
@@ -1626,7 +1626,7 @@ function mothership_draw(s)
   for c in all(s.columns) do
     if c.h > 0 then
       rectfill(c.x, s.y + c.y, c.x + c.w - 1, s.y + c.y + c.h - 1, 9)
-      if c.h != c.starth then
+      if c.h ~= c.starth then
         pset(c.x + 1, s.y + c.y + c.h - 1, 0)
         pset(c.x + 3, s.y + c.y + c.h - 1, 0)
       end
@@ -1650,7 +1650,7 @@ function mothership_hit(s, bullet)
   -- destructible columns
   for c in all(s.columns) do
     if c.h > 0 and bullet.x >= c.x and bullet.x < c.x + c.w and bullet.y <= s.y + c.y + c.h then
-      c.h -= 1
+      c.h = c.h - (1)
       -- particles
       particles_add(bullet.x, bullet.y, 2, 9, false, true)
       -- sfx
@@ -1660,11 +1660,11 @@ function mothership_hit(s, bullet)
   -- centre belt
   for b in all(s.belt) do
     if b.active and bullet.x >= b.x and bullet.x < b.x + b.w and bullet.y <= s.y + b.y + b.h then
-      b.hits += 1
+      b.hits = b.hits + (1)
       if b.hits == 2 then
         b.active = false
       else
-        b.frame += 1
+        b.frame = b.frame + (1)
       end
       -- particles
       particles_add(bullet.x, bullet.y, 2, 4, false, true)
@@ -1684,7 +1684,7 @@ function mothership_hit(s, bullet)
     sfx(sfx_shipexplode)
     -- destroy all other entities
     for e in all(entities) do
-      if e.type != et_mothership then
+      if e.type ~= et_mothership then
         e.active = false
         particles_add(e.x, e.y, 8, 7, false, false)
       end
@@ -1697,7 +1697,7 @@ end
 -- bomb
 function bomb_add(entity, offsety)
   -- can we drop a bomb?
-  if bombdropped or gamecompletebonus > 0 or gstatecount % 2 == 0 or gstatecount < 60 or gamestate != s_playing or player.state != ps_normal or countbombs >= maxbombs then
+  if bombdropped or gamecompletebonus > 0 or gstatecount % 2 == 0 or gstatecount < 60 or gamestate ~= s_playing or player.state ~= ps_normal or countbombs >= maxbombs then
     return
   end
   local s = {type = et_bomb, active = true, x = entity.x, y = entity.y - 2 + (offsety or 0), speed = 1.6,
@@ -1705,13 +1705,13 @@ function bomb_add(entity, offsety)
   draw = bomb_draw, update = bomb_update, destroy = bomb_destroy}
   add(entities, s)
   -- count
-  countbombs += 1
+  countbombs = countbombs + (1)
   -- prevent multiple bombs being dropped per cycle
   bombdropped = true
 end
 
 function bomb_update(s)
-  s.y += s.speed
+  s.y = s.y + (s.speed)
   -- hit rectangle (centred)
   s.hitrect = rectc(s.x, s.y, 1, 3)
   -- finished?
@@ -1786,7 +1786,7 @@ function printc(s, y, c, shad, sc)
   local offx = 0
   for i = 1, #s do
     if ord(sub(s, i, i)) > 134 then
-      offx += 2
+      offx = offx + (2)
     end
   end
   local x = 64 - offx - #s * 2
@@ -1845,7 +1845,7 @@ function input_update(s)
   else
     s.dir = d_none
   end
-  s.moved = s.dir != olddir
+  s.moved = s.dir ~= olddir
   s.fire1old = s.fire1
   s.fire2old = s.fire2
   -- fire 2 held down n/a if moving
@@ -1853,7 +1853,7 @@ function input_update(s)
     s.fire2downtime = 0
   end
   if s.fire2 and s.dir == d_none then
-    s.fire2downtime += 1
+    s.fire2downtime = s.fire2downtime + (1)
   else
     s.fire2downtime = 0
   end
@@ -1873,7 +1873,7 @@ end, draw = function(self)
   end
 end, update = function(self)
   if self.value < 128 then
-    self.value += 3
+    self.value = self.value + (3)
   end
 end}
 -->8

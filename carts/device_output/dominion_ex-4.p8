@@ -114,9 +114,9 @@ function delete_entities()
   for e in all(enemies) do
     del(enemies, e)
     if e.type == 'boss' then
-      boss_population -= 1
+      boss_population = boss_population - (1)
     else
-      enemy_population += 1
+      enemy_population = enemy_population + (1)
     end
   end
   enemy_projectiles = {}
@@ -148,12 +148,12 @@ end
 function animate_sprites()
   if btn(0) or btn(1) or btn(2) or btn(3) then
     if game_time % 2 == 0 then
-      player_sp += 16
+      player_sp = player_sp + (16)
     end
     if player_sp > 17 then
       player_sp = 1
     end
-    player_heat += 2
+    player_heat = player_heat + (2)
     --player ship exhaust
     create_player_exhaust()
   else
@@ -161,7 +161,7 @@ function animate_sprites()
   end
   for p in all(projectiles) do
     if p.name == 'missile' then
-      p.sp += 16
+      p.sp = p.sp + (16)
       if p.sp > 18 then
         p.sp = 2
       end
@@ -188,7 +188,7 @@ end
 --change current active weapon
 function changeweapon()
   if cooldown_weaponswitch < game_time then
-    player_currentweap += 1
+    player_currentweap = player_currentweap + (1)
     sfx(13)
     if player_currentweap > 4 then
       player_currentweap = 1
@@ -235,7 +235,7 @@ function coin_chance(cx, cy, cc)
     add(coins, coin)
     coin_accumulator = 0
   else
-    coin_accumulator += coin_roll
+    coin_accumulator = coin_accumulator + (coin_roll)
   end
 end
 
@@ -273,11 +273,11 @@ function collision()
   for coin in all(coins) do
     if collide(coin.x, coin.y, 4, player_x, player_y, player_size, player_size) then
       if coin.special == 'lifeup' then
-        player_lives += 1
+        player_lives = player_lives + (1)
         sfx(25)
       else
-        player_coins += 1
-        score += player_coins
+        player_coins = player_coins + (1)
+        score = score + (player_coins)
         player_show_coins = game_time
         sfx(4)
       end
@@ -329,7 +329,7 @@ function collision()
           sfx(5)
           e.draw_immune = true
         else
-          e.hp -= p.damage
+          e.hp = e.hp - (p.damage)
           e.flash = 1
         end
         if p.name == 'missile' or p.name == 'plasma' then
@@ -351,7 +351,7 @@ function collision()
           sfx(5)
           e.draw_immune = true
         else
-          e.hp -= ex.damage
+          e.hp = e.hp - (ex.damage)
           e.flash = 1
         end
         do_hit = false
@@ -359,14 +359,14 @@ function collision()
     end
     --kill enemies
     if e.hp <= 0 then
-      if e.name != 'grees_child' then
+      if e.name ~= 'grees_child' then
         coin_chance(e.x, e.y, e.coin_chance)
-        enemies_on_screen -= 1
+        enemies_on_screen = enemies_on_screen - (1)
       end
       if e.type == 'boss' then
-        boss_population -= 1
+        boss_population = boss_population - (1)
       end
-      score += e.points
+      score = score + (e.points)
       sfx(3)
       if e.w == 4 then
         for i = 1, 8 do
@@ -399,22 +399,22 @@ function cool_print(_string, _x, _y, _c)
 end
 
 function upg_update(upg_cost)
-  player_coins -= upg_cost
+  player_coins = player_coins - (upg_cost)
   sfx(8)
 end
 
 function do_upg(cur_upg)
   if cur_upg == 1 then
     if player_lives >= player_lives_max and player_coins >= upg_lives_max_cost then
-      player_lives_max += upg_lives_max_value
-      player_lives += 1
-      player_coins -= upg_lives_max_cost
-      upg_lives_max_cost += 1
+      player_lives_max = player_lives_max + (upg_lives_max_value)
+      player_lives = player_lives + (1)
+      player_coins = player_coins - (upg_lives_max_cost)
+      upg_lives_max_cost = upg_lives_max_cost + (1)
       sfx(8)
       cur_upg_cost = upg_lives_max_cost
     elseif player_lives < player_lives_max and player_coins >= upg_repair_cost then
-      player_lives += upg_repair_value
-      player_coins -= upg_repair_cost
+      player_lives = player_lives + (upg_repair_value)
+      player_coins = player_coins - (upg_repair_cost)
       sfx(8)
       cur_upg_cost = upg_repair_cost
     else
@@ -422,59 +422,59 @@ function do_upg(cur_upg)
     end
   elseif cur_upg == 2 then
     if player_coins >= upg_speed_cost then
-      player_speed += upg_speed_value
+      player_speed = player_speed + (upg_speed_value)
       upg_update(upg_speed_cost)
-      upg_speed_cost += 1
+      upg_speed_cost = upg_speed_cost + (1)
     else
       sfx(9)
     end
   elseif cur_upg == 3 then
     if player_coins >= upg_cooling_cost then
-      player_reactor_cooling += upg_cooling_value
+      player_reactor_cooling = player_reactor_cooling + (upg_cooling_value)
       upg_update(upg_cooling_cost)
-      upg_cooling_cost += 1
+      upg_cooling_cost = upg_cooling_cost + (1)
     else
       sfx(9)
     end
   elseif cur_upg == 4 then
     if player_coins >= upg_reactor_cost then
-      player_reactor_max += upg_reactor_value
-      player_ext += 3
+      player_reactor_max = player_reactor_max + (upg_reactor_value)
+      player_ext = player_ext + (3)
       upg_update(upg_reactor_cost)
-      upg_reactor_cost += 1
+      upg_reactor_cost = upg_reactor_cost + (1)
     else
       sfx(9)
     end
   elseif cur_upg == 5 then
     if player_coins >= upg_missile_ext_cost then
-      player_missile_ext += upg_missile_ext_value
+      player_missile_ext = player_missile_ext + (upg_missile_ext_value)
       upg_update(upg_missile_ext_cost)
-      upg_missile_ext_cost += 1
+      upg_missile_ext_cost = upg_missile_ext_cost + (1)
     else
       sfx(9)
     end
   elseif cur_upg == 6 then
     if player_coins >= upg_machinegun_damage_cost then
-      player_machinegun_damage += upg_machinegun_damage_value
+      player_machinegun_damage = player_machinegun_damage + (upg_machinegun_damage_value)
       upg_update(upg_machinegun_damage_cost)
-      upg_machinegun_damage_cost += 1
+      upg_machinegun_damage_cost = upg_machinegun_damage_cost + (1)
     else
       sfx(9)
     end
   elseif cur_upg == 7 then
     if player_coins >= upg_plasma_damage_cost then
-      player_plasma_damage += upg_plasma_damage_value
+      player_plasma_damage = player_plasma_damage + (upg_plasma_damage_value)
       upg_update(upg_plasma_damage_cost)
-      upg_plasma_damage_cost += 1
+      upg_plasma_damage_cost = upg_plasma_damage_cost + (1)
     else
       sfx(9)
     end
   elseif cur_upg == 8 then
     if player_coins >= upg_ftl_max_cost and upg_ftl_max_num < upg_ftl_max_max then
-      player_ftl_max += upg_ftl_max_value
+      player_ftl_max = player_ftl_max + (upg_ftl_max_value)
       upg_update(upg_ftl_max_cost)
-      upg_ftl_max_cost += 1
-      upg_ftl_max_num += 1
+      upg_ftl_max_cost = upg_ftl_max_cost + (1)
+      upg_ftl_max_num = upg_ftl_max_num + (1)
     else
       sfx(9)
     end
@@ -720,9 +720,9 @@ function enemy_manager()
 end
 
 function enemy_into_table(_e)
-  if _e.name != 'grees_child' then
-    enemy_population -= 1
-    enemies_on_screen += 1
+  if _e.name ~= 'grees_child' then
+    enemy_population = enemy_population - (1)
+    enemies_on_screen = enemies_on_screen + (1)
   end
   add(enemies, _e)
 end
@@ -858,20 +858,20 @@ function add_enemy(name, specific_x, specific_y, type)
   end
   for e in all(enemies) do
     if e.age == game_time and e.unique == nil then
-      if specific_x != nil then
+      if specific_x ~= nil then
         e.x = specific_x
         e.unique = 1
       end
-      if specific_y != nil then
+      if specific_y ~= nil then
         e.y = specific_y
         e.unique = 1
       end
-      if type != nil then
+      if type ~= nil then
         e.type = type
         e.unique = 1
       end
       if e.type == 'boss' then
-        boss_population += 1
+        boss_population = boss_population + (1)
       end
     end
   end
@@ -889,14 +889,14 @@ function fire(weapon)
   if player_heatlock == false then
     if weapon == 'missile' and cooldown_missile < game_time then
       local p = {name = 'missile', sp = 2, x = player_x, y = player_y, damage = player_missile_damage, ext = player_missile_ext, exc = 8, exdmg = player_missile_exdmg}
-      player_heat += 6
+      player_heat = player_heat + (6)
       add(projectiles, p)
       sfx(1)
       cooldown_missile = game_time + cooldown_missile_cooldown
     end
     if weapon == 'machinegun' and cooldown_machinegun < game_time then
       local p = {name = 'machinegun', sp = 3, x = player_x, y = player_y, drift = 1 - (rnd(20) / 10), damage = player_machinegun_damage}
-      player_heat += 3
+      player_heat = player_heat + (3)
       add(projectiles, p)
       sfx(0)
       cooldown_machinegun = game_time + cooldown_machinegun_cooldown
@@ -909,16 +909,16 @@ function fire(weapon)
       elseif player_plasmax == -3 then
         player_plasmaxn = 1
       end
-      player_heat += 5
+      player_heat = player_heat + (5)
       add(projectiles, p)
       sfx(2)
     end
     if weapon == 'ftl' then
-      player_ftl_charge += 1
+      player_ftl_charge = player_ftl_charge + (1)
       --cheats
       --player_lives+=1
       --player_coins+=10
-      player_heat += 4
+      player_heat = player_heat + (4)
       if player_ftl_charge == player_ftl_max then
         hangar_c = 'select upgrade'
         time_since_ftl = game_time + 30
@@ -972,7 +972,7 @@ function hard_difficulty_bonus()
 end
 
 function kill_player()
-  player_lives -= 1
+  player_lives = player_lives - (1)
   player_invincibility = game_time + 90
   sfx(6)
   explode(player_x, player_y, player_ext, 14, 2, 'player')
@@ -1050,7 +1050,7 @@ function starfield(col1, col2)
   end
   for s in all(stars) do
     circ(s.x, s.y, 0, s.col)
-    s.y += s.speed
+    s.y = s.y + (s.speed)
     if 0.4 < s.speed and s.speed < 0.7 then
       s.col = col2
     elseif s.speed < 0.4 then
@@ -1085,9 +1085,9 @@ end
 
 function toggle_upg(direction)
   if direction == 1 then
-    cur_upg += 1
+    cur_upg = cur_upg + (1)
   else
-    cur_upg -= 1
+    cur_upg = cur_upg - (1)
   end
   if cur_upg > 9 then
     cur_upg = 1
@@ -1141,7 +1141,7 @@ function _update()
   end
   if game_state == 'main' then
     if player_heat > 0 then
-      player_heat -= player_reactor_cooling / 10
+      player_heat = player_heat - (player_reactor_cooling / 10)
     elseif player_heat < 0 then
       player_heat = 0
     end
@@ -1157,7 +1157,7 @@ function _update()
     end
     --overheat klaxon
     if player_heatlock == true then
-      if stat(19) != 26 then
+      if stat(19) ~= 26 then
         sfx(26, 3)
       end
       player_c1 = 9
@@ -1167,11 +1167,11 @@ function _update()
       player_c1 = 12
     end
     --ftl update stuff
-    if (player_ftl_charge > 0 and player_weapon != 'ftl') or player_ftl_charge < 0 then
+    if (player_ftl_charge > 0 and player_weapon ~= 'ftl') or player_ftl_charge < 0 then
       player_ftl_charge = 0
     end
     if not btn(4) and game_time % 2 == 0 then
-      player_ftl_charge -= 1
+      player_ftl_charge = player_ftl_charge - (1)
     end
     --ship controls
     if player_lives > 0 then
@@ -1182,16 +1182,16 @@ function _update()
         player_ftl_spd = 0
       end
       if btn(0) then
-        player_x -= player_speed + player_ftl_spd
+        player_x = player_x - (player_speed + player_ftl_spd)
       end
       if btn(1) then
-        player_x += player_speed + player_ftl_spd
+        player_x = player_x + (player_speed + player_ftl_spd)
       end
       if btn(2) then
-        player_y -= player_speed + player_ftl_spd
+        player_y = player_y - (player_speed + player_ftl_spd)
       end
       if btn(3) then
-        player_y += player_speed + player_ftl_spd
+        player_y = player_y + (player_speed + player_ftl_spd)
       end
       if btn(4) then
         fire(player_weapon)
@@ -1219,7 +1219,7 @@ function _update()
   end
   for coin in all(coins) do
     if coin.y < 128 then
-      coin.y += 0.5
+      coin.y = coin.y + (0.5)
     else
       del(coins, coin)
     end
@@ -1227,13 +1227,13 @@ function _update()
   --projectiles update stuff
   for p in all(projectiles) do
     if p.name == 'missile' then
-      p.y -= 5
+      p.y = p.y - (5)
       create_exhaust(p.x + 4, p.y + 4, 8, 12)
     elseif p.name == 'machinegun' then
-      p.y -= 7
-      p.x += p.drift
+      p.y = p.y - (7)
+      p.x = p.x + (p.drift)
     elseif p.name == 'plasma' then
-      p.y -= 5
+      p.y = p.y - (5)
       create_exhaust(p.x + 4, p.y + 4, 13, 12, 0, 1)
     end
     if p.y > 136 or p.y < -8 or p.x > 136 or p.x < -8 then
@@ -1257,31 +1257,31 @@ function _update()
     else
       ep.x_flip = false
     end
-    ep.y += ep.dy
+    ep.y = ep.y + (ep.dy)
     if ep.name == 'orans' or ep.name == 'super_orans' then
-      ep.x += ep.lr
+      ep.x = ep.x + (ep.lr)
     end
     --yels projectiles go sideways
     if ep.name == 'yels' then
-      ep.x += ep.plr
+      ep.x = ep.x + (ep.plr)
     end
     if ep.name == 'azurs' then
       if ep.y < 96 then
         if player_x < ep.x then
-          ep.x -= 0.5
+          ep.x = ep.x - (0.5)
         else
-          ep.x += 0.5
+          ep.x = ep.x + (0.5)
         end
       end
     end
     if ep.name == 'comans_mis' then
-      ep.x += ep.lr
+      ep.x = ep.x + (ep.lr)
     end
     if ep.name == 'masts_lasran' then
-      ep.x += ep.ran
+      ep.x = ep.x + (ep.ran)
     end
     --deletes off-screen projectiles
-    if ep.y > 128 or ep.y < 0 or ep.x < 0 or ep.x > 128 and ep.name != 'bomber' then
+    if ep.y > 128 or ep.y < 0 or ep.x < 0 or ep.x > 128 and ep.name ~= 'bomber' then
       del(enemy_projectiles, ep)
     end
     --bomber bombs explode
@@ -1308,23 +1308,23 @@ function _update()
         e.lr = e.movespeed
       end
       if e.y < e.target_y and e.charging == 0 then
-        e.y += e.movespeed
+        e.y = e.y + (e.movespeed)
       end
       if e.charging == 0 and e.y == e.target_y then
-        e.x += e.lr
+        e.x = e.x + (e.lr)
       end
       if e.y == e.target_y and abs(e.x - player_x) < 6 then
         e.charging = 1
         sfx(23)
       end
       if e.y <= 128 - (e.h * 8) and e.charging == 1 then
-        e.y += 3
+        e.y = e.y + (3)
       end
       if e.y > 128 - (e.h * 8) and e.charging == 1 then
         e.charging = 2
       end
       if e.charging == 2 and e.y > e.target_y then
-        e.y -= 0.5
+        e.y = e.y - (0.5)
       end
       if e.charging == 2 and e.y == e.target_y then
         e.charging = 0
@@ -1332,8 +1332,8 @@ function _update()
     --end
     --yels movement/firing behaviour
     elseif e.name == 'yels' then
-      e.y += e.movespeed
-      e.firstp -= 1
+      e.y = e.y + (e.movespeed)
+      e.firstp = e.firstp - (1)
       if e.y > 116 then
         e.movespeed = -1
       end
@@ -1363,19 +1363,19 @@ function _update()
       --enemies reach target y coord then move side to side.
       side_bounce()
       if e.y < e.target_y then
-        e.y += e.movespeed
+        e.y = e.y + (e.movespeed)
       --then they move side-to-side			
       else
-        e.x += e.lr
+        e.x = e.x + (e.lr)
       end
       --enemy firing countdown.
       if e.firspd > 0 then
-        e.firstp -= 1
+        e.firstp = e.firstp - (1)
         --only yels uses plr
         if e.firstp < 1 then
           --red boss fire sequence
           if e.name == 'comans' then
-            e.firepoint += 1
+            e.firepoint = e.firepoint + (1)
             if e.firepoint == 3 then
               e.firepoint = 1
             end
@@ -1416,17 +1416,17 @@ function _update()
         end
       end
       if e.name == 'orans' and abs(e.x - player_x) < 6 then
-        e.firstp -= 2
+        e.firstp = e.firstp - (2)
       end
     --end
     --grees child movement/firing behavior
     elseif e.name == 'grees_child' then
       if game_time - e.age > 300 then
-        e.y += 2
+        e.y = e.y + (2)
         if player_x < e.x then
-          e.x -= 0.5
+          e.x = e.x - (0.5)
         else
-          e.x += 0.5
+          e.x = e.x + (0.5)
         end
       end
       if e.y > 128 then
@@ -1449,13 +1449,13 @@ function _update()
       end
       --bomber always moves side to side.
       side_bounce()
-      e.y += e.movespeed
+      e.y = e.y + (e.movespeed)
       if e.y > 128 then
         e.y = -64
       end
-      e.x += e.lr / 4
+      e.x = e.x + (e.lr / 4)
       if e.firspd > 0 then
-        e.firstp -= 1
+        e.firstp = e.firstp - (1)
         if e.firstp < 1 then
           enemy_fire(e.x, e.y, e.name, e.exc, lr, plr)
           e.firstp = e.firspd
@@ -1464,13 +1464,13 @@ function _update()
     end
   end
   for ex in all(explosions) do
-    ex.r += 1
-    ex.t -= 1
+    ex.r = ex.r + (1)
+    ex.t = ex.t - (1)
     if ex.t < 0 then
       del(explosions, ex)
     end
     if ex.name == 'player' then
-      ex.r += 1
+      ex.r = ex.r + (1)
     end
   end
   if level_state < 3 then
@@ -1512,7 +1512,7 @@ function _draw()
     --map scrolls based on enemy population
     if level_state > 2 then
       if enemy_population * 3 < abs(mapscroll) and game_time % 10 == 0 and mapscroll < 0 then
-        mapscroll += 1
+        mapscroll = mapscroll + (1)
       end
       if level_state > 2 and level_state < 6 then
         pal(1, 2)
@@ -1758,9 +1758,9 @@ end
 
 function update_particles()
   for exhaust in all(exhausts) do
-    exhaust.y += 1 + exhaust.speed
-    exhaust.x += 0.6 - rnd(1.2)
-    exhaust.age -= 1
+    exhaust.y = exhaust.y + (1 + exhaust.speed)
+    exhaust.x = exhaust.x + (0.6 - rnd(1.2))
+    exhaust.age = exhaust.age - (1)
     if exhaust.age % 3 == 0 then
       exhaust.c = exhaust.c2
     else
@@ -1771,9 +1771,9 @@ function update_particles()
     end
   end
   for explode in all(explodes) do
-    explode.x += explode.dx
-    explode.y += explode.dy
-    explode.age -= 1
+    explode.x = explode.x + (explode.dx)
+    explode.y = explode.y + (explode.dy)
+    explode.age = explode.age - (1)
     if explode.age < 0 then
       del(explodes, explode)
     end
@@ -1960,14 +1960,14 @@ function title()
   end
   if btnp(2) then
     view_story = 0
-    menu_cursor_y -= 6
+    menu_cursor_y = menu_cursor_y - (6)
     if menu_cursor_y < 85 then
       menu_cursor_y = 97
     end
   end
   if btnp(3) then
     view_story = 0
-    menu_cursor_y += 6
+    menu_cursor_y = menu_cursor_y + (6)
     if menu_cursor_y > 97 then
       menu_cursor_y = 85
     end
@@ -2000,7 +2000,7 @@ function title()
         story_screen = 0
       end
       view_story = 1
-      story_screen += 1
+      story_screen = story_screen + (1)
       if story_screen > 2 then
         story_screen = 1
       end

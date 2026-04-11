@@ -44,10 +44,10 @@ function _init()
 end
 
 function _update60()
-  gs += .001
+  gs = gs + (.001)
   if mode == "menu" then
     if btnp(3) then
-      mitem += 1
+      mitem = mitem + (1)
       if sounds == "on" then
         sfx(2)
       end
@@ -55,7 +55,7 @@ function _update60()
         mitem = 1
       end
     elseif btnp(2) then
-      mitem -= 1
+      mitem = mitem - (1)
       if sounds == "on" then
         sfx(2)
       end
@@ -66,14 +66,14 @@ function _update60()
     if mitem == 1 then
       if btnp(1) then
         if mhole < 32 and levelunlocked > mhole - 1 then
-          mhole += 1
+          mhole = mhole + (1)
           if sounds == "on" then
             sfx(4)
           end
         end
       elseif btnp(0) then
         if mhole > 1 then
-          mhole -= 1
+          mhole = mhole - (1)
           if sounds == "on" then
             sfx(5)
           end
@@ -137,7 +137,7 @@ function _update60()
           sfx(3)
         end
       elseif wt > 1 then
-        wt -= 1
+        wt = wt - (1)
       elseif wt == 1 then
         if scores[level + 1] == 0 then
           scores[level + 1] = strokes
@@ -149,7 +149,7 @@ function _update60()
           end
         end
         restoremap()
-        level += 1
+        level = level + (1)
         if level > levelunlocked then
           levelunlocked = level
           dset(0, levelunlocked)
@@ -232,7 +232,7 @@ function _draw()
     foreach(dust, drawdust)
     --strokes
     drawpar(strokes, pars[level + 1], 1, 1)
-    if scores[level + 1] != 0 then
+    if scores[level + 1] ~= 0 then
       printo("best:" .. scores[level + 1], 2, 11, 6, 1)
     end
     --hint
@@ -260,15 +260,15 @@ function _draw()
         end
         printo(scores[i] .. "/" .. pars[i], 13 + col * 32, 24 + row * 10, c1, c2)
         printo(i, 3 + col * 32, 24 + row * 10, 6, 5)
-        i += 1
+        i = i + (1)
       end
     end
     --list total score
     totalscore = 0
     totalpar = 0
     for i = 1, 32 do
-      totalscore += scores[i]
-      totalpar += pars[i]
+      totalscore = totalscore + (scores[i])
+      totalpar = totalpar + (pars[i])
     end
     printc("total: " .. totalscore .. "/" .. totalpar, 64, 110, 7, 1)
     --return msg
@@ -287,7 +287,7 @@ end
 
 function prevhole()
   if level - 1 >= 0 then
-    level -= 1
+    level = level - (1)
     loadlevel()
   end
 end
@@ -323,7 +323,7 @@ function updateballs()
         sfx(0)
       end
       sort(balls, bottomup)
-      strokes += 1
+      strokes = strokes + (1)
     elseif btnp(3) then
       for b in all(balls) do
         b.ys = spd
@@ -333,7 +333,7 @@ function updateballs()
         sfx(0)
       end
       sort(balls, topdown)
-      strokes += 1
+      strokes = strokes + (1)
     elseif btnp(0) then
       for b in all(balls) do
         b.ys = 0
@@ -343,7 +343,7 @@ function updateballs()
         sfx(0)
       end
       sort(balls, rtol)
-      strokes += 1
+      strokes = strokes + (1)
     elseif btnp(1) then
       for b in all(balls) do
         b.ys = 0
@@ -353,11 +353,11 @@ function updateballs()
         sfx(0)
       end
       sort(balls, ltor)
-      strokes += 1
+      strokes = strokes + (1)
     end
   end
   for b in all(balls) do
-    if b.xs != 0 or b.ys != 0 then
+    if b.xs ~= 0 or b.ys ~= 0 then
       b.nx = b.x + b.xs
       b.ny = b.y + b.ys
       if didcollide(b) then
@@ -376,8 +376,8 @@ function updateballs()
         b.xs = 0
         b.ys = 0
       end
-      b.x += b.xs
-      b.y += b.ys
+      b.x = b.x + (b.xs)
+      b.y = b.y + (b.ys)
     else
       b.lastsand = nil
     end
@@ -440,7 +440,7 @@ end
 function ballsmoving()
   isanyballmoving = false
   for b in all(balls) do
-    if b.xs != 0 or b.ys != 0 then
+    if b.xs ~= 0 or b.ys ~= 0 then
       isanyballmoving = true
     end
   end
@@ -598,7 +598,7 @@ function creategrass()
 end
 
 function drawgrass(g)
-  g.s += -.001 + rnd(.002)
+  g.s = g.s + (-.001 + rnd(.002))
   for j = 0, g.h do
     pset(g.x + cos(gs - g.s + g.y / 127) * j / 2, g.y - j, 1)
   end
@@ -618,10 +618,10 @@ function createdust(dx, dy, dc)
 end
 
 function drawdust(d)
-  d.x += d.xs
-  d.y += d.ys
-  d.ys += .1
-  d.t -= 1
+  d.x = d.x + (d.xs)
+  d.y = d.y + (d.ys)
+  d.ys = d.ys + (.1)
+  d.t = d.t - (1)
   if d.t <= 0 then
     del(dust, d)
   end
@@ -638,10 +638,10 @@ function createflag(fmx, fmy)
 end
 
 function drawflag(f)
-  f.at += 1
+  f.at = f.at + (1)
   if f.at > 5 then
     f.at = 0
-    f.s += 1
+    f.s = f.s + (1)
     if f.s == 12 then
       f.s = 8
     end
@@ -877,7 +877,7 @@ function trifill(x1, y1, x2, y2, x3, y3, color1)
       y2, y3 = y3, y2
       x2, x3 = x3, x2
     end
-    if (y1 != y2) then
+    if (y1 ~= y2) then
       local delta_sx = (x3 - x1) / (y3 - y1)
       local delta_ex = (x2 - x1) / (y2 - y1)
       if (y1 > 0) then
@@ -893,15 +893,15 @@ function trifill(x1, y1, x2, y2, x3, y3, color1)
       max_y = min(y2, 128)
       for y = min_y, max_y - 1 do
         rectfill(nsx, y, nex, y, color1)
-        nsx += delta_sx
-        nex += delta_ex
+        nsx = nsx + (delta_sx)
+        nex = nex + (delta_ex)
       end
     else
       --where top edge is horizontal
       nsx = x1
       nex = x2
     end
-    if (y3 != y2) then
+    if (y3 ~= y2) then
       local delta_sx = (x3 - x1) / (y3 - y1)
       local delta_ex = (x3 - x2) / (y3 - y2)
       min_y = y2
@@ -913,8 +913,8 @@ function trifill(x1, y1, x2, y2, x3, y3, color1)
       end
       for y = min_y, max_y do
         rectfill(nsx, y, nex, y, color1)
-        nex += delta_ex
-        nsx += delta_sx
+        nex = nex + (delta_ex)
+        nsx = nsx + (delta_sx)
       end
     else
       --where bottom edge is horizontal
@@ -936,7 +936,7 @@ function trifill(x1, y1, x2, y2, x3, y3, color1)
       x2, x3 = x3, x2
       y2, y3 = y3, y2
     end
-    if (x1 != x2) then
+    if (x1 ~= x2) then
       local delta_sy = (y3 - y1) / (x3 - x1)
       local delta_ey = (y2 - y1) / (x2 - x1)
       if (x1 > 0) then
@@ -952,15 +952,15 @@ function trifill(x1, y1, x2, y2, x3, y3, color1)
       max_x = min(x2, 128)
       for x = min_x, max_x - 1 do
         rectfill(x, nsy, x, ney, color1)
-        nsy += delta_sy
-        ney += delta_ey
+        nsy = nsy + (delta_sy)
+        ney = ney + (delta_ey)
       end
     else
       --where top edge is horizontal
       nsy = y1
       ney = y2
     end
-    if (x3 != x2) then
+    if (x3 ~= x2) then
       local delta_sy = (y3 - y1) / (x3 - x1)
       local delta_ey = (y3 - y2) / (x3 - x2)
       min_x = x2
@@ -972,8 +972,8 @@ function trifill(x1, y1, x2, y2, x3, y3, color1)
       end
       for x = min_x, max_x do
         rectfill(x, nsy, x, ney, color1)
-        ney += delta_ey
-        nsy += delta_sy
+        ney = ney + (delta_ey)
+        nsy = nsy + (delta_sy)
       end
     else
       --where bottom edge is horizontal
@@ -1000,17 +1000,17 @@ function ellipse(cx, cy, xr, yr, c, hlinefunc)
   while ex >= ey do
     local dy = cy - y
     hlinefunc(cx - x, cy - y, cx + x, dy, c)
-    dy += y * 2
+    dy = dy + (y * 2)
     hlinefunc(cx - x, dy, cx + x, dy, c)
-    y += 1
-    ey += a
-    err += yc
-    yc += a
+    y = y + (1)
+    ey = ey + (a)
+    err = err + (yc)
+    yc = yc + (a)
     if 2 * err + xc > 0 then
-      x -= 1
-      ex -= b
-      err += xc
-      xc += b
+      x = x - (1)
+      ex = ex - (b)
+      err = err + (xc)
+      xc = xc + (b)
     end
   end
   x = 0
@@ -1023,17 +1023,17 @@ function ellipse(cx, cy, xr, yr, c, hlinefunc)
   while ex <= ey do
     local dy = cy - y
     hlinefunc(cx - x, cy - y, cx + x, dy, c)
-    dy += y * 2
+    dy = dy + (y * 2)
     hlinefunc(cx - x, dy, cx + x, dy, c)
-    x += 1
-    ex += b
-    err += xc
-    xc += b
+    x = x + (1)
+    ex = ex + (b)
+    err = err + (xc)
+    xc = xc + (b)
     if 2 * err + yc > 0 then
-      y -= 1
-      ey -= a
-      err += yc
-      yc += a
+      y = y - (1)
+      ey = ey - (a)
+      err = err + (yc)
+      yc = yc + (a)
     end
   end
 end

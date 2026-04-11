@@ -468,7 +468,7 @@ function _update60()
           p = ""
           serial(0x800, 0x4300, 4864)
           for i = 0, 4864 do
-            p ..= chr(peek(0x4300 + i))
+            p = p .. (chr(peek(0x4300 + i)))
           end
         end
         loadplayer(p)
@@ -479,7 +479,7 @@ function _update60()
       load "#terra_char_edit"
     end
     if btnp(4) or loadedfile then
-      mode += 1
+      mode = mode + (1)
       loadedfile, p = ssfx "7,0"
     end
     if mode > 2 then
@@ -495,11 +495,11 @@ function _update60()
       sp, sw = php .. "," .. php_max .. "," .. phurt .. "," .. orbsmash .. "," .. worldtime .. "|", ""
       genprint "processing player..."
       for k, i in next, inventory do
-        sp ..= i.id .. ":" .. i.amount .. (k < #inventory and "," or "|")
+        sp = sp .. (i.id .. ":" .. i.amount .. (k < #inventory and "," or "|"))
       end
       genprint "processing world..."
       for i = 0, 32767 do
-        sw ..= chr(peek(i + 0x8000) + 32)
+        sw = sw .. (chr(peek(i + 0x8000) + 32))
       end
 
       function a(s, s2)
@@ -547,10 +547,10 @@ function _update60()
           invside = 0
         end
         if btnp(2) then
-          invsel -= 1
+          invsel = invsel - (1)
         end
         if btnp(3) then
-          invsel += 1
+          invsel = invsel + (1)
         end
         invsel = loop(invsel, inventory)
         -- trash
@@ -577,10 +577,10 @@ function _update60()
           invside = 1
         end
         if btnp(2) then
-          craftsel -= 1
+          craftsel = craftsel - (1)
         end
         if btnp(3) then
-          craftsel += 1
+          craftsel = craftsel + (1)
         end
         craftsel = loop(craftsel, craftable)
         local recipe = craftable[craftsel]
@@ -602,7 +602,7 @@ function _update60()
               for i in all(ing) do
                 for _ENV in all(inventory) do
                   if id == i[1] then
-                    amount -= i[2] or 1
+                    amount = amount - (i[2] or 1)
                   end
                 end
               end
@@ -613,11 +613,11 @@ function _update60()
                   ininv = true
                 end
                 if not ininv then
-                  slot += 1
+                  slot = slot + (1)
                 end
               end
               if ininv then
-                inventory[slot].amount += out[2] or 1
+                inventory[slot].amount = inventory[slot].amount + (out[2] or 1)
               else
                 add_inventory {id = out[1], amount = out[2] or 1}
               end
@@ -638,37 +638,37 @@ function _update60()
       if mget(tx, ty) == 27 then
         tree(tx, ty + 1)
       end
-      worldtime += 0.4
-      worldtime %= 24000
+      worldtime = worldtime + (0.4)
+      worldtime = worldtime % (24000)
       if pdead then
-        pdiet -= 1
+        pdiet = pdiet - (1)
         if pdiet <= 0 and jk then
           spawnplayer(max(php_max / 2, 100))
         end
       else
-        php += t % 100 // 99
+        php = php + (t % 100 // 99)
         local bl, br = btn(0) or stat(28, 4), btn(1) or stat(28, 7)
         if bl then
           if pxv > -mx then
-            pxv -= pxv > 0 and 0.15 or 0.08
+            pxv = pxv - (pxv > 0 and 0.15 or 0.08)
           end
           if canturn then
             pflip = true
           end
         elseif br then
           if pxv < mx then
-            pxv += pxv < 0 and 0.15 or 0.08
+            pxv = pxv + (pxv < 0 and 0.15 or 0.08)
           end
           if canturn then
             pflip = false
           end
         else
-          pxv -= sgn(pxv) * frc
+          pxv = pxv - (sgn(pxv) * frc)
           if abs(pxv) <= frc then
             pxv = 0
           end
         end
-        pyv += 0.08
+        pyv = pyv + (0.08)
         -- right
         local d = 0
         repeat
@@ -678,13 +678,13 @@ function _update60()
             door(bx, by, b, 1)
           elseif pxv > 0 and (t or fget(b, 0)) then
             pxv = 0
-            px += d
+            px = px + (d)
             if br and not t then
               pyv, jk = min(pyv, -1), true
             end
             break
           end
-          d += 1
+          d = d + (1)
         until d > pxv or e
         -- left
         d = 0
@@ -695,15 +695,15 @@ function _update60()
             door(bx, by, b, -1)
           elseif pxv < 0 and (t or fget(b, 0)) then
             pxv = 0
-            px += d
+            px = px + (d)
             if bl and not t then
               pyv, jk = min(pyv, -1), true
             end
             break
           end
-          d -= 1
+          d = d - (1)
         until d < pxv
-        px += pxv
+        px = px + (pxv)
         -- down
         d, pair = 0, true
         repeat
@@ -714,10 +714,10 @@ function _update60()
               pjump = false
             end
             pyv, pair = 0
-            py += d
+            py = py + (d)
             pfall = max(pfall / 8 - 13)
             if pfall > 0 then
-              php -= pfall * 10 // 1
+              php = php - (pfall * 10 // 1)
               piframes, pfall = 30, 0
               sfx(0, -1, phurt, 12)
             end
@@ -726,7 +726,7 @@ function _update60()
             end
             break
           end
-          d += 1
+          d = d + (1)
         until d > pyv
         -- up
         d = 0
@@ -736,23 +736,23 @@ function _update60()
           if pyv < 0 and (l or r) then
             if l and r then
               pyv = 0
-              py += d
+              py = py + (d)
             end
             if not r then
-              px += 1
+              px = px + (1)
             end
             if not l then
-              px -= 1
+              px = px - (1)
             end
             break
           end
-          d -= 1
+          d = d - (1)
         until d < pyv
         if pjump and not jk then
           pyv = max(pyv, -0.2)
         end
-        py += pyv
-        pfall += pyv
+        py = py + (pyv)
+        pfall = pfall + (pyv)
         digx, digy = pflip and -7 or 7, (btn(3) and 7) or (btn(2) and -7) or 0
         if (btn(3) or btn(2)) and not (btn(0) or btn(1)) then
           digx = 0
@@ -771,11 +771,11 @@ function _update60()
                 sfx "3"
                 add_projectile(px, py, pangle, 2.5, 35, 97)
               end
-              pdigt -= 1
+              pdigt = pdigt - (1)
             elseif helditem.tool then
               if hitype == "axe" and tile == 83 or hitype == "pick" and fget(tile, 1) and mget(actx, acty - 1) ~= 83 or hitype == "hammer" and fget(tile, 2) then
                 digging = true
-                pdigt += hivar or 1
+                pdigt = pdigt + (hivar or 1)
                 if pdigt % hiuse == 1 then
                   sfx "4"
                 end
@@ -786,7 +786,7 @@ function _update60()
               end
             elseif hitype == "block" and pdigt % 7 == 0 then
               if not mouse and hid == 14 and pxv ~= 0 then
-                acty += 1
+                acty = acty + (1)
               end
               local lt, tile, canplace = mget(actx, acty + 1), mget(actx, acty)
 
@@ -808,7 +808,7 @@ function _update60()
                 end
                 sfx "4"
                 mset(actx, acty, hid)
-                helditem.amount -= 1
+                helditem.amount = helditem.amount - (1)
               end
             elseif hitype == "ranged" and pswing == hiuse then
               ammosprite, ammodamage = -1
@@ -816,7 +816,7 @@ function _update60()
                 if a.type == hivar then
                   ammodamage = a.damage
                   if not fget(a.id, 1) then
-                    a.amount -= 1
+                    a.amount = a.amount - (1)
                   end
                   add_projectile(px, py, pangle, a.usetime / 2, helditem.damage + ammodamage, a.var, a.scale)
                   ssfx(hivar == "gel" and "9,1" or "7,3")
@@ -830,16 +830,16 @@ function _update60()
             elseif hitype == "hpup" and btnp(ab) and pswing == hiuse then
               if php < php_max and not hivar or hivar and php_max < 400 then
                 if hivar then
-                  php_max += helditem.damage
+                  php_max = php_max + (helditem.damage)
                 end
-                php += helditem.damage
-                helditem.amount -= 1
+                php = php + (helditem.damage)
+                helditem.amount = helditem.amount - (1)
                 sfx "5"
               end
             elseif hitype == "summon" and (svar[1] ~= "marco" or timelight > 1) and btnp(ab) and currentmusic == svar[2] then
               sfx "10"
               addmob(svar[1], px + 80 * sgn(rnd "-1"), py - 40, true)
-              helditem.amount -= 1
+              helditem.amount = helditem.amount - (1)
               _reload()
               if svar[1] == "plantera" then
                 tospr("eeee92f212ffff212f29eeeeeaae8222122ff2212228eaae54991221222222221221994544e812212222222212218e44eef811212222222212118feeee1f1111122222211111f1eeeee2f12f11222211f21f2eeeeee11a81f111111f18911eeeeee9aa9a1211112199aaaeeeeeaa98aa99a99aa9aa89aaeeeee98aa99a9cc9a89aa89eeeeeee999889e8ce9ce9aaeeeeeeeee898ceec8ec8e98eeeeeeeeeeeee88e8eee8ceeeeeeeeeeeeee8cee8ceeceeeeeeeeeeeeeeee8eee8eeeeeeeeeee", 24, 72, 112)
@@ -865,10 +865,10 @@ function _update60()
       end
       for _ENV in all(parts) do
         yv = min(yv + 0.07, 3)
-        xv *= 0.98
-        x += xv
-        y += yv
-        li -= 1
+        xv = xv * (0.98)
+        x = x + (xv)
+        y = y + (yv)
+        li = li - (1)
         if li < 0 then
           del(parts, _ENV)
         end
@@ -876,13 +876,13 @@ function _update60()
       for i in all(items) do
         local _ENV, g = i, _ENV
         yv, timer = min(yv + 0.04, 1.2), max(timer - 1)
-        xv *= 0.95
+        xv = xv * (0.95)
         if not pdead and timer <= 0 and abs(px - x) < 24 and abs(py - y) < 24 then
-          xv += (px - x) / 50
-          yv += (py - y) / 50
+          xv = xv + ((px - x) / 50)
+          yv = yv + ((py - y) / 50)
           if abs(px - x) < 4 and abs(py - y) < 4 then
             if id == 0 then
-              g.php += 20
+              g.php = g.php + (20)
             else
               local slot, ininv = 1
               for a in all(inventory) do
@@ -890,11 +890,11 @@ function _update60()
                   ininv = true
                 end
                 if not ininv then
-                  slot += 1
+                  slot = slot + (1)
                 end
               end
               if ininv then
-                g.inventory[slot].amount += amount
+                g.inventory[slot].amount = g.inventory[slot].amount + (amount)
               else
                 add_inventory {id = id, amount = amount}
               end
@@ -916,16 +916,16 @@ function _update60()
             xv = 0
           end
         end
-        x += xv
-        y += yv
+        x = x + (xv)
+        y = y + (yv)
         del(items, #items > 40 and i)
       end
       for _ENV in all(projectiles) do
         if fget(bulletsprite, 0) then
-          yv += 0.01
+          yv = yv + (0.01)
         end
-        x += xv
-        y += yv
+        x = x + (xv)
+        y = y + (yv)
         del(projectiles, (fmget(x / 8, y / 8, 0) or pierce <= 0) and _ENV)
       end
       -- spawning
@@ -1001,50 +1001,50 @@ function _update60()
             else
               s = 0.004 + sin(t / 100) / 100
             end
-            xv += s * sgn(px - x)
-            yv += s * sgn(py - y)
+            xv = xv + (s * sgn(px - x))
+            yv = yv + (s * sgn(py - y))
             xv, yv = mid(-0.5, xv, 0.5), mid(-0.5, yv, 0.5)
           elseif id == "tentacle" then
             angv, tang, collide, friction = angv or 0, host.ang + sin(t / 100 + irnd) * irnd
             sprx = 1.5 + (t + irnd * 20) % 20 // 10 * 2
             if ang > tang then
-              angv -= 0.0007
+              angv = angv - (0.0007)
               if ang > 0.75 and tang < 0.25 then
-                angv += 0.0005
+                angv = angv + (0.0005)
               end
             else
-              angv += 0.0007
+              angv = angv + (0.0007)
               if tang > 0.75 and ang < 0.25 then
-                angv -= 0.0005
+                angv = angv - (0.0005)
               end
             end
             angv, d = mid(-0.006, angv, 0.006), 30 + sin(t / 60 + irnd) * 14
-            ang += angv
+            ang = ang + (angv)
             x, y = host.x + cos(ang - 0.25) * d, host.y - sin(ang - 0.25) * d
             if host.hp <= 0 then
               hp = 0
             end
           end
-          ang %= 1
+          ang = ang % (1)
           if ai == "fighter" then
-            xv += sgn(px - x) * (air and 0.005 or 0.03) * vmod
+            xv = xv + (sgn(px - x) * (air and 0.005 or 0.03) * vmod)
             grav, xv, friction = true, mid(-vmod, xv, vmod)
             iflip = xv < 0
-            ispr += x / 8 % 2
+            ispr = ispr + (x / 8 % 2)
           elseif ai == "slime" then
             grav, jumpt, d, v, stoponwalls = true, jumpt or 60, d or sgn(rnd "-1"), angry and sgn(px - x) or d
-            jumpt -= 0.5 * vmod
+            jumpt = jumpt - (0.5 * vmod)
             if jumpt <= 0 and not air then
               jumpt, yv, xv = 80 + rnd "40", -1.2 - rnd(), v * vmod
             end
-            ispr += (jumpt < 30 and t % 20 // 10 or t % 40 // 20) * w
+            ispr = ispr + ((jumpt < 30 and t % 20 // 10 or t % 40 // 20) * w)
           elseif ai == "flying" then
             bouncy, v, ang = true, 0.02, playerang
-            ispr += t % 20 // 10
+            ispr = ispr + (t % 20 // 10)
             xv, yv = mid(-vmod, xv + cos(0.25 - playerang) * 0.01 * vmod, vmod), mid(-0.5 * vmod, yv + sin(0.25 - playerang) * 0.01 * vmod, 0.5 * vmod)
           elseif ai == "eye" then
             bouncy, xv, yv = true, mid(-0.8, xv + sgn(px - x) * 0.01, 0.8), mid(-0.5, yv + sgn(py - y) * 0.01, 0.5)
-            ispr += t % 20 // 10
+            ispr = ispr + (t % 20 // 10)
             ang = atan2(yv, xv) % 1 + 0.5
           elseif ai == "projectile" then
             ang, collide, friction = atan2(yv, xv) % 1 + 0.5
@@ -1054,8 +1054,8 @@ function _update60()
             if id == "stinger" and fmget(x / 8, y / 8, 0) then
               x = -32000
             end
-            x += xv
-            y += yv
+            x = x + (xv)
+            y = y + (yv)
           elseif ai == "eoc" then
             ang, boss, collide, friction = playerang, true
             if hp < phaseswitch then
@@ -1066,19 +1066,19 @@ function _update60()
             end
             -- leave
             if timelight <= 1 then
-              yv -= 0.02
+              yv = yv - (0.02)
             -- spin
             elseif dashstate == 1 then
               angv, ang2 = angv or -0.08, ang2 or ang
-              angv += 0.002
-              ang2 += max(angv)
+              angv = angv + (0.002)
+              ang2 = ang2 + (max(angv))
               ang = ang2
               if angv > 0.2 then
                 dashstate = sfx "10"
                 sprx = id == "marco" and 41 or 23.5
               end
-              xv *= 0.97
-              yv *= 0.97
+              xv = xv * (0.97)
+              yv = yv * (0.97)
             -- dash
             elseif dashstate then
               if t % 120 == 10 then
@@ -1088,7 +1088,7 @@ function _update60()
                 end
               end
               xv, yv = cos(va) * v, sin(va) * v
-              v *= 0.98
+              v = v * (0.98)
             -- above
             else
               if t % 120 == 1 and (id == "marco" or not secondphase) then
@@ -1105,7 +1105,7 @@ function _update60()
             end
           end
           if grav then
-            yv += 0.08
+            yv = yv + (0.08)
           elseif id == "marcoservant" then
             ang, collide, friction = t / 60
           end
@@ -1117,11 +1117,11 @@ function _update60()
               local v = (y + pxh + d) / 8
               local l, r = mget((x - pxw + 1) / 8, v), mget((x + pxw - 2) / 8, v)
               if yv > 0 and (fget(l, 0) or fget(r, 0) or (l == 14 or r == 14) and y >= py - 8) then
-                y += d
+                y = y + (d)
                 yv, down, air = bouncy and min(-yv, -.5) or 0, true
                 break
               end
-              d += 1
+              d = d + (1)
             until d > yv
             -- up
             d = 0
@@ -1129,10 +1129,10 @@ function _update60()
               local v = (y - pxh - 1 + d) / 8
               if yv < 0 and (fmget((x - pxw + 1) / 8, v, 0) or fmget((x + pxw - 2) / 8, v, 0)) then
                 yv = bouncy and max(-yv, .5) or 0
-                y += d
+                y = y + (d)
                 break
               end
-              d -= 1
+              d = d - (1)
             until d < yv
             -- right
             d = 0
@@ -1140,10 +1140,10 @@ function _update60()
               local h = (x + pxw - 1 + d) / 8
               if xv > 0 and (fmget(h, (y - pxh) / 8, 0) or fmget(h, (y + pxh - 1) / 8, 0)) then
                 xv, right = bouncy and min(-xv, -.5) or 0, true
-                x += d
+                x = x + (d)
                 break
               end
-              d += 1
+              d = d + (1)
             until d > xv
             -- left
             d = 0
@@ -1151,17 +1151,17 @@ function _update60()
               local h = (x - pxw + d) / 8
               if xv < 0 and (fmget(h, (y - pxh) / 8, 0) or fmget(h, (y + pxh - 1) / 8, 0)) then
                 xv, left = bouncy and max(-xv, .5) or 0, true
-                x += d
+                x = x + (d)
                 break
               end
-              d -= 1
+              d = d - (1)
             until d < xv
           end
           if friction then
-            xv *= down and 0.8 or 0.99
+            xv = xv * (down and 0.8 or 0.99)
           end
-          x += xv
-          y += yv
+          x = x + (xv)
+          y = y + (yv)
           -- fighter jump
           if ai == "fighter" and down and (left or right or y > py + 2 and abs(px - x) < 16) then
             yv = -2.2
@@ -1171,7 +1171,7 @@ function _update60()
           end
         end
         if not pdead and piframes <= 0 and abs(px - i.x) < i.pxw and abs(py - i.y) < i.pxh then
-          php -= max(i.damage - pdef, 1)
+          php = php - (max(i.damage - pdef, 1))
           piframes, pxv, pyv = 30, sgn(px - i.x) * 1.2, -1.2
           sfx(0, -1, phurt, 12)
         end
@@ -1180,15 +1180,15 @@ function _update60()
           -- p projectiles
           for a in all(projectiles) do
             if i.iframes == 0 and abs(a.x - i.x) < i.pxw and abs(a.y - i.y) < i.pxh then
-              i.hp -= max(a.damage - i.defence / 2, 1)
+              i.hp = i.hp - (max(a.damage - i.defence / 2, 1))
               kd, hit = sgn(a.xv), true
-              a.pierce -= 1
+              a.pierce = a.pierce - (1)
             end
           end
           -- hit enemies
           local r = 4 * helditem.scale - 1
           if pswing > 0 and helditem.melee and i.iframes == 0 and abs(px + wxo - i.x) < i.pxw + r and abs(py + wyo - i.y) < i.pxh + r then
-            i.hp -= max(helditem.damage - i.defence / 2, 1)
+            i.hp = i.hp - (max(helditem.damage - i.defence / 2, 1))
             kd, hit = pflip and -helditem.knockback or helditem.knockback, true
           end
         end
@@ -1209,7 +1209,7 @@ function _update60()
               if fmget((x - cos(ba) * sight) / 8, (y - sin(ba) * sight) / 8, 0) then
                 cansee = false
               end
-              sight += 2
+              sight = sight + (2)
             until sight > d or not cansee
             if cansee then
               g.distance, g.pangle = boss and 0 or d, ba
@@ -1334,7 +1334,7 @@ function _draw()
         if tile == 82 and mget(ix, iy - 1) ~= 82 then
           local y = iy
           repeat
-            y += 1
+            y = y + (1)
           until mget(ix, y) ~= 82
           local s, w, o, b = 142, 2, 4, mget(ix, y + 1)
           if b == 6 then
@@ -1400,7 +1400,7 @@ function _draw()
       mset(1, 1, swingitem.id)
       local sc = swingitem.scale
       if swingitem.type == "ranged" then
-        pangle %= 1
+        pangle = pangle % (1)
         local vf = pangle <= 0.75 and pangle > 0.25
         rotspr(px + cos(pangle) * 8 * sc, py + sin(pangle) * 8 * sc, (vf and 0.5 or 0) - pangle, 1.5, 1.5, 1, vf, sc)
       else
@@ -1502,7 +1502,7 @@ function generate()
   genprint "sculpting the land..."
   for ix = 0, 255 do
     ra = mid(-0.22, ra + rnd "0.2" - 0.1, 0.22)
-    ry += sin(ra) * (ix - 128) / 64
+    ry = ry + (sin(ra) * (ix - 128) / 64)
     if ry < 20 or ry > 37 then
       ra, ry = 0, mid(20, ry, 37)
     end
@@ -1525,14 +1525,14 @@ function generate()
       for i = 1, 5 do
         mset(ix, ry - i, i > 3 and dirttile or walls[dirttile])
       end
-      tunnel -= 1
+      tunnel = tunnel - (1)
     end
   end
   for i = 0, 30 do
     a, cx, cy, s = rnd(), rnd "256", 50 + i / 2 + rnd(78 - i / 2), 1 + rnd "2"
     for l = 0, 10 + rnd "80" do
       av = -0.0833 + rnd "0.1667"
-      a += av
+      a = a + (av)
       cx, cy = cx + cos(a), cy + sin(a)
       maketunnel(s - rnd "2")
     end
@@ -1540,7 +1540,7 @@ function generate()
   repeat
     ix, iy = 20 + rnd "216", 0
     repeat
-      iy += 1
+      iy = iy + (1)
       dirttile = mget(ix, iy)
       valid = dirtitle == 2 or dirttile == 7 or dirttile == 11
     until valid or iy > 32
@@ -1556,22 +1556,22 @@ function generate()
       ca, cx, cy = 0.5 - 0.25 * xo, ix + xo * r, iy
       for l = 0, 80 + rnd "40" do
         ca = mid(0.25, ca - 0.125 + rnd "0.25", 0.75)
-        cx += cos(ca + 0.25)
-        cy += sin(ca + 0.25)
+        cx = cx + (cos(ca + 0.25))
+        cy = cy + (sin(ca + 0.25))
         maketunnel "1"
       end
-      surfacecaves += 1
+      surfacecaves = surfacecaves + (1)
     end
   until surfacecaves >= 4
   genprint "digging corrupt chasms..."
   repeat
     x, y = rnd "256", 0
     repeat
-      y += 1
+      y = y + (1)
     until mget(x, y) == 11 or y > 40
     if y <= 37 then
       for l = 2, 30 + rnd "20" do
-        x += -1 + rnd "2"
+        x = x + (-1 + rnd)"2"
         for ix = -3, 3 do
           for iy = -3, 3 do
             mset(x + ix, y + iy + l, ((abs(ix) >= 2 or iy >= 2) and mget(x + ix, y + iy + l) ~= 76) and 12 or 76)
@@ -1583,7 +1583,7 @@ function generate()
     chasms = 0
     for i = 0, 32767 do
       if mget(i % 256, i // 256) == 77 then
-        chasms += 1
+        chasms = chasms + (1)
       end
     end
   until chasms >= 3
@@ -1602,21 +1602,21 @@ function generate()
     ix, iy = rnd "256", 60 + rnd "58"
     if mget(ix, iy) == 0 and fmget(ix, iy + 1, 0) then
       mset(ix, iy, 9)
-      crystals += 1
+      crystals = crystals + (1)
     end
   until crystals >= 20
   repeat
     ix, iy, set = rnd "256", ores * 0.6 + rnd "38"
     for i = -3, iy / 20 + rnd "3" do
-      ix += -1 + rnd "2"
-      iy += -1 + rnd "2"
+      ix = ix + (-1 + rnd)"2"
+      iy = iy + (-1 + rnd)"2"
       if fmget(ix, iy, 0) and mget(ix, iy - 1) < 82 then
         mset(ix, iy, 19 + ores / 46)
         set = true
       end
     end
     if set then
-      ores += 1
+      ores = ores + (1)
     end
   until ores >= 180
 end
@@ -1677,7 +1677,7 @@ function updaterecipes()
       local a = r[2] or 1
       for slot in all(inventory) do
         if slot.id == r[1] then
-          a -= slot.amount
+          a = a - (slot.amount)
         end
       end
       if a > 0 then
@@ -1694,9 +1694,9 @@ function spawnplayer(hp)
   bigmap()
   php, px, py, pxv, pyv, piframes, pdead = hp or php_max, 1024, 0, 0, 0, 60
   repeat
-    py += 8
+    py = py + (8)
   until fmget(px / 8, py / 8, 0)
-  py -= 4
+  py = py - (4)
 end
 
 function bigmap()
@@ -1786,7 +1786,7 @@ function break_tile(actx, acty, tile)
     local dropitem = drops[tile] or tile
     if tile == 77 then
       dropitem = 48 + orbsmash % 3
-      orbsmash += 1
+      orbsmash = orbsmash + (1)
       mset(actx, acty, 76)
     end
     if dropitem == 50 then
@@ -1801,7 +1801,7 @@ function break_tile(actx, acty, tile)
     additem(drops[b] or b, a8x, a8y + ty * 8)
     splat(a8x, a8y + ty * 8, c, 1)
     mset(actx, acty + ty, 0)
-    ty -= 1
+    ty = ty - (1)
   end
   -- trees drop saplings
   if tile == 83 then
@@ -1854,7 +1854,7 @@ end
 -->8
 function rotspr(x, y, rot, mx, my, w, flip, scale)
   scale = scale or 1
-  w *= scale * 4
+  w = w * (scale * 4)
   if flip then
     rot = -rot
   end
@@ -1862,7 +1862,7 @@ function rotspr(x, y, rot, mx, my, w, flip, scale)
   local sx, sy, hx, halfw = mx + cs * -w, my + ss * -w, flip and -w or w, -w
   for py = y - w, y + w do
     tline(x - hx, py, x + hx, py, sx - ss * halfw, sy + cs * halfw, cs, ss)
-    halfw += 1
+    halfw = halfw + (1)
   end
 end
 

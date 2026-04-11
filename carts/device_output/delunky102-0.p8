@@ -71,7 +71,7 @@ function start_next_level(level)
         -- exit
         rx, ry = 9 + flr(rnd(3)), 3
       end
-      if x + 1 != m[5] or y + 1 != m[6] then
+      if x + 1 ~= m[5] or y + 1 ~= m[6] then
         pal(7, 0)
       end
       sspr(0 + rx * 10, 96 + ry * 8, 10, 8, x * 10, y * 8, 10, 8, chance(0.3))
@@ -132,10 +132,10 @@ function start_next_level(level)
       -- help(crate/damsel) or stone or gap
       if (c == 15 and help_count > 0) then
         if (chance(0.1)) then
-          help_count += 1
+          help_count = help_count + (1)
           if (chance(0.5)) then
             local help = make_item(x + 1, y, 57)
-            help.y += 4
+            help.y = help.y + (4)
             help.h, help.name, help.on_hit = 8, "crate", crate_break
           else
             make_damsel(x + 1, y)
@@ -167,8 +167,8 @@ function start_next_level(level)
         mset(x, y + 1, 32)
         mset(x + 1, y + 1, 33)
         local idol = make_item(x, y, 44)
-        idol.x += 5
-        idol.y -= 4
+        idol.x = idol.x + (5)
+        idol.y = idol.y - (4)
         add_params({name = "idol", h = 8, value = 100, on_grab = grab_idol, trap = true, big = true}, idol)
       end
     end
@@ -363,7 +363,7 @@ end
 function is_triggering_arrow_trap(at, e)
   local dist = 48
   -- 6 tiles
-  if (e.dx != 0 or e.dy != 0) then
+  if (e.dx ~= 0 or e.dy ~= 0) then
     local in_range = false
     if at.dir > 0 and e.x > at.x and e.x < at.x + dist then
       in_range = true
@@ -402,7 +402,7 @@ end
 
 function fire_arrow(at)
   sfx(3)
-  at.ammo -= 1
+  at.ammo = at.ammo - (1)
   local e = make_entity(at.x + at.dir * 7, at.y, new_items)
   add_params({name = "arrow", spr = 43, h = 4, dir = at.dir, dy = -1, dx = 7 * at.dir, ix = 0.98, g = 0.5, knock_down = true, damage = 2, use = item_throw, drop = item_drop, on_landed = item_landed, on_sidecol = item_sidecol, can_grab = true}, e)
 end
@@ -416,7 +416,7 @@ function spider_update(e)
       end
     else
       if e.jump_delay > 0 then
-        e.jump_delay -= 1
+        e.jump_delay = e.jump_delay - (1)
       end
       if (e.jump_delay <= 0 and not e.inair) then
         e.spr = 84
@@ -458,14 +458,14 @@ function bat_update(e)
       end
     else
       -- return to ceiling
-      e.dy -= 0.2
+      e.dy = e.dy - (0.2)
     end
   end
   update_entity(e)
 end
 
 function bat_roofhit(e)
-  if e.mode != 2 then
+  if e.mode ~= 2 then
     return
   end
   e.spr = 85
@@ -475,7 +475,7 @@ function bat_roofhit(e)
 end
 
 function snake_update(e)
-  e.delay -= 1
+  e.delay = e.delay - (1)
   if (e.bleed_timer > 0) then
     --e.dx=0
     e.fs, e.frames = 9999, 1
@@ -507,7 +507,7 @@ end
 function check_item_exit(e)
   if (fget(mget(e.x / 8, (e.y - 4) / 8), 7)) then
     if e.name == "idol" then
-      pl.money += e.value
+      pl.money = pl.money + (e.value)
     end
     del(e.tbl, e)
     pl.item = nil
@@ -528,7 +528,7 @@ end
 
 function boulder_update(e)
   if (e.delay > 0) then
-    e.delay -= 1
+    e.delay = e.delay - (1)
     if (e.delay == 0) then
       e.x, e.y = e.spawnx, e.spawny
       e.dy = 0.01
@@ -542,13 +542,13 @@ function boulder_update(e)
     local tiles = 0
     if (fget(mget(bx, by), 0)) then
       crush_tile(bx, by, e.dx)
-      tiles += 1
+      tiles = tiles + (1)
     end
     if (fget(mget(bx, by - 1), 0)) then
       crush_tile(bx, by - 1, e.dx)
-      tiles += 1
+      tiles = tiles + (1)
     end
-    e.dx -= 0.20 * tiles * sgn(e.dx)
+    e.dx = e.dx - (0.20 * tiles * sgn(e.dx))
     update_entity(e)
     if (tiles > 0) then
       auto_tile(bx, by - 2, 1, 4)
@@ -597,7 +597,7 @@ function make_gold(tx, ty, tile)
   e.spr = flr(tile)
   e.g, e.value, e.can_take = 0.5, 5, true
   if e.spr == 60 or e.spr == 62 then
-    e.value *= 3
+    e.value = e.value * (3)
   end
   return e
 end
@@ -605,7 +605,7 @@ end
 function make_item(tx, ty, tile)
   local e = make_entity(tx * 8 + 4, ty * 8 + 3, items)
   add_params({name = "#" .. tile, spr = tile, ix = 0.98, g = 0.5, h = 4, use = item_throw, drop = item_drop, on_landed = item_landed, on_sidecol = item_sidecol, can_grab = true}, e)
-  e.y += 4
+  e.y = e.y + (4)
   return e
 end
 
@@ -617,7 +617,7 @@ function item_sidecol(e)
 end
 
 function item_landed(e)
-  e.dx *= 0.3
+  e.dx = e.dx * (0.3)
   if abs(e.dx) < 0.2 then
     e.dx = 0
   end
@@ -648,7 +648,7 @@ end
 function make_damsel(x, y)
   local di = make_item(x, y, 11)
   di.name = "damsel"
-  di.y += 4
+  di.y = di.y + (4)
   di.h, di.big = 8, true
   local de = make_entity(di.x, di.y, entities)
   de.name = "damsel"
@@ -674,7 +674,7 @@ function damsel_e_update(e)
   end
   -- at gate?
   if (fget(mget(e.x / 8, (e.y - 4) / 8), 7)) then
-    pl.health += 1
+    pl.health = pl.health + (1)
     del(e.tbl, e)
     del(e.item.tbl, e.item)
     pl.item = nil
@@ -693,7 +693,7 @@ local hitarea = {{0, 0, 1, 0, 0}, {0, 1, 1, 1, 0}, {1, 1, 1, 1, 1}, {0, 1, 1, 1,
 
 function bomb_update(e)
   if (e.timer > 0) then
-    e.timer -= 1
+    e.timer = e.timer - (1)
     e.spr = 26 + flr(e.timer / 2) % 2
     if (e.timer == 0) then
       e.life = 1
@@ -792,13 +792,13 @@ function rope_update(e)
   if (e.activated) then
     local tx = flr(e.x / 8)
     local ty = flr(e.y / 8)
-    if (mget(tx, ty) != 31 and mget(tx, ty) != 15) then
+    if (mget(tx, ty) ~= 31 and mget(tx, ty) ~= 15) then
       if (e.steps == 0 and e.dy > 0) then
         mset(tx, ty, 15)
       else
         mset(tx, ty, 31)
       end
-      e.steps += 1
+      e.steps = e.steps + (1)
       if (e.steps == 8) then
         e.on_roofhit(e)
       end
@@ -825,7 +825,7 @@ function rope_throw(e)
   sfx(3)
   -- adjust position
   e.x = flr(e.x / 8) * 8 + 4
-  e.y -= 5
+  e.y = e.y - (5)
   -- make sure there is nothing direcly on top
   if (fget(mget(e.x / 8, e.y / 8), 0)) then
     return
@@ -861,7 +861,7 @@ function player_faint()
   end
   pl.mode, pl.spr = 3, 68
   pl.frame, pl.frames = 0, 1
-  if (pl.item != nil and pl.holding == 1) then
+  if (pl.item ~= nil and pl.holding == 1) then
     pl.item.drop(pl.item)
     pl.item = nil
   end
@@ -871,13 +871,13 @@ function player_landed(e)
   jumps_left = max_jumps
   local impact = 0
   if pl.ody >= 8 then
-    impact += 1
+    impact = impact + (1)
   end
   if pl.ody >= 11 then
-    impact += 1
+    impact = impact + (1)
   end
   if pl.ody >= 13 then
-    impact += 97
+    impact = impact + (97)
   end
   if (impact > 0) then
     damage_entity(pl, nil, impact)
@@ -911,24 +911,24 @@ function update_play()
   end
   -- mode 0 = idle/ground/jump
   if (pl.mode == 0) then
-    if pl.item != nil and pl.item.name == "idol" then
+    if pl.item ~= nil and pl.item.name == "idol" then
       check_item_exit(pl.item)
     end
     if btnp(4) then
       switch_item()
     end
     if pl.grab_cooldown > 0 then
-      pl.grab_cooldown -= 1
+      pl.grab_cooldown = pl.grab_cooldown - (1)
     end
     pl.grab = false
     -- left/right
     if (btn(0)) then
-      pl.dx -= 2
+      pl.dx = pl.dx - (2)
       pl.dir = -1
       pl.grab = true
     end
     if (btn(1)) then
-      pl.dx += 2
+      pl.dx = pl.dx + (2)
       pl.dir = 1
       pl.grab = true
     end
@@ -938,10 +938,10 @@ function update_play()
       sfx(0)
     end
     if pl.whip > 0 then
-      pl.whip -= 1
+      pl.whip = pl.whip - (1)
     end
     -- use item?
-    if (btnp(5) and pl.item != nil) then
+    if (btnp(5) and pl.item ~= nil) then
       if (btn(3)) then
         pl.item.drop(pl.item)
         ok_to_crouch = false
@@ -957,12 +957,12 @@ function update_play()
         pl.dx = 0
       elseif (fget(mget(pl.x / 8, pl.y / 8), 7)) then
         --exit_level()
-        level += 1
+        level = level + (1)
         start_next_level(level)
       elseif (jumps_left > 0 and ok_to_jump) then
         -- regular jump
         pl.dy = -3.2
-        jumps_left -= 1
+        jumps_left = jumps_left - (1)
         pl.inair = true
         ok_to_jump = false
         sfx(4)
@@ -974,7 +974,7 @@ function update_play()
       if (fget(mget(pl.x / 8, (pl.y + 4) / 8), 2)) then
         pl.mode = 1
         pl.dx = 0
-        pl.y += 1
+        pl.y = pl.y + (1)
       end
     end
   elseif (pl.mode == 1) then
@@ -982,7 +982,7 @@ function update_play()
     pl.whip = 0
     pl.dy = 0
     pl.spr = 70
-    pl.x += (8 * flr(pl.x / 8) + 4 - pl.x) * 0.4
+    pl.x = pl.x + ((8 * flr(pl.x / 8) + 4 - pl.x) * 0.4)
     if btn(2) then
       pl.dy = -1
     end
@@ -991,12 +991,12 @@ function update_play()
     end
     local drop = false
     if (btn(0)) then
-      pl.dx -= 2
+      pl.dx = pl.dx - (2)
       pl.dir = -1
       drop = true
     end
     if (btn(1)) then
-      pl.dx += 2
+      pl.dx = pl.dx + (2)
       pl.dir = 1
       drop = true
     end
@@ -1026,7 +1026,7 @@ function update_play()
   elseif (pl.mode == 3) then
     -- mode 3 = fainted
     pl.whip = 0
-    pl.faint_timer -= 1
+    pl.faint_timer = pl.faint_timer - (1)
     if (pl.faint_timer == 0) then
       if (pl.health > 0) then
         pl.spr = 64
@@ -1056,7 +1056,7 @@ function update_play()
   --
   elseif (pl.mode == 4) then
     -- mode 4 = dead
-    pl.dead_timer += 1
+    pl.dead_timer = pl.dead_timer + (1)
     if btnp(5) and pl.dead_timer > 15 then
       swap_state(title_state)
     end
@@ -1070,10 +1070,10 @@ function update_play()
     if (e.inair == true) then
       -- check for impact with entities
       for e2 in all(entities) do
-        if (e.cooldown == 0 or e2 != pl) then
+        if (e.cooldown == 0 or e2 ~= pl) then
           local v = sqrt(e.dx * e.dx + e.dy * e.dy)
           if (v > 3 and abs(e2.x - e.x) < 5 and abs(e2.y - e.y) < 5) then
-            if (not (e.name == "rope" and e2 == pl) and e.name != e2.name) then
+            if (not (e.name == "rope" and e2 == pl) and e.name ~= e2.name) then
               damage_entity(e2, e)
               if e.flip_on_hit then
                 e.dx = -e2.dx / 2
@@ -1086,7 +1086,7 @@ function update_play()
     -- instant pickup?
     if (e.can_take) then
       if (abs(pl.x - e.x) < 4 and abs(pl.y - e.y) < 4) then
-        if (e.value != nil) then
+        if (e.value ~= nil) then
           sfx(7)
           if e.value == -2 then
             add_bombs(3)
@@ -1095,16 +1095,16 @@ function update_play()
             add_ropes(3)
           end
           if e.value > 0 then
-            pl.money += e.value
+            pl.money = pl.money + (e.value)
           end
         end
         del(items, e)
       end
     end
-    if (e != pl.item) then
+    if (e ~= pl.item) then
       -- pickup item?
       if (pl.mode == 0 and btn(3) and e.can_grab and not pl.inair and abs(pl.x - e.x) < 5 and abs(pl.y - e.y) < 5 and ok_to_crouch) then
-        if (pl.stowed_item != nil) then
+        if (pl.stowed_item ~= nil) then
           add(items, pl.stowed_item)
           set_item_to_player_pos(pl.stowed_item)
           pl.stowed_item.inair = true
@@ -1138,14 +1138,14 @@ function update_play()
   for e1 in all(entities) do
     -- e2e collision
     for e2 in all(entities) do
-      if (e1 != e2 and e1.damage >= 0 and (e1.collides_with_player or e2.collides_with_player)) then
+      if (e1 ~= e2 and e1.damage >= 0 and (e1.collides_with_player or e2.collides_with_player)) then
         if (abs(e2.x - e1.x) < (e2.w + e1.w) / 2 - 2 and abs(e2.y - e1.y) < (e2.h + e1.h) / 2 - 2) then
           e2e_coll(e1, e2)
         end
       end
     end
     -- spikes?
-    if (e1.inair and e1.health > 0 and e1.name != "bat") then
+    if (e1.inair and e1.health > 0 and e1.name ~= "bat") then
       local tx = flr(e1.x / 8)
       local ty = flr((e1.y + 3) / 8)
       if (e1.dy > 0 and fget(mget(tx, ty), 3)) then
@@ -1154,7 +1154,7 @@ function update_play()
       end
     end
     -- check whip
-    if (e1 != pl and pl.whip > 0) then
+    if (e1 ~= pl and pl.whip > 0) then
       if (abs(pl.x + 8 * pl.dir - e1.x) < 6 and abs(pl.y - e1.y) < 6 and e1.bleed_timer == 0) then
         damage_entity(e1, nil, 1, pl.dir, -1)
       end
@@ -1162,7 +1162,7 @@ function update_play()
     -- update it
     e1.update(e1)
   end
-  if (pl.item != nil) then
+  if (pl.item ~= nil) then
     set_item_to_player_pos(pl.item)
   end
   for e in all(particles) do
@@ -1211,24 +1211,24 @@ function e2e_coll(e1, e2)
 end
 
 function damage_entity(e1, e2, impact, dx, dy)
-  if (e2 != nil) then
-    e1.health -= e2.damage
+  if (e2 ~= nil) then
+    e1.health = e1.health - (e2.damage)
     if e1.flip_on_hit then
       e1.dx = 3 * sgn(e1.x - e2.x)
     end
   else
-    e1.health -= impact
+    e1.health = e1.health - (impact)
   end
   if dx then
-    e1.dx += dx
+    e1.dx = e1.dx + (dx)
   end
   if (dy and e1.flip_on_hit) then
     e1.inair = true
-    e1.dy += dy
+    e1.dy = e1.dy + (dy)
   end
-  if (e1.health <= 0 and e1 != pl) then
+  if (e1.health <= 0 and e1 ~= pl) then
     e1.ix = 0.7
-    pl.kills += 1
+    pl.kills = pl.kills + (1)
   end
   e1.dy, e1.bleed_timer = -3, 30
   if (e1 == pl) then
@@ -1249,7 +1249,7 @@ end
 function switch_to_whip()
   pl.holding = 1
   -- use stowed item if any
-  if (pl.stowed_item != nil) then
+  if (pl.stowed_item ~= nil) then
     pl.item = pl.stowed_item
     pl.stowed_item = nil
     add(items, pl.item)
@@ -1264,7 +1264,7 @@ function switch_item()
   end
   -- handle current item
   if (pl.holding == 1) then
-    if (pl.item != nil) then
+    if (pl.item ~= nil) then
       -- stow away
       del(items, pl.item)
       pl.stowed_item = pl.item
@@ -1282,15 +1282,15 @@ function switch_item()
     pl.item = nil
   end
   -- check for next item
-  pl.holding += 1
+  pl.holding = pl.holding + (1)
   if pl.holding == 2 and #pl.bombs == 0 then
-    pl.holding += 1
+    pl.holding = pl.holding + (1)
   end
   if pl.holding == 3 and #pl.ropes == 0 then
-    pl.holding += 1
+    pl.holding = pl.holding + (1)
   end
   if pl.holding > 3 then
-    pl.holding -= 3
+    pl.holding = pl.holding - (3)
   end
   -- set next item
   -- whip/item
@@ -1337,20 +1337,20 @@ function draw_play()
   local lx, ly = pl.x - camx, pl.y - camy
   -- pan camera but give player some room to move around in
   if lx < 48 then
-    camx -= 2
+    camx = camx - (2)
   end
   if lx > 80 then
-    camx += 2
+    camx = camx + (2)
   end
   if ly < 48 then
-    camy += (ly - 48) * 0.5
+    camy = camy + ((ly - 48) * 0.5)
   end
   if ly > 80 then
-    camy += (ly - 80) * 0.5
+    camy = camy + ((ly - 80) * 0.5)
   end
   local sx, sy = 0, 0
   if (screenshake > 0) then
-    screenshake -= 1
+    screenshake = screenshake - (1)
     sx = rnd(screenshake_pwr) - screenshake_pwr / 2
     sy = rnd(screenshake_pwr) - screenshake_pwr / 2
   end
@@ -1418,11 +1418,11 @@ function init_title()
 end
 
 function update_title()
-  bgy -= 0.5
+  bgy = bgy - (0.5)
   if bgy < -256 then
     bgy = 0
   end
-  t += 1
+  t = t + (1)
   if btnp(5) then
     swap_state(play_state)
   end
@@ -1593,7 +1593,7 @@ function collide_floor(self)
     if fget(tile, 0) then
       landed = true
     end
-    if (fget(tile, 1) and pl.mode != 1) then
+    if (fget(tile, 1) and pl.mode ~= 1) then
       if self.lastty < newty then
         landed = true
       end
@@ -1657,26 +1657,26 @@ function make_entity(x, y, t)
 end
 
 function update_entity_x(e)
-  e.x += e.dx
-  e.dx *= e.ix
+  e.x = e.x + (e.dx)
+  e.dx = e.dx * (e.ix)
 end
 
 function update_entity_y(e)
   if (e.inair or not e.col) then
-    e.y += e.dy
+    e.y = e.y + (e.dy)
     e.dy = min(e.dy + e.g, 13)
-    e.dy *= e.iy
+    e.dy = e.dy * (e.iy)
   end
 end
 
 function update_entity(e)
   if e.cooldown > 0 then
-    e.cooldown -= 1
+    e.cooldown = e.cooldown - (1)
   end
   update_entity_x(e)
   if (e.col) then
     d = collide_side(e)
-    if (d != nil) then
+    if (d ~= nil) then
       -- stick to ledge?
       if (e.grab and e.mode == 0 and e.inair and e.dy > 0 and pl.grab_cooldown == 0) then
         local f = fget(mget(d.tx, d.ty - 1))
@@ -1686,7 +1686,7 @@ function update_entity(e)
         end
       end
       -- callback
-      if e.on_sidecol != nil then
+      if e.on_sidecol ~= nil then
         e.on_sidecol(e)
       end
     end
@@ -1698,7 +1698,7 @@ function update_entity(e)
   if (e.col) then
     local ody = e.dy
     if (collide_floor(e)) then
-      if (e.inair == true and e.on_landed != nil) then
+      if (e.inair == true and e.on_landed ~= nil) then
         e.ody = ody
         e.on_landed(e)
       end
@@ -1707,13 +1707,13 @@ function update_entity(e)
       local toair = false
       if (e.inair == false and e.dy == 0) then
         if (should_fall(e)) then
-          if e.inair == false and e.on_air != nil then
+          if e.inair == false and e.on_air ~= nil then
             e.on_air(e)
           end
           e.inair = true
         end
       else
-        if e.inair == false and e.on_air != nil then
+        if e.inair == false and e.on_air ~= nil then
           e.on_air(e)
         end
         e.inair = true
@@ -1727,7 +1727,7 @@ function update_entity(e)
   end
   update_entity_a(e)
   if (e.bleed_timer > 0) then
-    e.bleed_timer -= 1
+    e.bleed_timer = e.bleed_timer - (1)
     if chance(0.5) then
       bleed(e.x, e.y + 4)
     end
@@ -1738,10 +1738,10 @@ function update_entity(e)
 end
 
 function update_entity_a(e)
-  e.t += 1
+  e.t = e.t + (1)
   if (e.frames > 0) then
     if e.t % e.fs == 0 then
-      e.frame += 1
+      e.frame = e.frame + (1)
     end
     if e.frame == e.frames then
       e.frame = 0
@@ -1777,28 +1777,28 @@ function make_map()
       tryagain = false
       local r = flr(rnd(5))
       if r < 2 then
-        rx -= 1
+        rx = rx - (1)
       end
       -- 0&1
       if r > 2 then
-        rx += 1
+        rx = rx + (1)
       end
       -- 3&4
       if (r == 2) then
-        ry += 1
+        ry = ry + (1)
         down = true
       end
       if (rx < 1) then
         rx = 1
-        ry += 1
+        ry = ry + (1)
         down = true
       end
       if (rx > 4) then
         rx = 4
-        ry += 1
+        ry = ry + (1)
         down = true
       end
-      if (m[rx][ry] != 0 and ry < 5) then
+      if (m[rx][ry] ~= 0 and ry < 5) then
         rx, ry = lrx, lry
         tryagain = true
       end
