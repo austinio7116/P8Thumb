@@ -1079,7 +1079,6 @@ char *p8_shrinko_unminify(const char *src, size_t len, size_t *out_len) {
     parse_block(&em, VLINE_NONE);
     em_indent(&em);
 
-    if (em.failed) { buf_free(&out); return NULL; }
     if (!buf_appendc(&out,'\0')) { buf_free(&out); return NULL; }
 
     char *result = out.data;

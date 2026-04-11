@@ -228,7 +228,7 @@ static int decompress_pxa(const unsigned char *src, size_t src_len,
 
             /* Length: base 3, accumulate 3-bit chunks while chunk == 7. */
             int length = 3;
-            for (int g = 0; g < 32; g++) {
+            while (1) {
                 int chunk = br_read(&r, 3);
                 length += chunk;
                 if (chunk != 7) break;
