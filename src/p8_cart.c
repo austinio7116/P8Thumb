@@ -191,7 +191,7 @@ int p8_cart_load_from_memory(p8_cart *cart, p8_machine *m,
         char *lua = NULL;
         size_t lua_len = 0;
         if (p8_p8png_load(m, (const unsigned char *)src, src_len,
-                          &lua, &lua_len) != 0) {
+                          &lua, &lua_len, NULL) != 0) {
             return -1;
         }
         /* Lua dialect rewrite, same as text path. */

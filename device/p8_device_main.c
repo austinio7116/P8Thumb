@@ -36,6 +36,13 @@
 #include "p8_draw.h"
 #include "p8_font.h"
 #include "p8_log.h"
+#include "p8_p8png.h"
+#include "p8_translate.h"
+#include "p8_bmp.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 /* Set by boot_filesystem(): 1 if we ran f_mkfs at boot (label
  * mismatch / no FS / MENU forced), 0 if the existing FS was kept.
@@ -53,11 +60,8 @@ static uint16_t scanline[128 * 128];
  * screen red and write a log entry so the next boot's log file
  * shows the cause. */
 void __not_in_flash_func(isr_hardfault)(void) {
-    p8_log_to_file("!!! HARDFAULT — see ring dump for last events");
-    p8_log_dump_ring();
-    p8_flash_disk_flush();
-    for (int i = 0; i < 128 * 128; i++) scanline[i] = 0xf800;
-    p8_lcd_present(scanline);
+    /* Do NOT repaint the screen — leave whatever was on the LCD
+     * so on-screen diagnostic logs remain visible. Just hang. */
     while (1) tight_loop_contents();
 }
 
@@ -141,6 +145,320 @@ static int boot_filesystem(void) {
     f_mkdir("/carts");   /* harmless if already present */
     p8_flash_disk_flush();
     return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* On-device .p8.png → .luac conversion                               */
+/*                                                                     */
+/* Scans /carts/ for .p8.png files that don't have a matching .luac.   */
+/* For each, loads the PNG, decodes steganographic cart bytes,          */
+/* decompresses Lua source, runs the full C dialect translator,        */
+/* compiles to bytecode via luaL_loadbuffer + lua_dump, and saves      */
+/* .luac + .rom + .bmp to /carts/.                                     */
+/*                                                                     */
+/* Runs once at boot, before USB comes up. Takes 5-15 seconds per      */
+/* cart depending on Lua source size. Shows a progress screen.         */
+/* ------------------------------------------------------------------ */
+
+/* lua_dump writer callback — appends to a growable buffer. */
+typedef struct {
+    unsigned char *data;
+    size_t len;
+    size_t cap;
+} dump_buf;
+
+static int dump_writer(lua_State *L, const void *p, size_t sz, void *ud) {
+    dump_buf *db = (dump_buf *)ud;
+    (void)L;
+    if (db->len + sz > db->cap) {
+        size_t nc = db->cap ? db->cap : 1024;
+        while (nc < db->len + sz) nc *= 2;
+        unsigned char *nd = (unsigned char *)realloc(db->data, nc);
+        if (!nd) return 1;  /* error */
+        db->data = nd;
+        db->cap = nc;
+    }
+    memcpy(db->data + db->len, p, sz);
+    db->len += sz;
+    return 0;
+}
+
+/* On-screen log: accumulates lines on a persistent black background.
+ * When a hardfault hits, the last line visible shows where it died. */
+static int g_log_y;
+
+static void screen_log(p8_machine *m, uint16_t *sl, const char *msg) {
+    if (g_log_y == 0) {
+        /* First call — clear screen */
+        p8_machine_reset(m);
+        p8_camera(m, 0, 0);
+        p8_cls(m, 0);
+        g_log_y = 2;
+    }
+    p8_font_draw(m, msg, 2, g_log_y, 7);
+    g_log_y += 7;
+    if (g_log_y > 122) g_log_y = 2;  /* wrap if too many lines */
+    p8_machine_present(m, sl);
+    p8_lcd_wait_idle();
+    p8_lcd_present(sl);
+}
+
+static int convert_one_cart(const char *stem, p8_machine *m,
+                             uint16_t *sl) {
+    char png_path[80], luac_path[80], rom_path[80], bmp_path[80];
+    snprintf(png_path,  sizeof(png_path),  "/carts/%s.p8.png", stem);
+    snprintf(luac_path, sizeof(luac_path), "/carts/%s.luac", stem);
+    snprintf(rom_path,  sizeof(rom_path),  "/carts/%s.rom", stem);
+    snprintf(bmp_path,  sizeof(bmp_path),  "/carts/%s.bmp", stem);
+
+    g_log_y = 0;  /* reset log screen for this cart */
+    screen_log(m, sl, stem);
+    screen_log(m, sl, "opening file...");
+
+    /* ---- Phase A: PNG → cart bytes + Lua source ---- */
+    FIL f;
+    if (f_open(&f, png_path, FA_READ) != FR_OK) {
+        screen_log(m, sl, "ERR: can't open");
+        p8_log_to_file("convert: can't open png");
+        return -1;
+    }
+    FSIZE_t png_sz = f_size(&f);
+    {
+        char info[40];
+        snprintf(info, sizeof(info), "size: %lu", (unsigned long)png_sz);
+        screen_log(m, sl, info);
+    }
+    if (png_sz == 0 || png_sz > 200 * 1024) {
+        f_close(&f);
+        screen_log(m, sl, "ERR: bad size");
+        p8_log_to_file("convert: png too large or empty");
+        return -2;
+    }
+    unsigned char *png_data = (unsigned char *)malloc((size_t)png_sz);
+    if (!png_data) {
+        f_close(&f);
+        screen_log(m, sl, "ERR: OOM for png");
+        p8_log_to_file("convert: OOM for png");
+        return -3;
+    }
+    UINT br;
+    f_read(&f, png_data, (UINT)png_sz, &br);
+    f_close(&f);
+    screen_log(m, sl, "file loaded");
+
+    screen_log(m, sl, "decoding png...");
+    p8_log_to_file("convert: decoding png");
+
+    /* NOTE: p8_p8png_load writes into m->mem (ROM region 0x0000-0x42ff).
+     * It does NOT touch the framebuffer at 0x6000, so screen_log text
+     * remains visible. The label (4bpp thumbnail) is returned separately. */
+    char *lua_src = NULL;
+    size_t lua_len = 0;
+    uint8_t *label_4bpp = NULL;
+    int rc = p8_p8png_load(m, png_data, (size_t)png_sz,
+                            &lua_src, &lua_len, &label_4bpp);
+    if (rc != 0 || !lua_src) {
+        free(png_data);
+        if (lua_src) free(lua_src);
+        if (label_4bpp) free(label_4bpp);
+        screen_log(m, sl, "ERR: png decode fail");
+        p8_log_to_file("convert: png decode failed");
+        return -4;
+    }
+    {
+        char info[40];
+        snprintf(info, sizeof(info), "lua: %d bytes", (int)lua_len);
+        screen_log(m, sl, info);
+    }
+
+    /* Free PNG immediately — we have everything we need now */
+    free(png_data);
+    png_data = NULL;
+
+    screen_log(m, sl, "saving rom...");
+    if (f_open(&f, rom_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+        UINT bw;
+        f_write(&f, m->mem, 0x4300, &bw);
+        f_close(&f);
+    }
+
+    /* Generate BMP thumbnail from the 4bpp label returned by p8_p8png_load.
+     * Uses the scanline buffer as scratch — screen_log will re-present
+     * the framebuffer on the next call, fixing the display. */
+    screen_log(m, sl, "saving bmp...");
+    if (label_4bpp) {
+        static const uint16_t pal[16] = {
+            0x0000, 0x194a, 0x792a, 0x042a, 0xaa86, 0x5aa9, 0xc618, 0xff9d,
+            0xf809, 0xfd00, 0xff64, 0x0726, 0x2d7f, 0x83b3, 0xfbb5, 0xfe75,
+        };
+        for (int y = 0; y < 128; y++) {
+            for (int x = 0; x < 128; x += 2) {
+                uint8_t b = label_4bpp[y * 64 + (x >> 1)];
+                sl[y * 128 + x]     = pal[b & 0x0f];
+                sl[y * 128 + x + 1] = pal[(b >> 4) & 0x0f];
+            }
+        }
+        p8_bmp_save_128(bmp_path, sl);
+        free(label_4bpp);
+        label_4bpp = NULL;
+    }
+    screen_log(m, sl, "png freed");
+
+    screen_log(m, sl, "translating...");
+    p8_log_to_file("convert: translating");
+
+    size_t translated_len = 0;
+    char *translated = p8_translate_full(lua_src, lua_len, &translated_len);
+    free(lua_src);
+    lua_src = NULL;
+
+    if (!translated) {
+        screen_log(m, sl, "ERR: translate OOM");
+        p8_log_to_file("convert: translate OOM");
+        return -5;
+    }
+    {
+        char info[40];
+        snprintf(info, sizeof(info), "translated: %d b", (int)translated_len);
+        screen_log(m, sl, info);
+    }
+
+    screen_log(m, sl, "compiling...");
+    p8_log_to_file("convert: compiling");
+
+    lua_State *L = luaL_newstate();
+    if (!L) {
+        free(translated);
+        screen_log(m, sl, "ERR: VM OOM");
+        p8_log_to_file("convert: lua VM OOM");
+        return -6;
+    }
+    screen_log(m, sl, "vm created");
+
+    rc = luaL_loadbuffer(L, translated, translated_len, "=cart");
+    free(translated);
+    translated = NULL;
+
+    if (rc != LUA_OK) {
+        const char *err = lua_tostring(L, -1);
+        char buf[160];
+        snprintf(buf, sizeof(buf), "compile: %s",
+                 err ? err : "(no msg)");
+        screen_log(m, sl, "ERR: compile fail");
+        screen_log(m, sl, buf);
+        p8_log_to_file(buf);
+        sleep_ms(5000);
+        lua_close(L);
+        return -7;
+    }
+    screen_log(m, sl, "compiled ok");
+
+    dump_buf db = {0};
+    lua_dump(L, dump_writer, &db, 0);
+    lua_close(L);
+
+    if (!db.data || db.len == 0) {
+        if (db.data) free(db.data);
+        screen_log(m, sl, "ERR: dump fail");
+        p8_log_to_file("convert: dump failed");
+        return -8;
+    }
+
+    screen_log(m, sl, "saving luac...");
+    p8_log_to_file("convert: saving luac");
+
+    if (f_open(&f, luac_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+        UINT bw;
+        f_write(&f, db.data, (UINT)db.len, &bw);
+        f_close(&f);
+    }
+    free(db.data);
+
+    p8_flash_disk_flush();
+    screen_log(m, sl, "DONE OK");
+
+    {
+        char buf[80];
+        snprintf(buf, sizeof(buf), "convert: ok %s", stem);
+        p8_log_to_file(buf);
+    }
+    return 0;
+}
+
+/* Scan /carts/ for .p8.png files without matching .luac and convert. */
+static int convert_pending_carts(p8_machine *m, uint16_t *sl) {
+    DIR dir;
+    FILINFO info;
+    if (f_opendir(&dir, "/carts") != FR_OK) return 0;
+
+    /* First pass: collect stems that need conversion. We can't convert
+     * while iterating the directory (opening files would invalidate
+     * the directory scan on some FatFs configs), so collect first. */
+    char stems[16][40];
+    int n_stems = 0;
+
+    while (n_stems < 16 && f_readdir(&dir, &info) == FR_OK) {
+        if (info.fname[0] == 0) break;
+        if (info.fattrib & AM_DIR) continue;
+        size_t L = strlen(info.fname);
+        /* Match *.p8.png */
+        if (L < 8) continue;
+        if (strcasecmp(info.fname + L - 7, ".p8.png") != 0) continue;
+
+        /* Extract stem (everything before .p8.png) */
+        size_t stem_len = L - 7;
+        if (stem_len >= 40) stem_len = 39;
+        memcpy(stems[n_stems], info.fname, stem_len);
+        stems[n_stems][stem_len] = 0;
+        n_stems++;
+    }
+    f_closedir(&dir);
+
+    if (n_stems == 0) return 0;
+
+    /* Second pass: check which stems lack .luac and convert those. */
+    int converted = 0;
+    for (int s = 0; s < n_stems; s++) {
+        char luac_path[80];
+        snprintf(luac_path, sizeof(luac_path), "/carts/%s.luac",
+                 stems[s]);
+        FILINFO fi;
+        if (f_stat(luac_path, &fi) == FR_OK) {
+            continue;  /* already converted */
+        }
+
+        /* Show overall progress */
+        p8_machine_reset(m);
+        p8_camera(m, 0, 0);
+        p8_cls(m, 1);
+        p8_font_draw(m, "ThumbyP8", 40, 4, 7);
+        {
+            char prog[40];
+            snprintf(prog, sizeof(prog), "cart %d / %d",
+                     s + 1, n_stems);
+            p8_font_draw(m, prog, 30, 20, 6);
+        }
+        p8_font_draw(m, stems[s], 4, 36, 11);
+        p8_font_draw(m, "converting...", 24, 56, 10);
+        p8_machine_present(m, sl);
+        p8_lcd_wait_idle();
+        p8_lcd_present(sl);
+
+        int rc = convert_one_cart(stems[s], m, sl);
+        if (rc == 0) converted++;
+        else {
+            char buf[80];
+            snprintf(buf, sizeof(buf), "convert: FAIL %s rc=%d",
+                     stems[s], rc);
+            p8_log_to_file(buf);
+        }
+    }
+
+    if (converted > 0) {
+        p8_flash_disk_flush();
+    }
+
+    return converted;
 }
 
 /* "Drop carts onto USB drive" wait screen. Holds until at least one
@@ -285,9 +603,9 @@ static void wait_for_carts(void) {
                 } else {
                     p8_font_draw(&machine, "drive idle",     32, 68, 6);
                 }
-                p8_font_draw(&machine, "drag .p8.png files",  4,  88, 6);
+                p8_font_draw(&machine, "drop .p8.png carts",   4,  88, 6);
                 p8_font_draw(&machine, "onto p8thumbv1",     16,  96, 6);
-                p8_font_draw(&machine, "then eject in os",   12, 104, 6);
+                p8_font_draw(&machine, "auto-converts on boot",4, 104, 6);
                 break;
             }
             case LOBBY_FLUSHING: {
@@ -355,6 +673,25 @@ int main(void) {
     p8_log_to_file("--- thumbyp8 boot ---");
     p8_log_to_file(g_boot_reformatted ? "fs: reformatted at boot"
                                        : "fs: kept existing volume");
+
+    /* Stage 2.5: on-device cart conversion. Scan /carts/ for .p8.png
+     * files without a matching .luac and convert them. Runs BEFORE
+     * USB so the host sees the generated .luac files immediately.
+     * Takes 5-15s per cart; shows a progress screen on the LCD.
+     *
+     * Hold B at boot to skip conversion (recovery escape hatch). */
+    splash(0xfbe0);  /* yellow-green = conversion check */
+    if (p8_buttons_read() & (1 << P8_BTN_O)) {
+        p8_log_to_file("convert: skipped (B held)");
+    } else {
+        int nc = convert_pending_carts(&machine, scanline);
+        if (nc > 0) {
+            char buf[40];
+            snprintf(buf, sizeof(buf), "converted %d cart(s)", nc);
+            p8_log_to_file(buf);
+            p8_flash_disk_flush();
+        }
+    }
 
     /* Stage 3: USB stack. Now the disk is fully on flash and we can
      * let the host enumerate and read consistent contents. */
@@ -460,12 +797,12 @@ int main(void) {
          * hardfault dump shows the last few bindings the cart called. */
         p8_trace_hook = p8_log_ring;
 
-        /* --- Precompiled path only (.luac + .rom) ---
+        /* --- Bytecode execution path (.luac + .rom) ---
          *
-         * All dialect translation and compilation happens on the
-         * host via tools/p8png_extract.py. The device is a pure
-         * bytecode executor. No C-side rewriter, no on-device
-         * compilation, no fallback.
+         * Cart conversion (dialect translation + compilation) happens
+         * either on the host via tools/p8png_extract.py, or on-device
+         * at boot via convert_pending_carts(). By this point the
+         * .luac + .rom files already exist on disk.
          */
         {
             /* cart_entries[chosen].name is already "<stem>.luac".
@@ -499,7 +836,7 @@ int main(void) {
                 p8_camera(&machine, 0, 0);
                 p8_cls(&machine, 2);
                 p8_font_draw(&machine, "missing .luac/.rom", 4, 20, 7);
-                p8_font_draw(&machine, "preprocess on host", 4, 36, 6);
+                p8_font_draw(&machine, "conversion failed?", 4, 36, 6);
                 p8_font_draw(&machine, "MENU = picker", 20, 116, 10);
                 p8_machine_present(&machine, scanline);
                 p8_lcd_wait_idle();

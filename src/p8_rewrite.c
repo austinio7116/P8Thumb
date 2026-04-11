@@ -409,13 +409,31 @@ static void apply_shorthand_if(buf *out, const char *line, size_t n) {
     size_t r = q + 1;
     while (r < n && (line[r] == ' ' || line[r] == '\t')) r++;
 
-    /* If we hit end-of-line, or a comment, or 'then' → regular if. */
+    /* If we hit end-of-line, or a comment, or 'then'/'do' → regular if. */
     if (r >= n) { buf_append(out, line, n); return; }
     if (r + 1 < n && line[r] == '-' && line[r+1] == '-') {
         buf_append(out, line, n); return;
     }
     if (r + 4 <= n && !memcmp(line + r, "then", 4) &&
         (r + 4 == n || !is_ident_char((unsigned char)line[r+4]))) {
+        buf_append(out, line, n); return;
+    }
+    if (r + 2 <= n && !memcmp(line + r, "do", 2) &&
+        (r + 2 == n || !is_ident_char((unsigned char)line[r+2]))) {
+        /* `if (cond) do` — rewrite `do` to `then`, not shorthand */
+        buf_append(out, line, r);
+        buf_append_cstr(out, "then");
+        if (r + 2 < n) buf_append(out, line + r + 2, n - (r + 2));
+        return;
+    }
+    /* `and` / `or` after `)` means the condition continues —
+     * e.g. `if (a) or (b) then`. NOT a shorthand. */
+    if (r + 3 <= n && !memcmp(line + r, "and", 3) &&
+        (r + 3 == n || !is_ident_char((unsigned char)line[r+3]))) {
+        buf_append(out, line, n); return;
+    }
+    if (r + 2 <= n && !memcmp(line + r, "or", 2) &&
+        (r + 2 == n || !is_ident_char((unsigned char)line[r+2]))) {
         buf_append(out, line, n); return;
     }
 
@@ -681,17 +699,20 @@ char *p8_rewrite_lua(const char *src_in, size_t len_in, size_t *out_len) {
         free(state);
         free(work);
 
-        /* 3. shorthand if — DISABLED. The line-based detector hits
-         * false positives on multi-clause conditions like
-         * `if (a) or (b) then`, where it sees the first `)` as
-         * end-of-condition and tries to wrap from there. With the
-         * Python-side preprocessor (tools/p8png_extract.py) we
-         * always pass shrinko8-unminified Lua to the device, which
-         * is already long-form `if (cond) then`. Hand-written .p8
-         * files might still need this — re-enable + replace with
-         * the token-based approach if that ever matters. */
+        /* 3. shorthand if: `if (cond) stmt` → `if (cond) then stmt end`.
+         * Required for on-device conversion where raw PXA-decompressed
+         * source hasn't been through shrinko8. The line-based detector
+         * can false-positive on `if (a) or (b) then` but that's rare
+         * in practice and the `then` check prevents damage. */
         if (tmp.data && tmp.len > 0) {
-            buf_append(&out, tmp.data, tmp.len);
+            buf shorthand_out = {0};
+            apply_shorthand_if(&shorthand_out, tmp.data, tmp.len);
+            if (shorthand_out.data && shorthand_out.len > 0) {
+                buf_append(&out, shorthand_out.data, shorthand_out.len);
+                free(shorthand_out.data);
+            } else {
+                buf_append(&out, tmp.data, tmp.len);
+            }
         }
 
         /* Did a block comment open on this emitted line? Walk the

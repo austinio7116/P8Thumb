@@ -16,4 +16,9 @@
 
 int p8_bmp_load_128(const unsigned char *data, size_t len, uint16_t *out128x128);
 
+/* Write a 128×128 RGB565 BMP to a file at `path` on the FAT filesystem.
+ * The input buffer is top-down (row 0 = top of image). Returns 0 on
+ * success, nonzero on error. */
+int p8_bmp_save_128(const char *path, const uint16_t *rgb565_128x128);
+
 #endif

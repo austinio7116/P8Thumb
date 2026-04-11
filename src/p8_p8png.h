@@ -38,9 +38,14 @@ int p8_p8png_is_png(const unsigned char *data, size_t len);
  *
  * Returns 0 on success, nonzero on parse / decompress error. Error
  * messages go to stderr. */
+/* out_label_4bpp: if non-NULL, receives a malloc'd 8KB buffer with the
+ * cart's label framebuffer (4bpp, 128×128, PICO-8 palette indices).
+ * Caller frees. Used to generate BMP thumbnails without a second
+ * PNG decode. Pass NULL if you don't need it. */
 int p8_p8png_load(p8_machine *m,
                   const unsigned char *png_data, size_t png_len,
-                  char **out_lua_src, size_t *out_lua_len);
+                  char **out_lua_src, size_t *out_lua_len,
+                  uint8_t **out_label_4bpp);
 
 /* Decode the visible PNG to a 128×128 RGB565 thumbnail. The PNG is
  * 160×205; we crop the central 128×128 (PICO-8's standard label area

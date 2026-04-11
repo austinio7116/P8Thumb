@@ -67,8 +67,11 @@ static void unpack_cart_bytes(const unsigned char *rgba, int w, int h,
  *
  * Our cart memory layout matches PICO-8's exactly (we deliberately
  * use the same offsets), so this is just a memcpy. */
-static void rom_to_machine(p8_machine *m, const unsigned char *rom) {
-    memcpy(&m->mem[0x0000], rom, 0x4300);
+static void rom_to_machine(p8_machine *m, const unsigned char *cart) {
+    /* Copy ROM (gfx, gff, map, sfx, music). Do NOT copy the label
+     * region (0x6000..0x7fff) — that overlaps the 4bpp framebuffer
+     * and would corrupt any on-screen display. */
+    memcpy(&m->mem[0x0000], cart, 0x4300);
 }
 
 /* ---------- "old" compression (`:c:\0`) ----------------------------- */
@@ -280,9 +283,11 @@ static char *extract_lua(const unsigned char *cart, size_t *out_len) {
 
 int p8_p8png_load(p8_machine *m,
                   const unsigned char *png_data, size_t png_len,
-                  char **out_lua_src, size_t *out_lua_len) {
+                  char **out_lua_src, size_t *out_lua_len,
+                  uint8_t **out_label_4bpp) {
     if (out_lua_src) *out_lua_src = NULL;
     if (out_lua_len) *out_lua_len = 0;
+    if (out_label_4bpp) *out_label_4bpp = NULL;
 
     int w = 0, h = 0, ch = 0;
     unsigned char *rgba = stbi_load_from_memory(png_data, (int)png_len,
@@ -293,20 +298,40 @@ int p8_p8png_load(p8_machine *m,
         return -1;
     }
 
-    /* Extract 32 KB of cart bytes from low 2 bits of each pixel. */
-    unsigned char cart[0x8000];
-    memset(cart, 0, sizeof(cart));
-    unpack_cart_bytes(rgba, w, h, cart, sizeof(cart));
+    /* Extract 32 KB of cart bytes from low 2 bits of each pixel.
+     * Heap-allocated — 32 KB on the stack would blow the 16 KB device stack. */
+    unsigned char *cart = (unsigned char *)malloc(0x8000);
+    if (!cart) {
+        stbi_image_free(rgba);
+        return -1;
+    }
+    memset(cart, 0, 0x8000);
+    unpack_cart_bytes(rgba, w, h, cart, 0x8000);
     stbi_image_free(rgba);
 
     /* Copy ROM region into machine memory. */
     rom_to_machine(m, cart);
 
+    /* Optionally return the label (4bpp framebuffer at 0x6000..0x7fff).
+     * This is 8 KB — much cheaper than re-decoding the PNG (~131 KB). */
+    if (out_label_4bpp) {
+        uint8_t *lbl = (uint8_t *)malloc(0x2000);
+        if (lbl) {
+            memcpy(lbl, cart + 0x6000, 0x2000);
+            *out_label_4bpp = lbl;
+        }
+    }
+
     /* Decompress Lua section. */
     size_t lua_len = 0;
     char *lua = extract_lua(cart, &lua_len);
+    free(cart);
     if (!lua) {
         fprintf(stderr, "[ThumbyP8] p8.png: Lua section decode failed\n");
+        if (out_label_4bpp && *out_label_4bpp) {
+            free(*out_label_4bpp);
+            *out_label_4bpp = NULL;
+        }
         return -1;
     }
     if (out_lua_src) *out_lua_src = lua;
