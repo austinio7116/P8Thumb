@@ -871,39 +871,20 @@ def main():
             # 4. Token-based rewrite: != → ~=, compound assigns, binary literals
             lua_clean = rewrite_pico8_to_lua(lua_src)
 
-            # 5. Write the cleaned .p8 (still needed for ROM sections + fallback)
-            # Replace __lua__ content with the cleaned version
-            out_lines = []
-            in_lua = False
-            lua_written = False
-            for line in lines:
-                if line.strip() == '__lua__':
-                    in_lua = True
-                    out_lines.append(line)
-                    out_lines.append(lua_clean)
-                    lua_written = True
-                    continue
-                if line.strip().startswith('__') and in_lua:
-                    in_lua = False
-                    out_lines.append(line)
-                    continue
-                if not in_lua:
-                    out_lines.append(line)
-            out_p8.write_text('\n'.join(out_lines), encoding="latin-1")
-
-            # 6. Precompile to bytecode if luac54 is available
-            if has_luac:
-                # Write pure Lua source to a temp file for luac
-                tmp_lua = dst_dir / f"{stem}_tmp.lua"
-                tmp_lua.write_text(lua_clean, encoding="latin-1")
-                result = subprocess.run(
-                    [str(LUAC54), "-o", str(out_luac), str(tmp_lua)],
-                    capture_output=True, text=True)
-                tmp_lua.unlink()
-                if result.returncode != 0:
-                    err = result.stderr.strip() or result.stdout.strip()
-                    print(f"  WARN luac: {stem}: {err}", file=sys.stderr)
-                    out_luac.unlink(missing_ok=True)
+            # 5. Precompile to bytecode (required — device only accepts .luac)
+            if not has_luac:
+                raise FileNotFoundError(
+                    "tools/luac54 not found — required for precompilation")
+            tmp_lua = dst_dir / f"{stem}_tmp.lua"
+            tmp_lua.write_text(lua_clean, encoding="latin-1")
+            result = subprocess.run(
+                [str(LUAC54), "-o", str(out_luac), str(tmp_lua)],
+                capture_output=True, text=True)
+            tmp_lua.unlink()
+            if result.returncode != 0:
+                err = result.stderr.strip() or result.stdout.strip()
+                print(f"  WARN luac: {stem}: {err}", file=sys.stderr)
+                out_luac.unlink(missing_ok=True)
 
             # 7. Extract binary ROM (17 KB: gfx + gff + map + sfx + music)
             # from the cart bytes via the PNG steganography
@@ -913,7 +894,10 @@ def main():
             # 8. BMP label thumbnail
             write_label_bmp(out_bmp, png)
 
-            luac_ok = out_luac.exists() if has_luac else False
+            # Clean up intermediate .p8 — device only needs .luac + .rom + .bmp
+            out_p8.unlink(missing_ok=True)
+
+            luac_ok = out_luac.exists()
             print(f"  ok  {png.name}"
                   f"  [luac:{'✓' if luac_ok else '✗'}]")
             n_ok += 1

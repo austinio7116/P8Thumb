@@ -468,22 +468,19 @@ int main(void) {
          * compilation, no fallback.
          */
         {
-            char luac_name[P8_PICKER_NAME_MAX];
+            /* cart_entries[chosen].name is already "<stem>.luac".
+             * Derive .rom name by replacing the extension. */
+            const char *cart_name = cart_entries[chosen].name;
             char rom_name[P8_PICKER_NAME_MAX];
-            strncpy(luac_name, cart_entries[chosen].name,
-                    sizeof(luac_name) - 1);
-            luac_name[sizeof(luac_name) - 1] = 0;
-            strncpy(rom_name, luac_name, sizeof(rom_name) - 1);
+            strncpy(rom_name, cart_name, sizeof(rom_name) - 1);
             rom_name[sizeof(rom_name) - 1] = 0;
-            size_t nL = strlen(luac_name);
-            if (nL >= 3 && strcasecmp(luac_name + nL - 3, ".p8") == 0) {
-                luac_name[nL - 3] = 0;
-                rom_name[nL - 3] = 0;
+            size_t nL = strlen(rom_name);
+            if (nL >= 5 && strcasecmp(rom_name + nL - 5, ".luac") == 0) {
+                rom_name[nL - 5] = 0;
             }
-            strncat(luac_name, ".luac",
-                    sizeof(luac_name) - strlen(luac_name) - 1);
             strncat(rom_name, ".rom",
                     sizeof(rom_name) - strlen(rom_name) - 1);
+            const char *luac_name = cart_name;
 
             size_t luac_len = 0, rom_len = 0;
             unsigned char *luac_data = p8_picker_load_cart(luac_name,

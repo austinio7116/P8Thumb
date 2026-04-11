@@ -39,13 +39,10 @@ int p8_picker_scan(p8_cart_entry *out, int max) {
         if (info.fname[0] == 0) break;
         if (info.fattrib & AM_DIR) continue;
         size_t L = strlen(info.fname);
-        /* Accept .p8 files only (the .luac + .rom + .bmp siblings
-         * are loaded by name derivation from the .p8 name). The
-         * .p8 itself is no longer loaded on device — it just serves
-         * as the "cart exists" marker in the picker scan. */
-        if (L < 3) continue;
-        if (strcasecmp(info.fname + L - 3, ".p8") != 0) continue;
-        if (L >= 7 && strcasecmp(info.fname + L - 7, ".p8.png") == 0) continue;
+        /* Scan for .luac files — the precompiled bytecode. The .rom
+         * and .bmp siblings are loaded by replacing the extension. */
+        if (L < 5) continue;
+        if (strcasecmp(info.fname + L - 5, ".luac") != 0) continue;
         strncpy(out[n].name, info.fname, P8_PICKER_NAME_MAX - 1);
         out[n].name[P8_PICKER_NAME_MAX - 1] = 0;
         n++;
@@ -145,8 +142,8 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
             strncpy(bmp_name, entries[sel].name, sizeof(bmp_name) - 1);
             bmp_name[sizeof(bmp_name) - 1] = 0;
             size_t L = strlen(bmp_name);
-            if (L >= 3 && strcasecmp(bmp_name + L - 3, ".p8") == 0) {
-                bmp_name[L - 3] = 0;
+            if (L >= 5 && strcasecmp(bmp_name + L - 5, ".luac") == 0) {
+                bmp_name[L - 5] = 0;
             }
             strncat(bmp_name, ".bmp",
                     sizeof(bmp_name) - strlen(bmp_name) - 1);
@@ -193,9 +190,9 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
             strncpy(display, entries[sel].name, sizeof(display) - 1);
             display[sizeof(display) - 1] = 0;
             size_t dL = strlen(display);
-            if (dL >= 3 && strcasecmp(display + dL - 3, ".p8") == 0) {
-                display[dL - 3] = 0;
-                dL -= 3;
+            if (dL >= 5 && strcasecmp(display + dL - 5, ".luac") == 0) {
+                display[dL - 5] = 0;
+                dL -= 5;
             }
             int text_px = (int)dL * P8_FONT_CELL_W;
             int xp = (128 - text_px) / 2;
