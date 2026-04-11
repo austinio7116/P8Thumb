@@ -431,35 +431,51 @@ static int convert_pending_carts(p8_machine *m, uint16_t *sl) {
                      stems[s], rc);
             p8_log_to_file(buf);
         }
-    }
 
-    if (converted > 0) {
-        p8_flash_disk_flush();
+        /* Reboot after EACH cart to reclaim fragmented heap.
+         * The conversion pipeline uses ~260KB peak (stb_image RGBA +
+         * zlib + cart bytes + Lua translate). After one full cycle,
+         * the heap is too fragmented for the next cart's stb_image
+         * to find a contiguous 131KB RGBA block.
+         *
+         * Rebooting is fast (~1s). On next boot, the just-converted
+         * cart already has .luac so it's skipped, and the next
+         * unconverted cart gets processed. Repeats until all done. */
+        if (converted > 0) {
+            p8_flash_disk_flush();
 
-        /* Reboot after conversion to reclaim fragmented heap.
-         * The conversion pipeline allocates and frees many large
-         * buffers (PNG decode ~131KB, Lua source ~50KB, etc.) which
-         * fragments the heap. After ~5 carts, malloc can't find
-         * contiguous blocks even though total free memory suffices.
-         * On reboot, carts already have .luac files so conversion
-         * is skipped and the heap starts clean for gameplay. */
-        p8_machine_reset(m);
-        p8_camera(m, 0, 0);
-        p8_cls(m, 1);
-        {
-            char msg[40];
-            snprintf(msg, sizeof(msg), "converted %d cart(s)", converted);
-            p8_font_draw(m, msg, 16, 50, 11);
+            p8_machine_reset(m);
+            p8_camera(m, 0, 0);
+            p8_cls(m, 1);
+            {
+                char msg[40];
+                snprintf(msg, sizeof(msg), "converted %s", stems[s]);
+                p8_font_draw(m, msg, 4, 50, 11);
+            }
+            {
+                int remaining = 0;
+                for (int r = s + 1; r < n_stems; r++) {
+                    char lp[80];
+                    snprintf(lp, sizeof(lp), "/carts/%s.luac", stems[r]);
+                    FILINFO fi2;
+                    if (f_stat(lp, &fi2) != FR_OK) remaining++;
+                }
+                if (remaining > 0) {
+                    char msg[40];
+                    snprintf(msg, sizeof(msg), "%d more, rebooting...", remaining);
+                    p8_font_draw(m, msg, 12, 62, 7);
+                } else {
+                    p8_font_draw(m, "all done, rebooting...", 4, 62, 7);
+                }
+            }
+            p8_machine_present(m, sl);
+            p8_lcd_wait_idle();
+            p8_lcd_present(sl);
+            sleep_ms(1000);
+
+            watchdog_reboot(0, 0, 0);
+            while (1) tight_loop_contents();
         }
-        p8_font_draw(m, "rebooting...", 28, 62, 7);
-        p8_machine_present(m, sl);
-        p8_lcd_wait_idle();
-        p8_lcd_present(sl);
-        sleep_ms(1500);
-
-        /* Watchdog reset — cleanest way to reboot on RP2350 */
-        watchdog_reboot(0, 0, 0);
-        while (1) tight_loop_contents();
     }
 
     return converted;
