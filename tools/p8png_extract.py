@@ -853,15 +853,21 @@ def main():
             text = out_p8.read_text(encoding="latin-1")
             text = post_fix_lua(text)
 
-            # 3. Extract the __lua__ section for further rewriting
+            # 3. Extract the __lua__ section for further rewriting.
+            # Section markers are specific names on their own line —
+            # NOT any line starting with `__` (that would catch Lua
+            # metamethods like `__index`, `__tostring`, etc).
+            _SECTIONS = {'__lua__', '__gfx__', '__gff__', '__map__',
+                         '__sfx__', '__music__', '__label__'}
             lines = text.split('\n')
             lua_lines = []
             in_lua = False
             for line in lines:
-                if line.strip() == '__lua__':
+                stripped = line.strip()
+                if stripped == '__lua__':
                     in_lua = True
                     continue
-                if line.strip().startswith('__') and in_lua:
+                if stripped in _SECTIONS and in_lua:
                     in_lua = False
                     continue
                 if in_lua:

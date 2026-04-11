@@ -772,15 +772,18 @@ static int l_print(lua_State *L) {
     } else {
         c = p8_pen(m);
     }
-    p8_font_draw(m, s, x, y, c);
+    int end_x = p8_font_draw(m, s, x, y, c);
     if (!has_xy) {
-        /* Advance cursor: PICO-8 increments y by 6 and wraps;
-         * x resets to the original cursor x. */
         int next_y = y + P8_FONT_CELL_H;
         if (next_y >= P8_SCREEN_H) next_y = P8_SCREEN_H - P8_FONT_CELL_H;
         m->mem[P8_DS_CURSOR_Y] = (uint8_t)next_y;
     }
-    return 0;
+    /* PICO-8 print() returns the pixel width of the rendered text.
+     * Carts use this for centering: `local w = print(t, 0, -1000)`.
+     * Drawing at y=-1000 is off-screen so nothing is visible, and
+     * the cart just reads the return value. */
+    lua_pushinteger(L, end_x - x);
+    return 1;
 }
 
 /* cursor(x, y, [col]) — set the print cursor and optionally pen. */
@@ -1236,6 +1239,26 @@ static int p8_trace_wrap(lua_State *L) {
     return g_bind_func[idx](L);
 }
 
+/* PICO-8 string[i] → character at index i (1-indexed).
+ * Upvalue 1 is the original string library __index table. */
+static int p8_string_index(lua_State *L) {
+    if (lua_isnumber(L, 2)) {
+        int i = (int)lua_tointeger(L, 2);
+        size_t slen;
+        const char *s = lua_tolstring(L, 1, &slen);
+        if (s && i >= 1 && (size_t)i <= slen) {
+            lua_pushlstring(L, s + i - 1, 1);
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
+    }
+    /* Non-numeric key: delegate to the string library table. */
+    lua_pushvalue(L, 2);
+    lua_gettable(L, lua_upvalueindex(1));
+    return 1;
+}
+
 void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input) {
     lua_State *L = vm->L;
 
@@ -1251,6 +1274,23 @@ void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input) {
     lua_pushlightuserdata(L, (void *)&k_input_key);
     lua_pushlightuserdata(L, input);
     lua_rawset(L, LUA_REGISTRYINDEX);
+
+    /* PICO-8 allows string[i] to access individual characters
+     * (1-indexed). Standard Lua doesn't — strings aren't tables.
+     * Set up the string metatable's __index to support numeric
+     * indexing: str[1] → first char, str[2] → second, etc.
+     * Non-numeric keys fall through to the string library. */
+    {
+        lua_pushliteral(L, "");
+        if (lua_getmetatable(L, -1)) {
+            lua_getfield(L, -1, "__index");
+            lua_pushvalue(L, -1);
+            lua_pushcclosure(L, p8_string_index, 1);
+            lua_setfield(L, -2, "__index");
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 1);
+    }
 
     /* Register every binding directly. The universal-wrapper
      * approach (closure with index upvalue) was tried but broke
