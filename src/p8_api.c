@@ -1050,13 +1050,11 @@ static int all_iter(lua_State *L) {
     while (i <= len) {
         lua_rawgeti(L, lua_upvalueindex(1), i);
         if (!lua_isnil(L, -1)) {
-            /* PICO-8 _ENV support: set __index = _G on tables */
-            if (lua_istable(L, -1) && !lua_getmetatable(L, -1)) {
-                lua_getfield(L, LUA_REGISTRYINDEX, "p8_env_mt");
-                lua_setmetatable(L, -2);
-            } else if (lua_istable(L, -2)) {
-                lua_pop(L, 1);
-            }
+            /* NOTE: do NOT set _ENV metatable here. all() just yields
+             * values — setting __index=_G on them would make every
+             * missing field resolve to a global (e.g. s.spr finding
+             * the global spr function). _ENV metatable is only for
+             * foreach() callbacks using function(_ENV) pattern. */
             /* Update upvalues for next call */
             lua_pushinteger(L, i);
             lua_replace(L, lua_upvalueindex(2));
