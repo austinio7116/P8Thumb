@@ -4,6 +4,14 @@ A PICO-8-compatible fantasy console runtime for the **TinyCircuits Thumby Color*
 
 Drop `.p8.png` cart files onto the USB drive — they are automatically converted and ready to play on next boot. No host tools required.
 
+<p align="center">
+  <img src="screenshots/celeste.jpg" width="320" alt="Celeste Classic running on Thumby Color" />
+  <img src="screenshots/delunky.jpg" width="320" alt="Delunky running on Thumby Color" />
+</p>
+<p align="center">
+  <em>Celeste Classic and Delunky running on real hardware</em>
+</p>
+
 PICO-8 is a trademark of Lexaloffle Games. ThumbyP8 is an independent, clean-room reimplementation of the publicly documented PICO-8 fantasy console API.
 
 ---
@@ -41,6 +49,10 @@ The device automatically converts `.p8.png` files to playable bytecode on boot. 
 Use **◀ ▶** in the picker to browse carts (shows the cart's label art). Press **A** to launch.
 
 ### 4. In-game menu
+
+<p align="center">
+  <img src="screenshots/menu.jpg" width="320" alt="ThumbyP8 in-game pause menu" />
+</p>
 
 Long-press **MENU** (>400ms) during gameplay to open the pause menu:
 - **Resume** — return to the game
