@@ -10,6 +10,8 @@ PICO-8 is a trademark of Lexaloffle Games. ThumbyP8 is an independent, clean-roo
 
 ## Quick Start
 
+> **Please support the creators.** PICO-8 is an incredible fantasy console made by [Lexaloffle](https://www.lexaloffle.com/pico-8.php). If you enjoy playing PICO-8 games on your Thumby Color, please [buy PICO-8](https://www.lexaloffle.com/pico-8.php) ($15) to support the developers and the amazing community that makes these games. ThumbyP8 wouldn't exist without their work.
+
 ### 1. Flash the firmware
 
 Download [`firmware.uf2`](firmware.uf2) from this repo (click the file, then "Download raw file").
