@@ -760,6 +760,10 @@ int main(void) {
             continue;
         }
         p8_api_install(&vm, &machine, &input);
+        /* Seed libc RNG from hardware timer — varies by microseconds
+         * depending on when the user navigated to this cart. Without
+         * this, rand() starts from seed 1 every boot (same levels). */
+        srand((unsigned)time_us_32());
         /* Route every traced binding into our RAM ring buffer so a
          * hardfault dump shows the last few bindings the cart called. */
         p8_trace_hook = p8_log_ring;

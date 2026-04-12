@@ -18,7 +18,7 @@ Last updated: 2026-04-12
 | beam4-2 | OK | Broken | Hangs on load — was working with host builds |
 | celeste | OK | Playable | Fully playable |
 | cheezymaze_ex-0 | OK | Untested | Controls were broken — should be fixed by glyph fix |
-| delunky102-0 | OK | Untested | Controls were broken — should be fixed by glyph fix |
+| delunky102-0 | OK | Playable | Working but same seed every time (rnd not seeded) |
 | digger-2 | OK | Playable | Working |
 | dominion_ex-4 | OK | Partial | Plays but eventually crashes/hangs |
 | flipknight-0 | OK | Untested | Was running OK |
