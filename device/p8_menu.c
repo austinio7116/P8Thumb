@@ -58,25 +58,41 @@
  *   bit 0..2 = row 0 pixels (LSB = leftmost)
  *   bit 3..5 = row 1, etc. 5 rows × 3 bits = 15 bits per glyph. */
 
-/* Import the font table from p8_font.c */
-extern const uint16_t font[256];
+/* Import the font tables from p8_font.c */
+extern const uint16_t font_lo[128];
+extern const uint8_t  font_hi[128][5];
 
 static void menu_text(uint16_t *fb, const char *text, int x, int y, uint16_t color) {
     for (const char *c = text; *c; c++) {
         unsigned char ch = (unsigned char)*c;
         if (ch == '\n') { x = 0; y += P8_FONT_CELL_H; continue; }
-        uint16_t g = (ch < 128) ? font[ch] : 0;
-        for (int row = 0; row < 5; row++) {
-            int bits = (g >> (row * 3)) & 0x7;
-            for (int col = 0; col < 3; col++) {
-                if (bits & (1 << col)) {
-                    int px = x + col, py = y + row;
-                    if ((unsigned)px < FB_W && (unsigned)py < FB_H)
-                        fb[py * FB_W + px] = color;
+        if (ch >= 128) {
+            const uint8_t *g = font_hi[ch - 128];
+            for (int row = 0; row < 5; row++) {
+                uint8_t bits = g[row];
+                for (int col = 0; col < 7; col++) {
+                    if (bits & (1 << col)) {
+                        int px = x + col, py = y + row;
+                        if ((unsigned)px < FB_W && (unsigned)py < FB_H)
+                            fb[py * FB_W + px] = color;
+                    }
                 }
             }
+            x += 8;
+        } else {
+            uint16_t g = font_lo[ch];
+            for (int row = 0; row < 5; row++) {
+                int bits = (g >> (row * 3)) & 0x7;
+                for (int col = 0; col < 3; col++) {
+                    if (bits & (1 << col)) {
+                        int px = x + col, py = y + row;
+                        if ((unsigned)px < FB_W && (unsigned)py < FB_H)
+                            fb[py * FB_W + px] = color;
+                    }
+                }
+            }
+            x += P8_FONT_CELL_W;
         }
-        x += P8_FONT_CELL_W;
     }
 }
 
