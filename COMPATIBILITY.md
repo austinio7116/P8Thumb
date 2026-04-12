@@ -19,7 +19,7 @@ Last updated: 2026-04-12
 | celeste | OK | Playable | Controls work, fully playable |
 | cheezymaze_ex-0 | OK | Untested | Controls were broken — should be fixed by glyph fix |
 | delunky102-0 | OK | Untested | Controls were broken — should be fixed by glyph fix |
-| digger-2 | OK | Untested | Was playable then crashed during play — may be fixed by bitwise fix |
+| digger-2 | OK | Partial | Quite playable but crashes late in level 1 |
 | dominion_ex-4 | OK | Partial | Plays but eventually crashes/hangs |
 | flipknight-0 | OK | Untested | Was running OK |
 | fromrust_a-4 | OK | Partial | Loads but crashes during gameplay: nil concat field '?' |
