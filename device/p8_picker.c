@@ -24,6 +24,10 @@
 #include "p8_buttons.h"
 #include "p8_log.h"
 #include "p8_bmp.h"
+#include "p8_menu.h"
+#include "p8_lcd_gc9107.h"
+#include "hardware/gpio.h"
+#include "ff.h"
 
 /* --- filesystem helpers --------------------------------------------- */
 
@@ -119,10 +123,63 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
                    const p8_cart_entry *entries, int n_entries) {
     if (n_entries <= 0) return -1;
     int sel = 0;
-    int dirty = 1;       /* repaint when sel changes — saves PNG decode every frame */
+    int dirty = 1;
+    uint32_t menu_hold_start = 0;
+    int menu_was_pressed = 0;
+    static int picker_show_fps = 1;
+    static int picker_volume = 15;  /* VOL_UNITY */
 
     while (1) {
         p8_input_begin_frame(in, p8_buttons_read());
+
+        /* MENU long-press → settings menu (no Quit option) */
+        if (p8_buttons_menu_pressed()) {
+            if (!menu_was_pressed) {
+                menu_hold_start = (uint32_t)time_us_64();
+                menu_was_pressed = 1;
+            }
+            uint32_t held_ms = ((uint32_t)time_us_64() - menu_hold_start) / 1000;
+            if (held_ms > 400) {
+                p8_menu_item_t items[4];
+                int ni = 0;
+                items[ni++] = (p8_menu_item_t){
+                    .kind = P8_MENU_KIND_ACTION, .label = "Resume",
+                    .enabled = true, .action_id = P8_MENU_ACT_RESUME };
+                items[ni++] = (p8_menu_item_t){
+                    .kind = P8_MENU_KIND_SLIDER, .label = "Volume",
+                    .value_ptr = &picker_volume, .min = 0, .max = 30,
+                    .enabled = true };
+                items[ni++] = (p8_menu_item_t){
+                    .kind = P8_MENU_KIND_TOGGLE, .label = "Show FPS",
+                    .value_ptr = &picker_show_fps, .enabled = true };
+                static int disk_pct = 0;
+                static char disk_text[24];
+                {
+                    DWORD free_clust = 0; FATFS *fsp = NULL;
+                    if (f_getfree("", &free_clust, &fsp) == FR_OK && fsp) {
+                        DWORD total = (fsp->n_fatent - 2) * fsp->csize;
+                        DWORD used = total - free_clust * fsp->csize;
+                        disk_pct = total > 0 ? (int)(used * 100 / total) : 0;
+                        snprintf(disk_text, sizeof(disk_text), "%dK/%dK",
+                                 (int)(used/2), (int)(total/2));
+                    }
+                }
+                items[ni++] = (p8_menu_item_t){
+                    .kind = P8_MENU_KIND_INFO, .label = "Disk",
+                    .info_text = disk_text, .value_ptr = &disk_pct,
+                    .min = 0, .max = 100, .enabled = true };
+
+                p8_machine_present(m, scanline);
+                p8_menu_run(scanline, "ThumbyP8", "settings",
+                            items, ni);
+                while (p8_buttons_menu_pressed()) sleep_ms(10);
+                menu_was_pressed = 0;
+                dirty = 1;
+                continue;
+            }
+        } else {
+            menu_was_pressed = 0;
+        }
 
         if (p8_btnp(in, P8_BTN_LEFT)) {
             sel = (sel - 1 + n_entries) % n_entries;
