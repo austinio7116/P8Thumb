@@ -683,17 +683,10 @@ int main(void) {
     }
 
     /* --- main outer loop: lobby → pick → run → repick on game exit -- */
-    /* Skip the lobby entirely if there are carts ready to play and
-     * nothing pending conversion. No reason to make the user press A
-     * when they just want to play. The lobby is only needed when carts
-     * are being uploaded via USB. */
-    {
-        int ready_carts = p8_picker_scan(cart_entries, P8_PICKER_MAX_CARTS);
-        if (ready_carts <= 0) {
-            /* No carts — must go through lobby to add some. */
-            wait_for_carts();
-        }
-    }
+    /* Always start USB so users can add new carts. If carts already
+     * exist, auto-proceed to the picker after 3 seconds unless the
+     * user interacts (gives time to connect USB if needed). */
+    wait_for_carts();
     /* Defensive: drain any leftover cache before going offline. */
     p8_flash_disk_flush();
 
