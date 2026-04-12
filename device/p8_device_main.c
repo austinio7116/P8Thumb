@@ -525,13 +525,13 @@ static void wait_for_carts(void) {
 
         /* --- button input ----------------------------------------- */
         p8_input_begin_frame(&input, p8_buttons_read());
-        /* A or B exits the lobby. Gated on (a) at least one cart
-         * present and (b) cache fully drained — the on-screen
-         * "drive idle" indicator tells the user when this is true.
-         * No synchronous flush on press; the user waits for clean. */
+        /* A press reboots so new .p8.png carts get converted.
+         * Gated on cache fully drained so we don't lose writes. */
         if ((p8_btnp(&input, P8_BTN_X) || p8_btnp(&input, P8_BTN_O))
-            && n_carts > 0 && !p8_flash_disk_dirty()) {
-            return;
+            && !p8_flash_disk_dirty()) {
+            p8_flash_disk_flush();
+            watchdog_reboot(0, 0, 0);
+            while (1) tight_loop_contents();
         }
 
         /* --- periodic disk rescan --------------------------------- */
@@ -583,7 +583,7 @@ static void wait_for_carts(void) {
                 p8_font_draw(&machine, "onto usb drive", 20, 94, 6);
 
                 if (n_carts > 0 && !busy) {
-                    p8_font_draw(&machine, "press A to play", 16, 112, 10);
+                    p8_font_draw(&machine, "press A to start", 14, 112, 10);
                 }
                 break;
             }
@@ -591,7 +591,7 @@ static void wait_for_carts(void) {
                 if (n_carts > 0) {
                     p8_circfill(&machine, 64, 52, 3, 11);
                     p8_font_draw(&machine, "ready", 48, 64, 11);
-                    p8_font_draw(&machine, "press A to play", 16, 112, 10);
+                    p8_font_draw(&machine, "press A to start", 14, 112, 10);
                 } else {
                     p8_font_draw(&machine, "no games found", 16, 50, 8);
                     p8_line(&machine, 20, 62, 108, 62, 5);
