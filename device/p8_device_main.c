@@ -1066,7 +1066,7 @@ int main(void) {
                     for (int i2 = 0; i2 < n; i2++) audio_buf[i2] = 0;
                 } else {
                     for (int i2 = 0; i2 < n; i2++) {
-                        int32_t s2 = (int32_t)audio_buf[i2] * master_volume * 4 / VOL_UNITY;
+                        int32_t s2 = (int32_t)audio_buf[i2] * master_volume / VOL_UNITY;
                         if (s2 >  32767) s2 =  32767;
                         if (s2 < -32768) s2 = -32768;
                         audio_buf[i2] = (int16_t)s2;

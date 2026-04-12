@@ -572,20 +572,33 @@ static int l_p8_chr(lua_State *L) {
 }
 
 /* --- memory peek/poke ------------------------------------------------- */
+/* peek(addr, [n]) — read n bytes (default 1), return n values */
 static int l_peek(lua_State *L) {
     TRACE("peek");
     p8_machine *m = get_machine(L);
     int addr = argi(L, 1, 0);
-    if ((unsigned)addr >= P8_MEM_SIZE) { lua_pushinteger(L, 0); return 1; }
-    lua_pushinteger(L, m->mem[addr]);
-    return 1;
+    int n = lua_isnoneornil(L, 2) ? 1 : (int)lua_tonumber(L, 2);
+    if (n < 1) n = 1;
+    for (int i = 0; i < n; i++) {
+        int a = addr + i;
+        if ((unsigned)a < P8_MEM_SIZE)
+            lua_pushinteger(L, m->mem[a]);
+        else
+            lua_pushinteger(L, 0);
+    }
+    return n;
 }
+/* poke(addr, val1, [val2], ...) — write multiple bytes */
 static int l_poke(lua_State *L) {
     TRACE("poke");
     p8_machine *m = get_machine(L);
     int addr = argi(L, 1, 0);
-    int val  = argi(L, 2, 0);
-    if ((unsigned)addr < P8_MEM_SIZE) m->mem[addr] = (uint8_t)(val & 0xff);
+    int nargs = lua_gettop(L);
+    for (int i = 2; i <= nargs; i++) {
+        int a = addr + (i - 2);
+        int val = (int)lua_tonumber(L, i);
+        if ((unsigned)a < P8_MEM_SIZE) m->mem[a] = (uint8_t)(val & 0xff);
+    }
     return 0;
 }
 
@@ -1080,10 +1093,23 @@ static int l_p8_all(lua_State *L) {
 static int l_add(lua_State *L) {
     TRACE("add");
     if (!lua_istable(L, 1)) { lua_pushnil(L); return 1; }
-    /* PICO-8 add returns the inserted value */
     lua_Integer len = luaL_len(L, 1);
-    lua_pushvalue(L, 2);
-    lua_rawseti(L, 1, len + 1);
+    if (!lua_isnoneornil(L, 3)) {
+        /* add(tbl, val, index) — insert at index, shifting others up */
+        lua_Integer idx = (lua_Integer)lua_tonumber(L, 3);
+        if (idx < 1) idx = 1;
+        if (idx > len + 1) idx = len + 1;
+        for (lua_Integer i = len; i >= idx; i--) {
+            lua_rawgeti(L, 1, i);
+            lua_rawseti(L, 1, i + 1);
+        }
+        lua_pushvalue(L, 2);
+        lua_rawseti(L, 1, idx);
+    } else {
+        /* add(tbl, val) — append */
+        lua_pushvalue(L, 2);
+        lua_rawseti(L, 1, len + 1);
+    }
     lua_pushvalue(L, 2);
     return 1;
 }
@@ -1113,7 +1139,20 @@ static int l_del(lua_State *L) {
 static int l_count(lua_State *L) {
     TRACE("count");
     if (!lua_istable(L, 1)) { lua_pushinteger(L, 0); return 1; }
-    lua_pushinteger(L, luaL_len(L, 1));
+    if (lua_isnoneornil(L, 2)) {
+        /* count(tbl) — return length */
+        lua_pushinteger(L, luaL_len(L, 1));
+    } else {
+        /* count(tbl, val) — count occurrences of val */
+        lua_Integer len = luaL_len(L, 1);
+        int n = 0;
+        for (lua_Integer i = 1; i <= len; i++) {
+            lua_rawgeti(L, 1, i);
+            if (lua_rawequal(L, -1, 2)) n++;
+            lua_pop(L, 1);
+        }
+        lua_pushinteger(L, n);
+    }
     return 1;
 }
 /* foreach must survive del()-during-iteration. PICO-8 carts (Celeste

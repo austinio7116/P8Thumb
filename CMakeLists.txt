@@ -44,6 +44,8 @@ add_library(thumbyp8 STATIC
     src/p8_api.c
     src/p8_cart.c
     src/p8_rewrite.c
+    src/p8_translate.c
+    src/p8_shrinko.c
     src/p8_font.c
     src/p8_audio.c
     src/p8_p8png.c

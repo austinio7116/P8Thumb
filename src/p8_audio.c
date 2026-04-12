@@ -312,7 +312,7 @@ void p8_audio_render(int16_t *out, int n_samples) {
         }
         if (mix >  1.0f) mix =  1.0f;
         if (mix < -1.0f) mix = -1.0f;
-        out[i] = (int16_t)(mix * 30000.0f);
+        out[i] = (int16_t)(mix * 32767.0f);
     }
 }
 

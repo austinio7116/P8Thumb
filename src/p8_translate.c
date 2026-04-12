@@ -26,7 +26,7 @@
 #include "p8_shrinko.h"
 
 #include <ctype.h>
-#include <stdio.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,7 +172,7 @@ static int match_glyph(const unsigned char *s, size_t len, size_t i) {
 /* These must happen before the tokenizer because they change the      */
 /* character structure (// comments, glyph bytes, string escapes).     */
 /* ================================================================== */
-static int is_id(int c) { return c == '_' || isalnum((unsigned char)c); }
+static int is_id(int c) { return c == '_' || isalnum((unsigned char)c) || (unsigned char)c >= 0x80; }
 
 static char *pre_tokenize(const char *src, size_t len, size_t *out_len) {
     const unsigned char *s = (const unsigned char *)src;
@@ -442,18 +442,17 @@ static char *pre_tokenize(const char *src, size_t len, size_t *out_len) {
          * which converts them to function calls (shl, shr, lshr, rotl,
          * rotr, band, bor, bxor, bnot) during unminification. */
 
-        /* ---- High bytes in code → numeric value ---- */
+        /* ---- High bytes in code ---- */
         /* PXA-decompressed source has single-byte P8SCII values (0x80+).
-         * Button/arrow glyphs must become button indices (0-5) to match
-         * PICO-8's btn()/btnp() API. All other high bytes become their
-         * P8SCII decimal value (used as numeric constants in code).
+         * PICO-8's Lua allows these as identifier characters, and carts
+         * do use them as variable names (e.g. porklike uses 😐/0x8C).
+         * We patched Lua 5.2's lctype.c to mark 0x80+ as alpha, so
+         * most high bytes pass through unchanged.
          *
-         * This matches the Python host pipeline:
-         *   1. _GLYPH_SUBS: arrow/button UTF-8 → "0"-"5"
-         *   2. _strip_code_highbytes: remaining → P8SCII decimal
-         *
-         * Our source is latin-1 single bytes, not UTF-8, so we match
-         * by P8SCII byte value directly. */
+         * The 6 button/arrow glyphs are special: when they appear as
+         * standalone values (not part of an identifier), they represent
+         * button indices 0-5 for btn()/btnp(). We only convert these
+         * when they're NOT adjacent to other identifier characters. */
         if (c >= 0x80) {
             /* Try UTF-8 multi-byte glyphs first (rare but possible) */
             int gi = match_glyph(s, len, i);
@@ -461,21 +460,34 @@ static char *pre_tokenize(const char *src, size_t len, size_t *out_len) {
                 if (g_glyphs[gi].val >= 0) buf_int(&o, g_glyphs[gi].val);
                 i += g_glyphs[gi].slen; goto next;
             }
-            /* Single-byte P8SCII: button/arrow → button index.
-             * Byte values from shrinko8's k_charset (pico_defs.py),
-             * which is the canonical PICO-8 character set. */
-            int val;
+            /* Single-byte P8SCII: button/arrow glyphs → button index,
+             * but ONLY when used as a standalone value (not part of an
+             * identifier). Check surrounding characters. */
+            int btn_val = -1;
             switch (c) {
-                case 0x8B: val = 0; break; /* ⬅ LEFT */
-                case 0x91: val = 1; break; /* ➡ RIGHT */
-                case 0x94: val = 2; break; /* ⬆ UP */
-                case 0x83: val = 3; break; /* ⬇ DOWN */
-                case 0x8E: val = 4; break; /* 🅾 O */
-                case 0x97: val = 5; break; /* ❎ X */
-                default:   val = (int)c; break; /* all others → P8SCII value */
+                case 0x8B: btn_val = 0; break; /* ⬅ LEFT */
+                case 0x91: btn_val = 1; break; /* ➡ RIGHT */
+                case 0x94: btn_val = 2; break; /* ⬆ UP */
+                case 0x83: btn_val = 3; break; /* ⬇ DOWN */
+                case 0x8E: btn_val = 4; break; /* 🅾 O */
+                case 0x97: btn_val = 5; break; /* ❎ X */
             }
-            buf_int(&o, val);
-            i++; goto next;
+            if (btn_val >= 0) {
+                /* Check if this glyph is part of an identifier:
+                 * preceded or followed by alnum/_ or another high byte */
+                bool prev_id = (i > 0 && (isalnum(s[i-1]) || s[i-1] == '_' || s[i-1] >= 0x80));
+                bool next_id = (i+1 < len && (isalnum(s[i+1]) || s[i+1] == '_' || s[i+1] >= 0x80));
+                if (prev_id || next_id) {
+                    /* Part of identifier — keep raw byte */
+                    buf_putc(&o, c); i++; goto next;
+                }
+                /* Standalone → button index */
+                buf_int(&o, btn_val);
+                i++; goto next;
+            }
+            /* All other high bytes: pass through as-is (valid ident chars) */
+            buf_putc(&o, c); i++;
+            goto next;
         }
 
         buf_putc(&o, c); i++;

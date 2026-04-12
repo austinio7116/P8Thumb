@@ -55,7 +55,7 @@ static void buf_append_cstr(buf *b, const char *s) { buf_append(b, s, strlen(s))
 enum { S_CODE, S_SQ, S_DQ, S_LCOMMENT };
 
 static int is_ident_char(int c) {
-    return c == '_' || isalnum((unsigned char)c);
+    return c == '_' || isalnum((unsigned char)c) || (unsigned char)c >= 0x80;
 }
 
 /* Walk backwards from `pos` (exclusive) in `line` to find the start

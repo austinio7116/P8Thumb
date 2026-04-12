@@ -8,6 +8,7 @@
  */
 #include "p8_cart.h"
 #include "p8_rewrite.h"
+#include "p8_translate.h"
 #include "p8_p8png.h"
 
 #include <ctype.h>
@@ -198,17 +199,14 @@ int p8_cart_load_from_memory(p8_cart *cart, p8_machine *m,
                           &lua, &lua_len, NULL /* no thumbnail */) != 0) {
             return -1;
         }
-        /* Lua dialect rewrite, same as text path. */
+        /* Full PICO-8 → Lua dialect translation:
+         * shrinko8 unminify → pre_tokenize → compound rewrite.
+         * p8_translate_full takes ownership of lua (frees internally). */
         size_t rewritten_len = 0;
-        char *rewritten = p8_rewrite_lua(lua, lua_len, &rewritten_len);
-        if (rewritten) {
-            free(lua);
-            cart->lua_source = rewritten;
-            cart->lua_size = rewritten_len;
-        } else {
-            cart->lua_source = lua;
-            cart->lua_size = lua_len;
-        }
+        char *rewritten = p8_translate_full(lua, lua_len, &rewritten_len);
+        if (!rewritten) return -1;
+        cart->lua_source = rewritten;
+        cart->lua_size = rewritten_len;
         return 0;
     }
 
@@ -291,17 +289,13 @@ int p8_cart_load_from_memory(p8_cart *cart, p8_machine *m,
         i = j + 1;
     }
 
-    /* Rewrite PICO-8 dialect → vanilla Lua 5.4. */
+    /* Full PICO-8 → Lua dialect translation.
+     * p8_translate_full takes ownership of lua_buf (frees internally). */
     size_t rewritten_len = 0;
-    char *rewritten = p8_rewrite_lua(lua_buf, lua_len, &rewritten_len);
-    if (rewritten) {
-        free(lua_buf);
-        cart->lua_source = rewritten;
-        cart->lua_size = rewritten_len;
-    } else {
-        cart->lua_source = lua_buf;
-        cart->lua_size = lua_len;
-    }
+    char *rewritten = p8_translate_full(lua_buf, lua_len, &rewritten_len);
+    if (!rewritten) return -1;
+    cart->lua_source = rewritten;
+    cart->lua_size = rewritten_len;
     return 0;
 }
 
