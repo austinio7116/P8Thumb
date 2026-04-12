@@ -10,18 +10,50 @@ PICO-8 is a trademark of Lexaloffle Games. ThumbyP8 is an independent, clean-roo
 
 ## Quick Start
 
-1. **Flash the firmware.** Enter BOOTSEL (power off → hold DOWN on d-pad → power on). Drag `p8run_device.uf2` onto the `RPI-RP2350` drive.
+### 1. Flash the firmware
 
-2. **Add carts.** On next boot the device appears as a USB drive labelled `P8THUMBv1`. Drag `.p8.png` cart files (from the PICO-8 BBS or elsewhere) into the `/carts/` folder. Eject the drive.
+Download [`firmware.uf2`](firmware.uf2) from this repo (click the file, then "Download raw file").
 
-3. **Play.** Press A to enter the picker. The device automatically converts any new `.p8.png` files to bytecode on boot (one per boot cycle, reboots between each to keep memory clean). Use ◀ ▶ to browse carts, A to launch.
+> **Warning:** Flashing ThumbyP8 replaces whatever is currently on your Thumby Color (the stock MicroPython system, any games, etc). To go back, reflash the original Thumby Color firmware the same way.
 
-4. **In-game menu.** Long-press MENU (>400ms) during gameplay to open the pause menu: Resume, Volume, Show FPS, Disk space, Battery, Quit to picker. The same menu is available from the picker (without Quit).
+To flash:
+1. Power off the Thumby Color
+2. Hold **DOWN** on the d-pad and power on — the device enters BOOTSEL mode
+3. It appears as a USB drive called `RPI-RP2350` on your computer
+4. Drag `firmware.uf2` onto that drive
+5. The device reboots automatically into ThumbyP8
 
-5. **Troubleshooting.**
-   - **USB drive not showing up or not named P8THUMBv1?** Hold MENU while powering on — this forces a reformat of the flash filesystem and re-labels the drive.
-   - **Cart conversion stuck?** Hold B while powering on to skip conversion and go straight to the lobby.
-   - **Firmware issue?** BOOTSEL (power off → hold DOWN on d-pad → power on) always works to reflash. The RP2350 boot ROM cannot be bricked.
+### 2. Add carts
+
+On first boot, the device formats its flash storage and appears as a USB drive labelled **P8THUMBv1**.
+
+1. Download `.p8.png` cart files from the [PICO-8 BBS](https://www.lexaloffle.com/bbs/?cat=7) or elsewhere
+2. Drag them into the `/carts/` folder on the P8THUMBv1 drive
+3. Eject the drive from your OS (or just wait — it auto-flushes)
+4. Press **A** to enter the game picker
+
+The device automatically converts `.p8.png` files to playable bytecode on boot. This takes one reboot per cart (a few seconds each). You'll see a progress screen during conversion.
+
+### 3. Play
+
+Use **◀ ▶** in the picker to browse carts (shows the cart's label art). Press **A** to launch.
+
+### 4. In-game menu
+
+Long-press **MENU** (>400ms) during gameplay to open the pause menu:
+- **Resume** — return to the game
+- **Volume** — master audio (slider)
+- **Show FPS** — toggle FPS counter
+- **Disk** / **Battery** — info displays
+- **Quit to picker** — exit the current cart
+
+The same menu is available from the picker (without Quit).
+
+### 5. Troubleshooting
+
+- **USB drive not showing up or not named P8THUMBv1?** Hold **MENU** while powering on — this forces a full reformat of the flash filesystem.
+- **Cart conversion stuck?** Hold **B** while powering on to skip conversion.
+- **Want to go back to the stock Thumby Color firmware?** Enter BOOTSEL (power off → hold DOWN → power on) and flash the original `.uf2`. The RP2350 boot ROM cannot be bricked — BOOTSEL always works.
 
 ---
 
