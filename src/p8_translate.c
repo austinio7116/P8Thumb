@@ -121,11 +121,15 @@ static void tok_set(tok_t *t, int kind, const char *text, int len) {
 typedef struct { const char *seq; int slen, val; } glyph_t;
 #define G(s, v) { s, sizeof(s)-1, v }
 static const glyph_t g_glyphs[] = {
-    G("\xf0\x9f\x90\xb1",131), G("\xf0\x9f\x85\xbe",143),
+    G("\xf0\x9f\x90\xb1",131),
+    G("\xf0\x9f\x85\xbe",4),     /* 🅾 → button O (index 4) */
     G("\xf0\x9f\x98\x90",141),
-    G("\xe2\xac\x85",140), G("\xe2\x9e\xa1",146),
-    G("\xe2\xac\x86",149), G("\xe2\xac\x87",132),
-    G("\xe2\x9d\x8e",152), G("\xe2\x97\x8b",128),
+    G("\xe2\xac\x85",0),          /* ⬅ → button LEFT (index 0) */
+    G("\xe2\x9e\xa1",1),          /* ➡ → button RIGHT (index 1) */
+    G("\xe2\xac\x86",2),          /* ⬆ → button UP (index 2) */
+    G("\xe2\xac\x87",3),          /* ⬇ → button DOWN (index 3) */
+    G("\xe2\x9d\x8e",5),          /* ❎ → button X (index 5) */
+    G("\xe2\x97\x8b",128),
     G("\xe2\x96\x88",129), G("\xe2\x96\x92",130),
     G("\xe2\x96\x91",133), G("\xe2\x9c\xbd",134),
     G("\xe2\x97\x8f",135), G("\xe2\x99\xa5",136),
@@ -438,14 +442,40 @@ static char *pre_tokenize(const char *src, size_t len, size_t *out_len) {
          * which converts them to function calls (shl, shr, lshr, rotl,
          * rotr, band, bor, bxor, bnot) during unminification. */
 
-        /* ---- UTF-8 glyph in code → numeric value ---- */
+        /* ---- High bytes in code → numeric value ---- */
+        /* PXA-decompressed source has single-byte P8SCII values (0x80+).
+         * Button/arrow glyphs must become button indices (0-5) to match
+         * PICO-8's btn()/btnp() API. All other high bytes become their
+         * P8SCII decimal value (used as numeric constants in code).
+         *
+         * This matches the Python host pipeline:
+         *   1. _GLYPH_SUBS: arrow/button UTF-8 → "0"-"5"
+         *   2. _strip_code_highbytes: remaining → P8SCII decimal
+         *
+         * Our source is latin-1 single bytes, not UTF-8, so we match
+         * by P8SCII byte value directly. */
         if (c >= 0x80) {
+            /* Try UTF-8 multi-byte glyphs first (rare but possible) */
             int gi = match_glyph(s, len, i);
             if (gi >= 0) {
                 if (g_glyphs[gi].val >= 0) buf_int(&o, g_glyphs[gi].val);
                 i += g_glyphs[gi].slen; goto next;
             }
-            buf_int(&o, (int)c); i++; goto next;
+            /* Single-byte P8SCII: button/arrow → button index.
+             * Byte values from shrinko8's k_charset (pico_defs.py),
+             * which is the canonical PICO-8 character set. */
+            int val;
+            switch (c) {
+                case 0x8B: val = 0; break; /* ⬅ LEFT */
+                case 0x91: val = 1; break; /* ➡ RIGHT */
+                case 0x94: val = 2; break; /* ⬆ UP */
+                case 0x83: val = 3; break; /* ⬇ DOWN */
+                case 0x8E: val = 4; break; /* 🅾 O */
+                case 0x97: val = 5; break; /* ❎ X */
+                default:   val = (int)c; break; /* all others → P8SCII value */
+            }
+            buf_int(&o, val);
+            i++; goto next;
         }
 
         buf_putc(&o, c); i++;

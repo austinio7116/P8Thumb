@@ -405,13 +405,21 @@ static int l_p8_sqrt(lua_State *L) {
  * fixed-point representation, then the result is converted back.
  * This handles fractional values: 0.5 << 1 = 1.0, 0.5 >> 1 = 0.25. */
 static int32_t to_fix16(lua_Number v) { return (int32_t)(v * 65536.0f); }
-static lua_Number from_fix16(int32_t v) { return (lua_Number)v / 65536.0f; }
+/* Push a 16.16 fixed-point result. If the fractional part is zero,
+ * push as integer to preserve Lua 5.4's int/float key distinction
+ * (t[3] and t[3.0] are different keys in Lua 5.4). */
+static void push_fix16(lua_State *L, int32_t v) {
+    if ((v & 0xFFFF) == 0)
+        lua_pushinteger(L, (lua_Integer)(v >> 16));
+    else
+        lua_pushnumber(L, (lua_Number)v / 65536.0f);
+}
 
 static int l_p8_shl(lua_State *L) {
     TRACE("shl");
     int32_t x = to_fix16(argn0(L, 1));
     int n = (int)argn0(L, 2);
-    lua_pushnumber(L, from_fix16((int32_t)(((uint32_t)x) << (n & 31))));
+    push_fix16(L, (int32_t)(((uint32_t)x) << (n & 31)));
     return 1;
 }
 static int l_p8_shr(lua_State *L) {
@@ -419,41 +427,41 @@ static int l_p8_shr(lua_State *L) {
     int32_t x = to_fix16(argn0(L, 1));
     int n = (int)argn0(L, 2);
     /* Arithmetic right shift to match PICO-8's signed semantics. */
-    lua_pushnumber(L, from_fix16(x >> (n & 31)));
+    push_fix16(L, x >> (n & 31));
     return 1;
 }
 static int l_p8_lshr(lua_State *L) {
     TRACE("lshr");
     uint32_t x = (uint32_t)to_fix16(argn0(L, 1));
     int n = (int)argn0(L, 2);
-    lua_pushnumber(L, from_fix16((int32_t)(x >> (n & 31))));
+    push_fix16(L, (int32_t)(x >> (n & 31)));
     return 1;
 }
 static int l_p8_band(lua_State *L) {
     TRACE("band");
     int32_t a = to_fix16(argn0(L, 1));
     int32_t b = to_fix16(argn0(L, 2));
-    lua_pushnumber(L, from_fix16(a & b));
+    push_fix16(L, a & b);
     return 1;
 }
 static int l_p8_bor(lua_State *L) {
     TRACE("bor");
     int32_t a = to_fix16(argn0(L, 1));
     int32_t b = to_fix16(argn0(L, 2));
-    lua_pushnumber(L, from_fix16(a | b));
+    push_fix16(L, a | b);
     return 1;
 }
 static int l_p8_bxor(lua_State *L) {
     TRACE("bxor");
     int32_t a = to_fix16(argn0(L, 1));
     int32_t b = to_fix16(argn0(L, 2));
-    lua_pushnumber(L, from_fix16(a ^ b));
+    push_fix16(L, a ^ b);
     return 1;
 }
 static int l_p8_bnot(lua_State *L) {
     TRACE("bnot");
     int32_t a = to_fix16(argn0(L, 1));
-    lua_pushnumber(L, from_fix16(~a));
+    push_fix16(L, ~a);
     return 1;
 }
 
@@ -705,14 +713,14 @@ static int l_p8_rotl(lua_State *L) {
     TRACE("rotl");
     uint32_t x = (uint32_t)to_fix16(argn0(L, 1));
     int n = (int)argn0(L, 2) & 31;
-    lua_pushnumber(L, from_fix16((int32_t)((x << n) | (x >> (32 - n)))));
+    push_fix16(L, (int32_t)((x << n) | (x >> (32 - n))));
     return 1;
 }
 static int l_p8_rotr(lua_State *L) {
     TRACE("rotr");
     uint32_t x = (uint32_t)to_fix16(argn0(L, 1));
     int n = (int)argn0(L, 2) & 31;
-    lua_pushnumber(L, from_fix16((int32_t)((x >> n) | (x << (32 - n)))));
+    push_fix16(L, (int32_t)((x >> n) | (x << (32 - n))));
     return 1;
 }
 
