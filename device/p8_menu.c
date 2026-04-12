@@ -13,6 +13,7 @@
 #include "p8_draw.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "pico/stdlib.h"
@@ -245,15 +246,18 @@ p8_menu_result_t p8_menu_run(uint16_t        *fb,
     p8_menu_result_t result = { .kind = P8_MENU_RESUME, .action_id = 0 };
     if (n_items == 0) return result;
 
-    static uint16_t fb_dim[FB_W * FB_H];
-    memcpy(fb_dim, fb, sizeof(fb_dim));
+    /* Allocate the dimmed backdrop on heap instead of BSS — saves 32KB
+     * of permanent SRAM that's only used when the menu is open. */
+    uint16_t *fb_dim = (uint16_t *)malloc(FB_W * FB_H * sizeof(uint16_t));
+    if (!fb_dim) return result;  /* OOM — can't show menu */
+    memcpy(fb_dim, fb, FB_W * FB_H * sizeof(uint16_t));
     darken_fb(fb_dim);
 
     int cursor = -1;
     for (int i = 0; i < n_items; i++) {
         if (items[i].enabled) { cursor = i; break; }
     }
-    if (cursor < 0) return result;
+    if (cursor < 0) { free(fb_dim); return result; }
     int scroll_top = 0;
 
     /* Wait for MENU release */
@@ -285,6 +289,7 @@ p8_menu_result_t p8_menu_run(uint16_t        *fb,
         /* B or MENU = close */
         if (e_b || e_mn) {
             while (!gpio_get(BTN_B_GP) || !gpio_get(BTN_MENU_GP)) sleep_ms(10);
+            free(fb_dim);
             return result;
         }
 
@@ -317,6 +322,7 @@ p8_menu_result_t p8_menu_run(uint16_t        *fb,
                 result.kind = P8_MENU_ACTION;
                 result.action_id = it->action_id;
                 while (!gpio_get(BTN_A_GP)) sleep_ms(10);
+                free(fb_dim);
                 return result;
             }
             break;
