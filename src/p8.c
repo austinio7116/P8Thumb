@@ -93,20 +93,33 @@ int p8_vm_init(p8_vm *vm, size_t heap_cap) {
 
     /* Curated stdlib subset. PICO-8 itself only exposes a small
      * surface; we mirror that here so host and device builds load
-     * the same modules. Crucially, we omit io / os / package /
-     * coroutine / debug — io & package would pull fopen/dlopen
-     * which the embedded build can't satisfy cheaply. */
+     * the same modules. We omit io / os / package / debug — io &
+     * package would pull fopen/dlopen. Coroutines are included
+     * because PICO-8 supports cocreate/coresume/costatus/yield. */
     static const luaL_Reg p8_libs[] = {
         { "",              luaopen_base   },  /* Lua 5.2: base lib name is "" */
         { LUA_TABLIBNAME,  luaopen_table  },
         { LUA_STRLIBNAME,  luaopen_string },
         { LUA_MATHLIBNAME, luaopen_math   },
+        { LUA_COLIBNAME,   luaopen_coroutine },
         { NULL, NULL }
     };
     for (const luaL_Reg *lib = p8_libs; lib->func; lib++) {
         luaL_requiref(vm->L, lib->name, lib->func, 1);
         lua_pop(vm->L, 1);
     }
+
+    /* PICO-8 coroutine aliases:
+     *   cocreate = coroutine.create
+     *   coresume = coroutine.resume
+     *   costatus = coroutine.status
+     *   yield    = coroutine.yield  */
+    lua_getglobal(vm->L, "coroutine");
+    lua_getfield(vm->L, -1, "create");  lua_setglobal(vm->L, "cocreate");
+    lua_getfield(vm->L, -1, "resume");  lua_setglobal(vm->L, "coresume");
+    lua_getfield(vm->L, -1, "status");  lua_setglobal(vm->L, "costatus");
+    lua_getfield(vm->L, -1, "yield");   lua_setglobal(vm->L, "yield");
+    lua_pop(vm->L, 1);  /* pop coroutine table */
 
     return 0;
 }

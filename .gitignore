@@ -13,3 +13,5 @@ build*/
 .cache/
 compile_commands.json
 __pycache__/
+carts/
+tools/luac52

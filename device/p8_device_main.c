@@ -159,7 +159,8 @@ static int boot_filesystem(void) {
 /* cart depending on Lua source size. Shows a progress screen.         */
 /* ------------------------------------------------------------------ */
 
-/* lua_dump writer callback — appends to a growable buffer. */
+/* lua_dump writer callback — writes directly to a FIL* (FatFs file).
+ * Avoids allocating a large heap buffer that competes with the Lua VM. */
 /* FatFs IO callbacks for stb_image — reads PNG directly from file,
  * avoiding the need to hold the entire compressed PNG in heap. */
 static int fat_io_read(void *user, char *data, int size) {
@@ -178,25 +179,14 @@ static int fat_io_eof(void *user) {
 }
 static const p8_png_io g_fat_io = { fat_io_read, fat_io_skip, fat_io_eof };
 
-typedef struct {
-    unsigned char *data;
-    size_t len;
-    size_t cap;
-} dump_buf;
-
-static int dump_writer(lua_State *L, const void *p, size_t sz, void *ud) {
-    dump_buf *db = (dump_buf *)ud;
+/* lua_dump writer: writes directly to a FIL* (FatFs file).
+ * Zero heap allocation — the Lua VM keeps all its memory. */
+static int dump_file_writer(lua_State *L, const void *p, size_t sz, void *ud) {
+    FIL *f = (FIL *)ud;
     (void)L;
-    if (db->len + sz > db->cap) {
-        size_t nc = db->cap ? db->cap : 1024;
-        while (nc < db->len + sz) nc *= 2;
-        unsigned char *nd = (unsigned char *)realloc(db->data, nc);
-        if (!nd) return 1;  /* error */
-        db->data = nd;
-        db->cap = nc;
-    }
-    memcpy(db->data + db->len, p, sz);
-    db->len += sz;
+    UINT bw;
+    if (f_write(f, p, (UINT)sz, &bw) != FR_OK || bw != (UINT)sz)
+        return 1;
     return 0;
 }
 
@@ -330,26 +320,26 @@ static int convert_one_cart(const char *stem, p8_machine *m,
     }
     screen_log(m, sl, "compiled ok");
 
-    dump_buf db = {0};
-    lua_dump(L, dump_writer, &db);  /* Lua 5.2: no strip parameter */
+    /* Dump bytecode directly to file — no heap buffer needed.
+     * This is critical for large carts where the Lua VM already
+     * occupies most of the available heap after compilation. */
+    screen_log(m, sl, "saving luac...");
+    p8_log_to_file("convert: saving luac");
+
+    int dump_ok = 0;
+    if (f_open(&f, luac_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+        int drc = lua_dump(L, dump_file_writer, &f);
+        f_close(&f);
+        dump_ok = (drc == 0);
+    }
     lua_close(L);
 
-    if (!db.data || db.len == 0) {
-        if (db.data) free(db.data);
+    if (!dump_ok) {
+        f_unlink(luac_path);  /* remove partial file */
         screen_log(m, sl, "ERR: dump fail");
         p8_log_to_file("convert: dump failed");
         return -8;
     }
-
-    screen_log(m, sl, "saving luac...");
-    p8_log_to_file("convert: saving luac");
-
-    if (f_open(&f, luac_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-        UINT bw;
-        f_write(&f, db.data, (UINT)db.len, &bw);
-        f_close(&f);
-    }
-    free(db.data);
 
     p8_flash_disk_flush();
     screen_log(m, sl, "DONE OK");
@@ -525,39 +515,12 @@ static void wait_for_carts(void) {
 
         /* --- button input ----------------------------------------- */
         p8_input_begin_frame(&input, p8_buttons_read());
-        /* A press: if there are unconverted .p8.png files, reboot to
-         * trigger conversion. Otherwise go straight to the picker. */
+        /* A: always go to picker if there are playable carts.
+         * Conversion happens automatically on boot — the lobby is
+         * for USB access, not for gating conversion. */
         if ((p8_btnp(&input, P8_BTN_X) || p8_btnp(&input, P8_BTN_O))
             && n_carts > 0 && !p8_flash_disk_dirty()) {
-            /* Check if any .p8.png still needs conversion */
-            int need_convert = 0;
-            {
-                DIR cdir;
-                FILINFO cinfo;
-                if (f_opendir(&cdir, "/carts") == FR_OK) {
-                    while (f_readdir(&cdir, &cinfo) == FR_OK && cinfo.fname[0]) {
-                        size_t L = strlen(cinfo.fname);
-                        if (L >= 8 && strcasecmp(cinfo.fname + L - 7, ".p8.png") == 0) {
-                            char lp[80];
-                            size_t sl = L - 7;
-                            if (sl >= 40) sl = 39;
-                            memcpy(lp, "/carts/", 7);
-                            memcpy(lp + 7, cinfo.fname, sl);
-                            memcpy(lp + 7 + sl, ".luac", 6);
-                            FILINFO fi2;
-                            if (f_stat(lp, &fi2) != FR_OK) { need_convert = 1; break; }
-                        }
-                    }
-                    f_closedir(&cdir);
-                }
-            }
-            if (need_convert) {
-                p8_flash_disk_flush();
-                watchdog_reboot(0, 0, 0);
-                while (1) tight_loop_contents();
-            } else {
-                return;  /* all converted — go to picker */
-            }
+            return;
         }
 
         /* --- periodic disk rescan --------------------------------- */

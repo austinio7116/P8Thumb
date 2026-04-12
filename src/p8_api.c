@@ -855,13 +855,11 @@ static int l_p8_tostr(lua_State *L) {
     TRACE("tostr");
     if (lua_isnoneornil(L, 1)) { lua_pushstring(L, ""); return 1; }
     if (lua_isnumber(L, 1)) {
+        /* PICO-8 tostr: integers display without decimals.
+         * Matches lua_number2str in luaconf.h. */
         char buf[32];
         lua_Number n = lua_tonumber(L, 1);
-        if (n == (lua_Number)(long long)n) {
-            snprintf(buf, sizeof(buf), "%lld", (long long)n);
-        } else {
-            snprintf(buf, sizeof(buf), "%g", (double)n);
-        }
+        lua_number2str(buf, n);
         lua_pushstring(L, buf);
         return 1;
     }
@@ -1276,7 +1274,8 @@ static int p8_string_index(lua_State *L) {
         size_t slen;
         const char *s = lua_tolstring(L, 1, &slen);
         if (s && i >= 1 && (size_t)i <= slen) {
-            lua_pushlstring(L, s + i - 1, 1);
+            /* PICO-8's str[i] returns the ordinal value (number) */
+            lua_pushinteger(L, (unsigned char)s[i - 1]);
         } else {
             lua_pushnil(L);
         }

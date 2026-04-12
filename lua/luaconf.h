@@ -385,6 +385,7 @@
 
 /* ThumbyP8: single-precision float — M33 has single-precision FPU only. */
 #define LUA_NUMBER	float
+#define LUA_NUMBER_FLOAT	1  /* enables proper unsigned conversion in llimits.h */
 
 /*
 @@ LUAI_UACNUMBER is the result of an 'usual argument conversion'
@@ -400,11 +401,29 @@
 @@ lua_number2str converts a number to a string.
 @@ LUAI_MAXNUMBER2STR is maximum size of previous conversion.
 */
-/* ThumbyP8: float format — 7 significant digits for single-precision. */
+/* ThumbyP8: float format — 7 significant digits for single-precision.
+ * Custom lua_number2str because the Pico SDK's printf %g doesn't
+ * strip trailing zeros (e.g. 47.0 → "47.00000" instead of "47"). */
 #define LUA_NUMBER_SCAN		"%f"
 #define LUA_NUMBER_FMT		"%.7g"
-#define lua_number2str(s,n)	sprintf((s), LUA_NUMBER_FMT, (LUAI_UACNUMBER)(n))
 #define LUAI_MAXNUMBER2STR	32
+static inline int lua_number2str(char *s, float n) {
+    /* If the value is a whole number in int range, format as integer.
+     * PICO-8 prints 47 not 47.0. This matches PICO-8's tostr(). */
+    if (n == (float)(int)n && n >= -32768.0f && n <= 32767.0f) {
+        return sprintf(s, "%d", (int)n);
+    }
+    /* For fractional values, use %f and manually trim trailing zeros.
+     * Pico SDK's printf %g doesn't strip trailing zeros correctly. */
+    int len = sprintf(s, "%.4f", (double)n);
+    /* Trim trailing zeros after decimal point */
+    if (memchr(s, '.', len)) {
+        while (len > 1 && s[len-1] == '0') len--;
+        if (len > 1 && s[len-1] == '.') len--;
+        s[len] = '\0';
+    }
+    return len;
+}
 
 
 /*
@@ -531,8 +550,11 @@
 
 #else								/* }{ */
 
-/* assume IEEE754 and a 32-bit integer type */
-#define LUA_IEEE754TRICK
+/* ThumbyP8: do NOT use IEEE754TRICK — it assumes lua_Number is double
+ * and uses a 64-bit double union for int conversion. With float as
+ * lua_Number, the trick produces wrong results. Use the simple cast
+ * fallback in llimits.h instead. */
+/* #define LUA_IEEE754TRICK */
 
 #endif								/* } */
 
