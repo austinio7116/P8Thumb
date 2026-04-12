@@ -534,20 +534,40 @@ static int l_p8_split(lua_State *L) {
 }
 
 /* ord(s, [i]) → byte value of s[i] (1-indexed). chr(n) → 1-byte string. */
+/* ord(str, [index], [num_results]) — return ordinal(s) of character(s).
+ * PICO-8 supports multi-return: ord("hello", 1, 3) → 104, 101, 108 */
 static int l_p8_ord(lua_State *L) {
     TRACE("ord");
-    size_t L_str = 0;
-    const char *s = luaL_checklstring(L, 1, &L_str);
+    size_t slen = 0;
+    const char *s = luaL_checklstring(L, 1, &slen);
     int i = lua_isnoneornil(L, 2) ? 1 : (int)luaL_checknumber(L, 2);
-    if (i < 1 || (size_t)i > L_str) { lua_pushnil(L); return 1; }
-    lua_pushinteger(L, (unsigned char)s[i - 1]);
-    return 1;
+    int n = lua_isnoneornil(L, 3) ? 1 : (int)luaL_checknumber(L, 3);
+    if (n < 1) n = 1;
+    int count = 0;
+    for (int k = 0; k < n; k++) {
+        int pos = i + k;
+        if (pos < 1 || (size_t)pos > slen) {
+            lua_pushnil(L);
+        } else {
+            lua_pushinteger(L, (unsigned char)s[pos - 1]);
+        }
+        count++;
+    }
+    return count;
 }
+/* chr(val0, [val1], ...) — convert ordinal(s) to string.
+ * PICO-8 supports multi-arg: chr(104, 101, 108) → "hel" */
 static int l_p8_chr(lua_State *L) {
     TRACE("chr");
-    int n = (int)luaL_checknumber(L, 1);
-    char buf[2] = { (char)(n & 0xff), 0 };
-    lua_pushlstring(L, buf, 1);
+    int nargs = lua_gettop(L);
+    if (nargs <= 0) { lua_pushliteral(L, ""); return 1; }
+    luaL_Buffer b;
+    luaL_buffinit(L, &b);
+    for (int i = 1; i <= nargs; i++) {
+        int c = (int)luaL_checknumber(L, i) & 0xff;
+        luaL_addchar(&b, (char)c);
+    }
+    luaL_pushresult(&b);
     return 1;
 }
 
@@ -1153,6 +1173,8 @@ static const luaL_Reg p8_funcs[] = {
     { "line",     l_line },
     { "rect",     l_rect },
     { "rectfill", l_rectfill },
+    { "rrect",    l_rect },       /* rounded rect — stub as regular rect */
+    { "rrectfill",l_rectfill },   /* rounded rectfill — stub as regular */
     { "circ",     l_circ },
     { "circfill", l_circfill },
     { "pal",      l_pal },
