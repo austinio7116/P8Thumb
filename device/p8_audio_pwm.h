@@ -26,4 +26,8 @@ void p8_audio_pwm_push(const int16_t *samples, int n_samples);
 /* How much room is currently in the ring buffer (in samples). */
 int  p8_audio_pwm_room(void);
 
+/* Master volume: 0 (mute) to 10 (full). Applied in push(). */
+void p8_audio_pwm_set_volume(int vol);
+int  p8_audio_pwm_get_volume(void);
+
 #endif

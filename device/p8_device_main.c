@@ -922,7 +922,11 @@ int main(void) {
         absolute_time_t next = make_timeout_time_us(frame_us);
 
         /* Run until the user exits via menu, or a Lua error fires. */
+        #define VOL_MIN   0
+        #define VOL_UNITY 15
+        #define VOL_MAX   30
         static int show_fps_toggle = 1;
+        static int master_volume = VOL_UNITY;
         int return_to_picker = 0;
         char err_msg[160] = {0};
         uint32_t menu_hold_start = 0;
@@ -943,7 +947,7 @@ int main(void) {
                 uint32_t held_ms = ((uint32_t)time_us_64() - menu_hold_start) / 1000;
                 if (held_ms > 400) {
                     /* Build menu items */
-                    p8_menu_item_t items[6];
+                    p8_menu_item_t items[8];
                     int ni = 0;
 
                     items[ni++] = (p8_menu_item_t){
@@ -951,16 +955,44 @@ int main(void) {
                         .enabled = true, .action_id = P8_MENU_ACT_RESUME };
 
                     items[ni++] = (p8_menu_item_t){
+                        .kind = P8_MENU_KIND_SLIDER, .label = "Volume",
+                        .value_ptr = &master_volume,
+                        .min = VOL_MIN, .max = VOL_MAX, .enabled = true };
+
+                    items[ni++] = (p8_menu_item_t){
                         .kind = P8_MENU_KIND_TOGGLE, .label = "Show FPS",
                         .value_ptr = &show_fps_toggle, .enabled = true };
+
+                    /* Disk space */
+                    static int disk_used_pct = 0;
+                    static char disk_text[24];
+                    {
+                        DWORD free_clust = 0;
+                        FATFS *fsp = NULL;
+                        if (f_getfree("", &free_clust, &fsp) == FR_OK && fsp) {
+                            DWORD total = (fsp->n_fatent - 2) * fsp->csize;
+                            DWORD free_sect = free_clust * fsp->csize;
+                            DWORD used = total - free_sect;
+                            /* Sector size is 512 bytes */
+                            int used_kb = (int)(used / 2);
+                            int total_kb = (int)(total / 2);
+                            disk_used_pct = total > 0 ? (int)(used * 100 / total) : 0;
+                            snprintf(disk_text, sizeof(disk_text), "%dK/%dK",
+                                     used_kb, total_kb);
+                        } else {
+                            disk_used_pct = 0;
+                            snprintf(disk_text, sizeof(disk_text), "?");
+                        }
+                    }
+                    items[ni++] = (p8_menu_item_t){
+                        .kind = P8_MENU_KIND_INFO, .label = "Disk",
+                        .info_text = disk_text, .value_ptr = &disk_used_pct,
+                        .min = 0, .max = 100, .enabled = true };
 
                     /* Battery info */
                     static int batt_pct = 0;
                     static char batt_text[16];
                     float bv = 3.7f; /* placeholder — no ADC on emulator */
-                    #ifdef PICO_ON_DEVICE
-                    /* TODO: read actual battery voltage via ADC */
-                    #endif
                     batt_pct = (int)((bv - 3.0f) / (4.2f - 3.0f) * 100);
                     if (batt_pct < 0) batt_pct = 0;
                     if (batt_pct > 100) batt_pct = 100;
@@ -1035,6 +1067,21 @@ int main(void) {
             int n = P8_AUDIO_SAMPLE_RATE / target_fps;
             if (n > 1024) n = 1024;
             p8_audio_render(audio_buf, n);
+            /* Master volume scaling (same approach as ThumbyNES):
+             * scale in the render path, not the IRQ. Unity at
+             * VOL_UNITY means no gain change. Clamp to int16. */
+            if (master_volume != VOL_UNITY) {
+                if (master_volume <= 0) {
+                    for (int i2 = 0; i2 < n; i2++) audio_buf[i2] = 0;
+                } else {
+                    for (int i2 = 0; i2 < n; i2++) {
+                        int32_t s2 = (int32_t)audio_buf[i2] * master_volume * 4 / VOL_UNITY;
+                        if (s2 >  32767) s2 =  32767;
+                        if (s2 < -32768) s2 = -32768;
+                        audio_buf[i2] = (int16_t)s2;
+                    }
+                }
+            }
             p8_audio_pwm_push(audio_buf, n);
 
             /* FPS counter overlay — toggled via pause menu. */
