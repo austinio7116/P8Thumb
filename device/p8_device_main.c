@@ -111,9 +111,6 @@ static int boot_filesystem(void) {
 
     if (needs_format) {
         g_boot_reformatted = 1;
-        /* Yellow splash so we can tell from outside whether reformat
-         * actually ran. */
-        splash(0xffe0);
 
         f_unmount("");
         /* Wipe in-memory FS state so the next mount sees fresh disk. */
@@ -635,18 +632,10 @@ int main(void) {
     p8_lcd_init();
     p8_audio_pwm_init();
 
-    /* Stage 1: blue splash — LCD alive */
-    splash(0x194a);
-
-    /* Stage 2: filesystem comes up FIRST — before USB. Doing it the
-     * other way around means USB tries to enumerate while mkfs is
-     * mid-flight, the host reads inconsistent BPB state, and File
-     * Explorer crashes when it tries to traverse a half-written
-     * directory tree. */
-    splash(0xfd00);   /* orange = mounting / formatting */
+    /* Filesystem comes up FIRST — before USB. */
     p8_flash_disk_init();
     if (boot_filesystem() != 0) {
-        splash(0xf81f);   /* magenta = mount/format failed */
+        splash(0xf800);   /* red = mount/format failed (fatal) */
         while (1) tight_loop_contents();
     }
     /* Force any cached writes (from mkfs) out to flash before the
@@ -666,7 +655,6 @@ int main(void) {
      * Takes 5-15s per cart; shows a progress screen on the LCD.
      *
      * Hold B at boot to skip conversion (recovery escape hatch). */
-    splash(0xfbe0);  /* yellow-green = conversion check */
     if (p8_buttons_read() & (1 << P8_BTN_O)) {
         p8_log_to_file("convert: skipped (B held)");
     } else {
@@ -679,9 +667,7 @@ int main(void) {
         }
     }
 
-    /* Stage 3: USB stack. Now the disk is fully on flash and we can
-     * let the host enumerate and read consistent contents. */
-    splash(0x07ff);   /* cyan = USB stack starting */
+    /* USB stack. */
     tusb_init();
     {
         absolute_time_t until = make_timeout_time_ms(1000);
@@ -690,7 +676,6 @@ int main(void) {
             sleep_us(100);
         }
     }
-    splash(0x07e0);   /* green = ready */
 
     /* Pre-fill audio ring with silence so the IRQ has something
      * to chew on while picker + cart load run. */
@@ -774,8 +759,6 @@ int main(void) {
         p8_vm vm;
         if (p8_vm_init(&vm, 0) != 0) {
             p8_log_to_file("load: lua VM init OOM");
-            splash(0xf800);
-            sleep_ms(1500);
             continue;
         }
         p8_api_install(&vm, &machine, &input);
@@ -845,8 +828,6 @@ int main(void) {
 
             if (!rom_xip || !bc_xip) {
                 p8_log_to_file("load: flash program failed");
-                splash(0xf800);
-                sleep_ms(1500);
                 continue;
             }
 
@@ -865,8 +846,6 @@ int main(void) {
                          m ? m : "(no msg)");
                 p8_log_to_file(buf);
                 lua_pop(vm.L, 1);
-                splash(0xffe0);
-                sleep_ms(1500);
                 continue;
             }
             /* Execute top-level cart code. */
@@ -877,8 +856,6 @@ int main(void) {
                          m ? m : "(no msg)");
                 p8_log_to_file(buf);
                 lua_pop(vm.L, 1);
-                splash(0xffe0);
-                sleep_ms(1500);
                 continue;
             }
             p8_log_to_file("load: ok");
