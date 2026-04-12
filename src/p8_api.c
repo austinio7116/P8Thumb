@@ -1325,15 +1325,14 @@ void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input) {
      * indexing: str[1] → first char, str[2] → second, etc.
      * Non-numeric keys fall through to the string library. */
     {
-        lua_pushliteral(L, "");
-        if (lua_getmetatable(L, -1)) {
-            lua_getfield(L, -1, "__index");
-            lua_pushvalue(L, -1);
-            lua_pushcclosure(L, p8_string_index, 1);
-            lua_setfield(L, -2, "__index");
-            lua_pop(L, 1);
+        lua_pushliteral(L, "");              /* stack: "" */
+        if (lua_getmetatable(L, -1)) {       /* stack: "", mt */
+            lua_getfield(L, -1, "__index");  /* stack: "", mt, old_idx */
+            lua_pushcclosure(L, p8_string_index, 1); /* pops old_idx as upvalue; stack: "", mt, closure */
+            lua_setfield(L, -2, "__index");  /* mt.__index = closure; stack: "", mt */
+            lua_pop(L, 1);                   /* pop mt; stack: "" */
         }
-        lua_pop(L, 1);
+        lua_pop(L, 1);                       /* pop ""; stack clean */
     }
 
     /* Register every binding directly. The universal-wrapper
