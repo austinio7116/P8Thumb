@@ -525,13 +525,39 @@ static void wait_for_carts(void) {
 
         /* --- button input ----------------------------------------- */
         p8_input_begin_frame(&input, p8_buttons_read());
-        /* A press reboots so new .p8.png carts get converted.
-         * Gated on cache fully drained so we don't lose writes. */
+        /* A press: if there are unconverted .p8.png files, reboot to
+         * trigger conversion. Otherwise go straight to the picker. */
         if ((p8_btnp(&input, P8_BTN_X) || p8_btnp(&input, P8_BTN_O))
-            && !p8_flash_disk_dirty()) {
-            p8_flash_disk_flush();
-            watchdog_reboot(0, 0, 0);
-            while (1) tight_loop_contents();
+            && n_carts > 0 && !p8_flash_disk_dirty()) {
+            /* Check if any .p8.png still needs conversion */
+            int need_convert = 0;
+            {
+                DIR cdir;
+                FILINFO cinfo;
+                if (f_opendir(&cdir, "/carts") == FR_OK) {
+                    while (f_readdir(&cdir, &cinfo) == FR_OK && cinfo.fname[0]) {
+                        size_t L = strlen(cinfo.fname);
+                        if (L >= 8 && strcasecmp(cinfo.fname + L - 7, ".p8.png") == 0) {
+                            char lp[80];
+                            size_t sl = L - 7;
+                            if (sl >= 40) sl = 39;
+                            memcpy(lp, "/carts/", 7);
+                            memcpy(lp + 7, cinfo.fname, sl);
+                            memcpy(lp + 7 + sl, ".luac", 6);
+                            FILINFO fi2;
+                            if (f_stat(lp, &fi2) != FR_OK) { need_convert = 1; break; }
+                        }
+                    }
+                    f_closedir(&cdir);
+                }
+            }
+            if (need_convert) {
+                p8_flash_disk_flush();
+                watchdog_reboot(0, 0, 0);
+                while (1) tight_loop_contents();
+            } else {
+                return;  /* all converted — go to picker */
+            }
         }
 
         /* --- periodic disk rescan --------------------------------- */
