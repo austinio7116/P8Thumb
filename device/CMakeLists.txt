@@ -32,7 +32,7 @@ pico_sdk_init()
 set(P8_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 
 # ----------------------------------------------------------------------
-# Lua 5.4.7 — embedded subset
+# Lua 5.2.4 — embedded subset
 # ----------------------------------------------------------------------
 # Files we deliberately exclude from the device build:
 #   lua.c     — standalone interpreter main (excluded at vendor time)
@@ -41,7 +41,6 @@ set(P8_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 #   liolib.c  — fopen/FILE* — too heavy for embedded
 #   loadlib.c — dynamic loader (dlopen) — not available
 #   loslib.c  — date/time/exit — uses time.h, mostly noise on device
-#   lcorolib.c — coroutines — drop for now, re-add later if needed
 #   ldblib.c  — debug library — drop for now
 file(GLOB LUA_ALL CONFIGURE_DEPENDS ${P8_ROOT}/lua/*.c)
 set(LUA_EXCLUDE
@@ -49,7 +48,6 @@ set(LUA_EXCLUDE
     ${P8_ROOT}/lua/liolib.c
     ${P8_ROOT}/lua/loadlib.c
     ${P8_ROOT}/lua/loslib.c
-    ${P8_ROOT}/lua/lcorolib.c
     ${P8_ROOT}/lua/ldblib.c
 )
 list(REMOVE_ITEM LUA_ALL ${LUA_EXCLUDE})
@@ -58,10 +56,8 @@ add_library(thumbyp8_lua STATIC ${LUA_ALL})
 target_include_directories(thumbyp8_lua PUBLIC ${P8_ROOT}/lua)
 target_compile_definitions(thumbyp8_lua PUBLIC
     LUA_USE_C89          # avoid POSIX-only paths
-    LUA_32BITS=1         # 32-bit int + 32-bit float lua_Number.
-                         # Critical: M33 has single-precision FPU but no
-                         # double FPU, so doubles are software-emulated.
-                         # luaconf.h is patched to honor this -D.
+    # Lua 5.2 with luaconf.h patched for single-precision float.
+    # No LUA_32BITS (that's a 5.3+ feature).
 )
 # Force -O3 across both Lua and our runtime — Release defaults to -O2.
 target_compile_options(thumbyp8_lua PUBLIC -O3)

@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
 
     /* 7. Dump bytecode */
     dump_buf db = {0};
-    lua_dump(L, dump_writer, &db, 0);
+    lua_dump(L, dump_writer, &db);  /* Lua 5.2: no strip parameter */
     lua_close(L);
 
     if (!db.data || db.len == 0) {

@@ -318,7 +318,11 @@ static int l_p8_atan2(lua_State *L) {
     lua_pushnumber(L, a);
     return 1;
 }
-static int l_p8_flr(lua_State *L)  { TRACE("flr");  lua_pushnumber(L, floor(argn0(L, 1))); return 1; }
+static int l_p8_flr(lua_State *L) {
+    TRACE("flr");
+    lua_pushnumber(L, floor(argn0(L, 1)));
+    return 1;
+}
 static int l_p8_ceil(lua_State *L) { TRACE("ceil"); lua_pushnumber(L, ceil(argn0(L, 1)));  return 1; }
 static int l_p8_abs(lua_State *L)  { TRACE("abs");  lua_pushnumber(L, fabs(argn0(L, 1)));  return 1; }
 static int l_p8_min(lua_State *L) {
@@ -355,10 +359,10 @@ static int l_p8_rnd(lua_State *L) {
         return 1;
     }
     if (lua_istable(L, 1)) {
-        lua_Integer len = luaL_len(L, 1);
+        int len = (int)luaL_len(L, 1);
         if (len <= 0) { lua_pushnil(L); return 1; }
-        lua_Integer idx = (rand() % len) + 1;
-        lua_geti(L, 1, idx);
+        int idx = (rand() % len) + 1;
+        lua_rawgeti(L, 1, idx);
         return 1;
     }
     lua_Number top = luaL_checknumber(L, 1);
@@ -397,6 +401,16 @@ static int l_p8_sqrt(lua_State *L) {
     lua_pushnumber(L, x < 0 ? 0 : sqrt(x));
     return 1;
 }
+/* PICO-8 integer division: floor(a/b). Used by translator for the
+ * \ operator, since Lua 5.2 has no // operator. */
+static int l_p8_idiv(lua_State *L) {
+    TRACE("p8idiv");
+    lua_Number a = argn0(L, 1);
+    lua_Number b = argn0(L, 2);
+    if (b == 0) { lua_pushnumber(L, 0); return 1; } /* PICO-8: div by 0 = 0 */
+    lua_pushnumber(L, floor(a / b));
+    return 1;
+}
 
 /* PICO-8 pre-0.2 bitwise functions (now usually expressed as << >>
  * & | ~ in newer carts, but old carts still call these by name). */
@@ -405,14 +419,8 @@ static int l_p8_sqrt(lua_State *L) {
  * fixed-point representation, then the result is converted back.
  * This handles fractional values: 0.5 << 1 = 1.0, 0.5 >> 1 = 0.25. */
 static int32_t to_fix16(lua_Number v) { return (int32_t)(v * 65536.0f); }
-/* Push a 16.16 fixed-point result. If the fractional part is zero,
- * push as integer to preserve Lua 5.4's int/float key distinction
- * (t[3] and t[3.0] are different keys in Lua 5.4). */
 static void push_fix16(lua_State *L, int32_t v) {
-    if ((v & 0xFFFF) == 0)
-        lua_pushinteger(L, (lua_Integer)(v >> 16));
-    else
-        lua_pushnumber(L, (lua_Number)v / 65536.0f);
+    lua_pushnumber(L, (lua_Number)v / 65536.0f);
 }
 
 static int l_p8_shl(lua_State *L) {
@@ -514,7 +522,7 @@ static int l_p8_split(lua_State *L) {
         } else {
             lua_pushlstring(L, s + i, j - i);
         }
-        lua_seti(L, -2, idx++);
+        lua_rawseti(L, -2, idx++);
         if (seplen == 0) {
             i = j;
         } else {
@@ -631,14 +639,14 @@ static int l_p8_deli(lua_State *L) {
     lua_Integer len = luaL_len(L, 1);
     lua_Integer i = lua_isnoneornil(L, 2) ? len : (lua_Integer)argi(L, 2, (int)len);
     if (i < 1 || i > len) { lua_pushnil(L); return 1; }
-    lua_geti(L, 1, i);   /* return value */
+    lua_rawgeti(L, 1, i);   /* return value */
     /* shift down */
     for (lua_Integer j = i; j < len; j++) {
-        lua_geti(L, 1, j + 1);
-        lua_seti(L, 1, j);
+        lua_rawgeti(L, 1, j + 1);
+        lua_rawseti(L, 1, j);
     }
     lua_pushnil(L);
-    lua_seti(L, 1, len);
+    lua_rawseti(L, 1, len);
     return 1;
 }
 
@@ -731,7 +739,7 @@ static int l_p8_pack(lua_State *L) {
     lua_createtable(L, n, 1);
     for (int i = 1; i <= n; i++) {
         lua_pushvalue(L, i);
-        lua_seti(L, -2, i);
+        lua_rawseti(L, -2, i);
     }
     lua_pushinteger(L, n);
     lua_setfield(L, -2, "n");
@@ -748,7 +756,7 @@ static int l_p8_unpack(lua_State *L) {
     if (n <= 0) return 0;
     luaL_checkstack(L, n, "too many results to unpack");
     for (int k = 0; k < n; k++) {
-        lua_geti(L, 1, i + k);
+        lua_rawgeti(L, 1, i + k);
     }
     return n;
 }
@@ -999,7 +1007,7 @@ static int all_iter(lua_State *L) {
     /* upvalues: 1=table, 2=last_index, 3=last_value */
     lua_Integer i = (lua_Integer)lua_tointeger(L, lua_upvalueindex(2));
     if (i > 0) {
-        lua_geti(L, lua_upvalueindex(1), i);
+        lua_rawgeti(L, lua_upvalueindex(1), i);
         int eq = lua_rawequal(L, -1, lua_upvalueindex(3));
         lua_pop(L, 1);
         if (eq) i++;        /* normal advance */
@@ -1009,7 +1017,7 @@ static int all_iter(lua_State *L) {
     }
     lua_Integer len = luaL_len(L, lua_upvalueindex(1));
     while (i <= len) {
-        lua_geti(L, lua_upvalueindex(1), i);
+        lua_rawgeti(L, lua_upvalueindex(1), i);
         if (!lua_isnil(L, -1)) {
             /* Update upvalues for next call */
             lua_pushinteger(L, i);
@@ -1050,7 +1058,7 @@ static int l_add(lua_State *L) {
     /* PICO-8 add returns the inserted value */
     lua_Integer len = luaL_len(L, 1);
     lua_pushvalue(L, 2);
-    lua_seti(L, 1, len + 1);
+    lua_rawseti(L, 1, len + 1);
     lua_pushvalue(L, 2);
     return 1;
 }
@@ -1059,17 +1067,17 @@ static int l_del(lua_State *L) {
     if (!lua_istable(L, 1)) { lua_pushnil(L); return 1; }
     lua_Integer len = luaL_len(L, 1);
     for (lua_Integer i = 1; i <= len; i++) {
-        lua_geti(L, 1, i);
+        lua_rawgeti(L, 1, i);
         int eq = lua_rawequal(L, -1, 2);
         lua_pop(L, 1);
         if (eq) {
             /* shift down */
             for (lua_Integer j = i; j < len; j++) {
-                lua_geti(L, 1, j + 1);
-                lua_seti(L, 1, j);
+                lua_rawgeti(L, 1, j + 1);
+                lua_rawseti(L, 1, j);
             }
             lua_pushnil(L);
-            lua_seti(L, 1, len);
+            lua_rawseti(L, 1, len);
             lua_pushvalue(L, 2);
             return 1;
         }
@@ -1097,7 +1105,7 @@ static int l_foreach(lua_State *L) {
     for (;;) {
         lua_Integer len = luaL_len(L, 1);
         if (i > len) break;
-        lua_geti(L, 1, i);              /* stack: value */
+        lua_rawgeti(L, 1, i);              /* stack: value */
         if (lua_isnil(L, -1)) {
             lua_pop(L, 1);
             i++;
@@ -1109,7 +1117,7 @@ static int l_foreach(lua_State *L) {
         lua_insert(L, -2);               /* stack: value, fn, value */
         if (lua_pcall(L, 1, 0, 0) != LUA_OK) return lua_error(L);
         /* stack: value (saved) */
-        lua_geti(L, 1, i);               /* stack: value, cur */
+        lua_rawgeti(L, 1, i);               /* stack: value, cur */
         int eq = lua_rawequal(L, -1, -2);
         lua_pop(L, 2);
         if (eq) i++;
@@ -1162,6 +1170,7 @@ static const luaL_Reg p8_funcs[] = {
     { "srand",    l_p8_srand },
     { "sgn",      l_p8_sgn },
     { "sqrt",     l_p8_sqrt },
+    { "p8idiv",   l_p8_idiv },
     { "shl",      l_p8_shl },
     { "shr",      l_p8_shr },
     { "lshr",     l_p8_lshr },

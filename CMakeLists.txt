@@ -19,7 +19,7 @@ add_compile_options(
 )
 
 # ----------------------------------------------------------------------
-# Lua 5.4.7 (vendored, MIT — see lua/README)
+# Lua 5.2.4 (vendored, MIT — see lua/README)
 # ----------------------------------------------------------------------
 file(GLOB LUA_SOURCES CONFIGURE_DEPENDS lua/*.c)
 # lua.c (standalone interpreter) and luac.c (compiler) are excluded
@@ -29,7 +29,7 @@ add_library(thumbyp8_lua STATIC ${LUA_SOURCES})
 target_include_directories(thumbyp8_lua PUBLIC lua)
 target_compile_definitions(thumbyp8_lua PUBLIC
     LUA_USE_POSIX            # enables POSIX features in loslib (host only)
-    LUA_COMPAT_5_3
+    LUA_COMPAT_ALL           # enable 5.1 compatibility layer
 )
 # Lua wants libm for math.sin/cos/etc.
 target_link_libraries(thumbyp8_lua PUBLIC m)

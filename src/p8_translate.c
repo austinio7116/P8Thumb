@@ -1,9 +1,9 @@
 /*
- * ThumbyP8 — full PICO-8 dialect → Lua 5.4 translator (C).
+ * ThumbyP8 — full PICO-8 dialect → Lua 5.2 translator (C).
  *
  * On-device equivalent of the Python pipeline (post_fix_lua +
  * pico8_lua.py). Takes raw PXA-decompressed PICO-8 source and
- * produces valid Lua 5.4 that luaL_loadbuffer can compile.
+ * produces valid Lua 5.2 that luaL_loadbuffer can compile.
  *
  * Architecture:
  *   Phase 0 (pre_tokenize): character-level transforms that must
@@ -1459,14 +1459,20 @@ static char *rewrite_compounds(const char *src, size_t len, size_t *out_len) {
                            (work[lhs_start]==' '||work[lhs_start]=='\t'))
                         lhs_start++;
 
-                    /* Get the Lua op (strip trailing =) */
-                    char op_text[4] = {0};
+                    /* Get the Lua op (strip trailing =) and map PICO-8
+                     * operators to function calls for Lua 5.2 compat.
+                     * Lua 5.2 has NO bitwise operators (|, &, ~, <<, >>)
+                     * and NO // floor division. */
+                    char op_text[8] = {0};
                     int op_text_len = compound_len - 1;
                     memcpy(op_text, work + compound_pos, op_text_len);
-                    /* ^^= → ~ (Lua XOR) */
-                    if (strcmp(op_text, "^^") == 0) {
-                        strcpy(op_text, "~"); op_text_len = 1;
-                    }
+                    const char *op_func = NULL;  /* non-NULL → emit as func call */
+                    if (strcmp(op_text, "^^") == 0)  op_func = "bxor";
+                    else if (strcmp(op_text, "//") == 0) op_func = "p8idiv";
+                    else if (strcmp(op_text, "|") == 0)  op_func = "bor";
+                    else if (strcmp(op_text, "&") == 0)  op_func = "band";
+                    else if (strcmp(op_text, "<<") == 0) op_func = "shl";
+                    else if (strcmp(op_text, ">>") == 0) op_func = "shr";
 
                     /* RHS: after the op= to end of line (or comment) */
                     size_t rhs_start = compound_pos + compound_len;
@@ -1496,16 +1502,27 @@ static char *rewrite_compounds(const char *src, size_t len, size_t *out_len) {
                            (work[rhs_end-1]==' '||work[rhs_end-1]=='\t'))
                         rhs_end--;
 
-                    /* Emit: prefix + lhs = lhs op (rhs) + tail */
+                    /* Emit: prefix + lhs = func(lhs, rhs) or lhs op (rhs)
+                     * Lua 5.2 has no bitwise ops or //, so PICO-8 operators
+                     * that map to missing Lua operators use function calls. */
                     buf_puts(&o, work, lhs_start);  /* prefix (indentation) */
                     buf_puts(&o, work + lhs_start, lhs_end - lhs_start); /* lhs */
                     buf_str(&o, " = ");
-                    buf_puts(&o, work + lhs_start, lhs_end - lhs_start); /* lhs again */
-                    buf_putc(&o, ' ');
-                    buf_puts(&o, op_text, op_text_len);
-                    buf_str(&o, " (");
-                    buf_puts(&o, work + rhs_start, rhs_end - rhs_start);
-                    buf_putc(&o, ')');
+                    if (op_func) {
+                        buf_str(&o, op_func);
+                        buf_putc(&o, '(');
+                        buf_puts(&o, work + lhs_start, lhs_end - lhs_start);
+                        buf_str(&o, ", ");
+                        buf_puts(&o, work + rhs_start, rhs_end - rhs_start);
+                        buf_putc(&o, ')');
+                    } else {
+                        buf_puts(&o, work + lhs_start, lhs_end - lhs_start); /* lhs again */
+                        buf_putc(&o, ' ');
+                        buf_puts(&o, op_text, op_text_len);
+                        buf_str(&o, " (");
+                        buf_puts(&o, work + rhs_start, rhs_end - rhs_start);
+                        buf_putc(&o, ')');
+                    }
                     /* Tail: comment etc */
                     if (rhs_end < ll) buf_puts(&o, work + rhs_end, ll - rhs_end);
                 } else {

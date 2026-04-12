@@ -97,7 +97,7 @@ int p8_vm_init(p8_vm *vm, size_t heap_cap) {
      * coroutine / debug — io & package would pull fopen/dlopen
      * which the embedded build can't satisfy cheaply. */
     static const luaL_Reg p8_libs[] = {
-        { LUA_GNAME,       luaopen_base   },
+        { "",              luaopen_base   },  /* Lua 5.2: base lib name is "" */
         { LUA_TABLIBNAME,  luaopen_table  },
         { LUA_STRLIBNAME,  luaopen_string },
         { LUA_MATHLIBNAME, luaopen_math   },

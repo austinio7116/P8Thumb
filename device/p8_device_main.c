@@ -331,7 +331,7 @@ static int convert_one_cart(const char *stem, p8_machine *m,
     screen_log(m, sl, "compiled ok");
 
     dump_buf db = {0};
-    lua_dump(L, dump_writer, &db, 0);
+    lua_dump(L, dump_writer, &db);  /* Lua 5.2: no strip parameter */
     lua_close(L);
 
     if (!db.data || db.len == 0) {

@@ -462,6 +462,14 @@ static const char *fixpoint_binop_func(const char *src, int off, int len) {
     if (len==1 && src[off]=='|') return "bor";
     /* ~ as binary XOR (only when used as binary, not unary NOT) */
     if (len==1 && src[off]=='~') return "bxor";
+    /* \ and // integer division: Lua 5.2 has no // operator, so route
+     * through p8idiv(a, b) which does floor(a/b). PICO-8 uses \ for
+     * integer divide; we catch both the raw \ and the // form (which
+     * the pre_tokenize pass converts \ to). */
+    if (len==1 && src[off]=='\\') return "p8idiv";
+    if (len==2 && memcmp(src+off,"//",2)==0) return "p8idiv";
+    /* ^ power: Lua 5.2's ^ returns a number (no int/float split), so
+     * it can be emitted as-is. No wrapper needed. */
     return NULL;
 }
 
