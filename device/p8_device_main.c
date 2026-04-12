@@ -370,98 +370,81 @@ static int convert_pending_carts(p8_machine *m, uint16_t *sl) {
     FILINFO info;
     if (f_opendir(&dir, "/carts") != FR_OK) return 0;
 
-    /* First pass: collect stems that need conversion. We can't convert
-     * while iterating the directory (opening files would invalidate
-     * the directory scan on some FatFs configs), so collect first. */
-    char stems[16][40];
-    int n_stems = 0;
+    /* Scan for the FIRST .p8.png that lacks a matching .luac.
+     * Convert it and reboot. On next boot, it's skipped (has .luac)
+     * and the next unconverted cart gets processed. No array needed —
+     * just find one, close the directory, convert, reboot. */
+    char stem[40];
+    int found = 0;
 
-    while (n_stems < 16 && f_readdir(&dir, &info) == FR_OK) {
+    while (f_readdir(&dir, &info) == FR_OK) {
         if (info.fname[0] == 0) break;
         if (info.fattrib & AM_DIR) continue;
         size_t L = strlen(info.fname);
-        /* Match *.p8.png */
         if (L < 8) continue;
         if (strcasecmp(info.fname + L - 7, ".p8.png") != 0) continue;
 
-        /* Extract stem (everything before .p8.png) */
+        /* Extract stem */
         size_t stem_len = L - 7;
-        if (stem_len >= 40) stem_len = 39;
-        memcpy(stems[n_stems], info.fname, stem_len);
-        stems[n_stems][stem_len] = 0;
-        n_stems++;
+        if (stem_len >= sizeof(stem)) stem_len = sizeof(stem) - 1;
+        memcpy(stem, info.fname, stem_len);
+        stem[stem_len] = 0;
+
+        /* Check if .luac exists */
+        char luac_path[80];
+        snprintf(luac_path, sizeof(luac_path), "/carts/%s.luac", stem);
+        FILINFO fi;
+        if (f_stat(luac_path, &fi) == FR_OK) continue; /* already done */
+
+        found = 1;
+        break;
     }
     f_closedir(&dir);
 
-    if (n_stems == 0) return 0;
+    if (!found) return 0;
 
-    /* Second pass: check which stems lack .luac and convert those. */
-    int converted = 0;
-    for (int s = 0; s < n_stems; s++) {
-        char luac_path[80];
-        snprintf(luac_path, sizeof(luac_path), "/carts/%s.luac",
-                 stems[s]);
-        FILINFO fi;
-        if (f_stat(luac_path, &fi) == FR_OK) {
-            continue;  /* already converted */
-        }
+    /* Convert this one cart */
+    p8_machine_reset(m);
+    p8_camera(m, 0, 0);
+    p8_cls(m, 1);
+    p8_font_draw(m, "ThumbyP8", 40, 4, 7);
+    p8_font_draw(m, stem, 4, 36, 11);
+    p8_font_draw(m, "converting...", 24, 56, 10);
+    p8_machine_present(m, sl);
+    p8_lcd_wait_idle();
+    p8_lcd_present(sl);
 
-        /* Show overall progress */
-        p8_machine_reset(m);
-        p8_camera(m, 0, 0);
-        p8_cls(m, 1);
-        p8_font_draw(m, "ThumbyP8", 40, 4, 7);
-        {
-            char prog[40];
-            snprintf(prog, sizeof(prog), "cart %d / %d",
-                     s + 1, n_stems);
-            p8_font_draw(m, prog, 30, 20, 6);
-        }
-        p8_font_draw(m, stems[s], 4, 36, 11);
-        p8_font_draw(m, "converting...", 24, 56, 10);
-        p8_machine_present(m, sl);
-        p8_lcd_wait_idle();
-        p8_lcd_present(sl);
-
-        int rc = convert_one_cart(stems[s], m, sl);
-        if (rc == 0) {
-            converted++;
-        } else {
-            char buf[80];
-            snprintf(buf, sizeof(buf), "convert: FAIL %s rc=%d",
-                     stems[s], rc);
-            p8_log_to_file(buf);
-            /* Write an empty .luac so this cart is skipped on next
-             * boot instead of retrying forever. */
-            char fail_path[80];
-            snprintf(fail_path, sizeof(fail_path), "/carts/%s.luac",
-                     stems[s]);
-            FIL ff;
-            if (f_open(&ff, fail_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK)
-                f_close(&ff);
-        }
-
-        /* Reboot after EVERY conversion attempt (success or fail)
-         * to reclaim fragmented heap. On next boot, the just-handled
-         * cart has a .luac (real or empty stub) so it's skipped. */
-        p8_flash_disk_flush();
-
-        p8_machine_reset(m);
-        p8_camera(m, 0, 0);
-        p8_cls(m, 1);
-        p8_font_draw(m, rc == 0 ? "converted:" : "FAILED:", 4, 46, rc == 0 ? 11 : 8);
-        p8_font_draw(m, stems[s], 4, 56, 7);
-        p8_font_draw(m, "rebooting...", 28, 72, 6);
-        p8_machine_present(m, sl);
-        p8_lcd_wait_idle();
-        p8_lcd_present(sl);
-        sleep_ms(1000);
-
-        watchdog_reboot(0, 0, 0);
-        while (1) tight_loop_contents();
+    int rc = convert_one_cart(stem, m, sl);
+    if (rc != 0) {
+        char buf[80];
+        snprintf(buf, sizeof(buf), "convert: FAIL %s rc=%d", stem, rc);
+        p8_log_to_file(buf);
+        /* Write empty .luac stub so this cart is skipped next boot */
+        char fail_path[80];
+        snprintf(fail_path, sizeof(fail_path), "/carts/%s.luac", stem);
+        FIL ff;
+        if (f_open(&ff, fail_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK)
+            f_close(&ff);
     }
 
-    return converted;
+    /* Reboot to reclaim heap for next cart */
+    p8_flash_disk_flush();
+
+    p8_machine_reset(m);
+    p8_camera(m, 0, 0);
+    p8_cls(m, 1);
+    p8_font_draw(m, rc == 0 ? "converted:" : "FAILED:", 4, 46, rc == 0 ? 11 : 8);
+    p8_font_draw(m, stem, 4, 56, 7);
+    p8_font_draw(m, "rebooting...", 28, 72, 6);
+    p8_machine_present(m, sl);
+    p8_lcd_wait_idle();
+    p8_lcd_present(sl);
+    sleep_ms(1000);
+
+    watchdog_reboot(0, 0, 0);
+    while (1) tight_loop_contents();
+
+    return 1; /* unreachable */
 }
 
 /* "Drop carts onto USB drive" wait screen. Holds until at least one
