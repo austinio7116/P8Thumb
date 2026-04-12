@@ -1,34 +1,27 @@
 /*
  * ThumbyP8 — PICO-8 audio synth implementation.
  *
- * Per-channel state machine: each tick (one PICO-8 "note time")
- * we read the next note from the active SFX, set up frequency
- * + waveform + envelope + effect, and produce samples until the
- * tick expires. Effects modulate frequency or volume across the
- * tick.
+ * Reference: fake-08 Audio.cpp/synth.cpp (MIT, jtothebell) and
+ * zepto-8 synth.cpp. Bit formats verified against shrinko8's
+ * pico_cart.py and picotool.
  *
- * Sample loop is the hot path. Kept in plain C for portability;
- * optimized version with viper-style fixed-point integer hot
- * loop will land in a later phase if profiling demands.
+ * Key format details:
+ *   SFX note (16-bit LE at 0x3200 + sfx*68 + note*2):
+ *     byte0: [w1 w0 p5 p4 p3 p2 p1 p0]
+ *     byte1: [c  e2 e1 e0 v2 v1 v0 w2]
+ *     pitch  = byte0 & 0x3f          (0-63)
+ *     wave   = ((byte0>>6)&3) | ((byte1&1)<<2)  (0-7)
+ *     volume = (byte1>>1) & 7        (0-7)
+ *     effect = (byte1>>4) & 7        (0-7)
+ *     custom = (byte1>>7) & 1
  *
- * Format reference (PICO-8 cart memory layout):
+ *   SFX header (at offset +64..+67 within 68-byte entry):
+ *     +64: filters/editor  +65: speed  +66: loop_start  +67: loop_end
  *
- *   SFX entry @ 0x3200 + n*68:
- *     +0    editor mode (ignored at runtime)
- *     +1    note duration (ticks per note, in 2.4ms units * speed)
- *     +2    loop start note
- *     +3    loop end note
- *     +4..  32 notes * 2 bytes:
- *           bits 0-5  pitch (0-63, semitones from C0)
- *           bits 6-8  waveform 0..7
- *           bits 9-11 volume 0..7
- *           bits 12-14 effect 0..7
- *           bit 15    custom-instrument flag (we ignore)
- *
- *   Music entry @ 0x3100 + n*4:
- *     bytes encode 4 sfx slot IDs, with high bit = "no sound";
- *     additional flag bits 6/7 of byte 0 = loop start / loop end
- *     / stop. We model the documented subset.
+ *   Music pattern (4 bytes at 0x3100 + pat*4):
+ *     Each byte: bits 0-6 = SFX index, bit 7 = flag
+ *     byte0 bit7 = loop-start, byte1 bit7 = loop-back,
+ *     byte2 bit7 = stop. Channel disabled when (byte & 0x7f) >= 64.
  */
 #include "p8_audio.h"
 #include <math.h>
@@ -36,30 +29,36 @@
 #include <stdlib.h>
 
 #ifndef M_PI
-#define M_PI 3.14159265358979323846
+#define M_PI 3.14159265358979323846f
 #endif
 
-#define SR        P8_AUDIO_SAMPLE_RATE
-#define NCH       P8_AUDIO_CHANNELS
+#define SR        P8_AUDIO_SAMPLE_RATE   /* 22050 */
+#define NCH       P8_AUDIO_CHANNELS      /* 4 */
 #define NOTES_PER_SFX 32
+#define TICKS_PER_SPEED 183   /* samples per note at speed=1 */
 
 /* Per-channel synth state. */
 typedef struct {
     int   sfx;              /* current SFX index, -1 = idle */
-    int   note;             /* current note index 0..31 */
-    int   start_note;       /* SFX play offset */
-    int   end_note;         /* exclusive */
-    int   loop;             /* nonzero = music loops the sfx */
-    int   samples_left;     /* in current note */
-    int   note_samples;     /* samples per note (set per-note from sfx speed) */
+    int   note_id;          /* current note index 0..31 */
+    int   end_note;         /* note index where SFX stops (exclusive) */
+    int   samples_left;     /* remaining samples in current note */
+    int   note_samples;     /* total samples for current note */
+    int   is_music;         /* 1 = this channel is playing for music */
+
     /* Cached note data */
     uint8_t cur_pitch, cur_wave, cur_vol, cur_effect;
     uint8_t prev_pitch, prev_vol;
-    /* Phase accumulator (Q16.16 fractional samples per cycle) */
-    uint32_t phase;
-    uint32_t phase_inc;     /* current freq's phase increment */
-    /* Noise state */
-    uint32_t noise_lfsr;
+
+    /* Phase accumulator (float, wraps at 1.0) */
+    float phase;
+
+    /* Noise state: low-pass filtered random */
+    float noise_sample;     /* last noise output */
+    float noise_advance;    /* accumulated phase for noise */
+
+    /* SFX loop range */
+    int loop_start, loop_end;
 } p8_channel;
 
 static p8_machine *g_machine = NULL;
@@ -67,90 +66,108 @@ static p8_channel  ch[NCH];
 
 /* Music state */
 static int music_pat = -1;
-static int music_loop_start = -1;
+static int music_mask = 0;     /* channel mask from music() call */
+static float music_offset = 0; /* global music clock (in speed-1 note units) */
+static float music_length = 0; /* pattern length in same units */
 
 /* --------- helpers --------------------------------------------------- */
 
-/* Pitch number → frequency in Hz. PICO-8 pitch 0 = C0 (≈ 16.35 Hz),
- * each step is one semitone. */
-static double pitch_to_freq(int pitch) {
-    return 16.351597831287414 * pow(2.0, (double)pitch / 12.0);
+/* Pitch → frequency. Key 33 = A4 = 440 Hz. */
+static float pitch_to_freq(float pitch) {
+    return 440.0f * expf(((pitch - 33.0f) / 12.0f) * 0.6931471805599453f);
 }
 
-/* Compute phase increment for the given pitch, as Q16.16 of "cycles
- * per sample" — feed to the waveform LUT below. */
-static uint32_t pitch_to_inc(int pitch) {
-    double freq = pitch_to_freq(pitch);
-    double cps  = freq / (double)SR;        /* cycles per sample */
-    return (uint32_t)(cps * 65536.0 * 65536.0);   /* Q16.16 */
-}
-
-/* Read a 16-bit note word out of an SFX. */
-static uint16_t sfx_note_word(int sfx, int note) {
-    int addr = 0x3200 + sfx * 68 + 4 + note * 2;
-    return (uint16_t)g_machine->mem[addr]
-         | ((uint16_t)g_machine->mem[addr + 1] << 8);
+/* Read a 16-bit note word and unpack fields. */
+static void read_note(int sfx, int note,
+                      uint8_t *pitch, uint8_t *wave,
+                      uint8_t *vol, uint8_t *effect) {
+    int addr = 0x3200 + sfx * 68 + note * 2;
+    uint8_t b0 = g_machine->mem[addr];
+    uint8_t b1 = g_machine->mem[addr + 1];
+    *pitch  = b0 & 0x3f;
+    *wave   = ((b0 >> 6) & 3) | ((b1 & 1) << 2);
+    *vol    = (b1 >> 1) & 7;
+    *effect = (b1 >> 4) & 7;
 }
 
 static int sfx_speed(int sfx) {
-    return g_machine->mem[0x3200 + sfx * 68 + 1];
+    int s = g_machine->mem[0x3200 + sfx * 68 + 65];
+    return s < 1 ? 1 : s;
 }
 static int sfx_loop_start(int sfx) {
-    return g_machine->mem[0x3200 + sfx * 68 + 2];
+    return g_machine->mem[0x3200 + sfx * 68 + 66];
 }
 static int sfx_loop_end(int sfx) {
-    return g_machine->mem[0x3200 + sfx * 68 + 3];
+    return g_machine->mem[0x3200 + sfx * 68 + 67];
 }
 
-/* Convert sfx speed (1..255, 1 = fastest) to samples per note.
- * PICO-8: tick = 183 samples per "speed unit" at 22050 Hz. */
-static int speed_to_samples(int speed) {
-    if (speed < 1) speed = 1;
-    return speed * 183;
-}
-
-/* Waveform lookup: phase is the high 16 bits of the Q16.16
- * accumulator (0..65535). Returns sample in [-1.0, +1.0]. */
-static float wave_sample(uint8_t wave, uint16_t phase, uint32_t *noise_lfsr) {
-    float t = (float)phase / 65536.0f;       /* 0..1 */
+/* Waveform sample. `t` is phase position 0..1, `advance` is total
+ * accumulated phase (for phaser detuning). Returns ~[-0.5, +0.5]. */
+static float wave_sample(uint8_t wave, float t, float advance,
+                          float *noise_sample, float pitch) {
     switch (wave & 7) {
     case 0: { /* triangle */
-        return (t < 0.5f) ? (4.0f * t - 1.0f) : (3.0f - 4.0f * t);
+        return (1.0f - fabsf(4.0f * t - 2.0f)) * 0.5f;
     }
-    case 1: { /* tilted triangle (asymmetric) */
-        const float k = 0.875f;
-        if (t < k) return (2.0f * t / k) - 1.0f;
-        return 1.0f - 2.0f * (t - k) / (1.0f - k);
+    case 1: { /* tilted saw (asymmetric triangle, 87.5% rise) */
+        float a = 0.875f;
+        float ret = t < a ? (2.0f * t / a - 1.0f)
+                          : (2.0f * (1.0f - t) / (1.0f - a) - 1.0f);
+        return ret * 0.5f;
     }
     case 2: { /* sawtooth */
-        return 2.0f * t - 1.0f;
+        float ret = t < 0.5f ? t : (t - 1.0f);
+        return 0.653f * ret;
     }
-    case 3: { /* square */
-        return (t < 0.5f) ? -1.0f : 1.0f;
+    case 3: { /* square 50% duty */
+        return t < 0.5f ? 0.25f : -0.25f;
     }
-    case 4: { /* pulse (1/3 duty) */
-        return (t < 0.333f) ? 1.0f : -1.0f;
+    case 4: { /* pulse ~31.6% duty */
+        return t < 0.316f ? 0.25f : -0.25f;
     }
-    case 5: { /* organ — sum of two saws an octave apart */
-        float a = 2.0f * t - 1.0f;
-        float t2 = t * 2.0f; if (t2 >= 1.0f) t2 -= 1.0f;
-        float b = 2.0f * t2 - 1.0f;
-        return 0.5f * (a + b);
+    case 5: { /* organ (harmonic-rich dual triangle) */
+        float ret = t < 0.5f
+            ? (3.0f - fabsf(24.0f * t - 6.0f))
+            : (1.0f - fabsf(16.0f * t - 12.0f));
+        return ret / 9.0f;
     }
-    case 6: { /* white noise — LFSR */
-        uint32_t x = *noise_lfsr;
-        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
-        *noise_lfsr = x;
-        return ((int32_t)x / (float)INT32_MAX);
+    case 6: { /* noise — low-pass filtered random.
+              * Pitch controls cutoff: high pitch = bright, low = dark. */
+        float tscale = (float)SR / pitch_to_freq(63);
+        float freq = pitch_to_freq(pitch);
+        float scale = (freq / (float)SR) * tscale;
+        /* Random float in [-1, 1] */
+        float r = ((float)(rand() % 65536) / 32768.0f) - 1.0f;
+        float ns = (*noise_sample + scale * r) / (1.0f + scale);
+        *noise_sample = ns;
+        /* Volume compensation for low pitches */
+        float factor = 1.0f - pitch / 63.0f;
+        return ns * 1.5f * (1.0f + factor * factor) * 0.25f;
     }
-    case 7: { /* phaser — square swept */
-        float s = (t < 0.5f) ? -1.0f : 1.0f;
-        float s2 = (t < 0.6f) ? -1.0f : 1.0f;
-        return 0.5f * (s + s2);
+    case 7: { /* phaser — two detuned triangles beating together */
+        float ret = 2.0f - fabsf(8.0f * t - 4.0f);
+        float t2 = fmodf(advance * 109.0f / 110.0f, 1.0f);
+        ret += 1.0f - fabsf(4.0f * t2 - 2.0f);
+        return ret / 6.0f;
     }
     }
     return 0.0f;
 }
+
+/* --------- music helpers --------------------------------------------- */
+
+static int pat_flag_start(int pat) {
+    return (g_machine->mem[0x3100 + pat * 4 + 0] >> 7) & 1;
+}
+static int pat_flag_loop(int pat) {
+    return (g_machine->mem[0x3100 + pat * 4 + 1] >> 7) & 1;
+}
+static int pat_flag_stop(int pat) {
+    return (g_machine->mem[0x3100 + pat * 4 + 2] >> 7) & 1;
+}
+
+static void start_note(int chan);
+static void music_start_pattern(int pat);
 
 /* --------- public API ------------------------------------------------ */
 
@@ -159,157 +176,290 @@ void p8_audio_init(p8_machine *m) {
     memset(ch, 0, sizeof(ch));
     for (int i = 0; i < NCH; i++) {
         ch[i].sfx = -1;
-        ch[i].noise_lfsr = 0xACE1u + i;
     }
     music_pat = -1;
-    music_loop_start = -1;
+    music_mask = 0;
+    music_offset = 0;
+    music_length = 0;
 }
 
 static void start_note(int chan) {
     p8_channel *c = &ch[chan];
-    if (c->note >= c->end_note) {
-        if (c->loop) {
-            int ls = sfx_loop_start(c->sfx);
-            int le = sfx_loop_end(c->sfx);
-            if (le > ls) {
-                c->note = ls;
-                c->end_note = le;
-            } else {
-                c->note = c->start_note;
-            }
+    if (c->note_id >= c->end_note) {
+        /* Check SFX loop */
+        if (c->loop_end > c->loop_start) {
+            c->note_id = c->loop_start;
+            c->end_note = c->loop_end;
         } else {
             c->sfx = -1;
             return;
         }
     }
-    uint16_t w = sfx_note_word(c->sfx, c->note);
     c->prev_pitch = c->cur_pitch;
     c->prev_vol   = c->cur_vol;
-    c->cur_pitch  = (uint8_t)(w & 0x3f);
-    c->cur_wave   = (uint8_t)((w >> 6) & 0x7);
-    c->cur_vol    = (uint8_t)((w >> 9) & 0x7);
-    c->cur_effect = (uint8_t)((w >> 12) & 0x7);
-    c->phase_inc  = pitch_to_inc(c->cur_pitch);
-    c->note_samples = speed_to_samples(sfx_speed(c->sfx));
+    read_note(c->sfx, c->note_id,
+              &c->cur_pitch, &c->cur_wave, &c->cur_vol, &c->cur_effect);
+    int spd = sfx_speed(c->sfx);
+    c->note_samples = TICKS_PER_SPEED * spd;
     c->samples_left = c->note_samples;
 }
 
 void p8_audio_sfx(int n, int channel, int offset, int length) {
     if (!g_machine) return;
     if (n < 0) {
-        /* sfx(-1, ch) → stop the channel */
-        if (channel >= 0 && channel < NCH) ch[channel].sfx = -1;
+        /* sfx(-1, ch) or sfx(-2, ch) → stop */
+        if (channel >= 0 && channel < NCH) {
+            if (!ch[channel].is_music)
+                ch[channel].sfx = -1;
+        }
         return;
     }
     if (n >= 64) return;
+
+    /* Deduplicate: stop any channel already playing this SFX */
+    for (int i = 0; i < NCH; i++) {
+        if (ch[i].sfx == n) ch[i].sfx = -1;
+    }
+
     int chan = channel;
     if (chan < 0 || chan >= NCH) {
-        /* auto: pick first idle channel */
+        /* Auto-pick: find idle non-masked channel */
         chan = -1;
-        for (int i = 0; i < NCH; i++) if (ch[i].sfx < 0) { chan = i; break; }
-        if (chan < 0) chan = 0;
+        for (int i = 0; i < NCH; i++) {
+            if ((music_mask & (1 << i)) && ch[i].is_music) continue;
+            if (ch[i].sfx < 0) { chan = i; break; }
+        }
+        /* If none idle, steal first non-masked channel */
+        if (chan < 0) {
+            for (int i = 0; i < NCH; i++) {
+                if ((music_mask & (1 << i)) && ch[i].is_music) continue;
+                chan = i; break;
+            }
+        }
+        if (chan < 0) return;  /* all channels masked, can't play */
     }
+
     p8_channel *c = &ch[chan];
     c->sfx = n;
-    c->start_note = (offset > 0) ? offset : 0;
-    c->end_note   = (length > 0) ? (c->start_note + length) : NOTES_PER_SFX;
+    c->note_id = (offset > 0) ? offset : 0;
+    c->end_note = (length > 0) ? (c->note_id + length) : NOTES_PER_SFX;
     if (c->end_note > NOTES_PER_SFX) c->end_note = NOTES_PER_SFX;
-    c->note = c->start_note;
-    c->loop = 0;
+    c->loop_start = sfx_loop_start(n);
+    c->loop_end   = sfx_loop_end(n);
+    /* If loop_end == 0 and loop_start > 0, treat loop_start as note count */
+    if (c->loop_end == 0 && c->loop_start > 0 && !c->is_music) {
+        c->end_note = c->loop_start;
+        c->loop_start = 0;  /* no actual looping */
+    }
     c->phase = 0;
-    c->cur_pitch = c->prev_pitch = 0;
+    c->noise_sample = 0;
+    c->noise_advance = 0;
+    c->cur_pitch = c->prev_pitch = 24;  /* default prev = C2 */
     c->cur_vol   = c->prev_vol   = 0;
+    c->is_music  = 0;
     start_note(chan);
 }
 
-void p8_audio_music(int n, int fade_len, int channel_mask) {
-    (void)fade_len; (void)channel_mask;
-    if (!g_machine) {
+/* Compute pattern length in speed-1-note units. */
+static float compute_pattern_length(int pat) {
+    float len = 32.0f;  /* default */
+    int found_nonloop = 0;
+    float max_loop_len = 0;
+
+    for (int i = 0; i < NCH; i++) {
+        uint8_t b = g_machine->mem[0x3100 + pat * 4 + i];
+        int sfx_idx = b & 0x7f;
+        if (sfx_idx >= 64) continue;  /* channel disabled */
+
+        int spd = sfx_speed(sfx_idx);
+        int ls = sfx_loop_start(sfx_idx);
+        int le = sfx_loop_end(sfx_idx);
+
+        if (le > ls) {
+            /* Looping SFX */
+            float l = 32.0f * spd;
+            if (l > max_loop_len) max_loop_len = l;
+        } else {
+            /* Non-looping SFX — its length determines pattern duration */
+            if (!found_nonloop) {
+                int end = 32;
+                if (le == 0 && ls > 0) end = ls;  /* ls = note count */
+                len = (float)(end * spd);
+                found_nonloop = 1;
+            }
+        }
+    }
+    if (!found_nonloop && max_loop_len > 0) len = max_loop_len;
+    return len;
+}
+
+static void music_start_pattern(int pat) {
+    if (pat < 0 || pat >= 64) {
+        music_pat = -1;
+        for (int i = 0; i < NCH; i++) {
+            if (ch[i].is_music) { ch[i].sfx = -1; ch[i].is_music = 0; }
+        }
         return;
     }
+    music_pat = pat;
+    music_offset = 0;
+    music_length = compute_pattern_length(pat);
+
+    for (int i = 0; i < NCH; i++) {
+        uint8_t b = g_machine->mem[0x3100 + pat * 4 + i];
+        int sfx_idx = b & 0x7f;
+        if (sfx_idx >= 64) {
+            if (ch[i].is_music) { ch[i].sfx = -1; ch[i].is_music = 0; }
+            continue;
+        }
+        /* Only start on channel if it's not currently playing a user SFX */
+        if (ch[i].sfx >= 0 && !ch[i].is_music) {
+            /* Channel busy with sfx() call — defer */
+            continue;
+        }
+        p8_channel *c = &ch[i];
+        c->sfx = sfx_idx;
+        c->note_id = 0;
+        c->end_note = NOTES_PER_SFX;
+        c->loop_start = sfx_loop_start(sfx_idx);
+        c->loop_end   = sfx_loop_end(sfx_idx);
+        c->phase = 0;
+        c->noise_sample = 0;
+        c->noise_advance = 0;
+        c->cur_pitch = c->prev_pitch = 24;
+        c->cur_vol   = c->prev_vol   = 0;
+        c->is_music  = 1;
+        start_note(i);
+    }
+}
+
+static void music_advance(void) {
+    if (music_pat < 0) return;
+    if (pat_flag_stop(music_pat)) {
+        music_start_pattern(-1);
+        return;
+    }
+    if (pat_flag_loop(music_pat)) {
+        int target = music_pat;
+        while (--target > 0 && !pat_flag_start(target)) ;
+        if (target < 0) target = 0;
+        music_start_pattern(target);
+        return;
+    }
+    music_start_pattern(music_pat + 1);
+}
+
+void p8_audio_music(int n, int fade_len, int channel_mask) {
+    (void)fade_len;  /* TODO: fade support */
+    if (!g_machine) return;
+    music_mask = channel_mask;
     if (n < 0) {
-        /* music(-1) → stop */
-        music_pat = -1;
-        for (int i = 0; i < NCH; i++) ch[i].sfx = -1;
+        music_start_pattern(-1);
         return;
     }
     if (n >= 64) return;
-    music_pat = n;
-    /* Read pattern: 4 bytes, each = sfx index (& 0x3f). High bit = mute. */
-    for (int i = 0; i < 4; i++) {
-        uint8_t b = g_machine->mem[0x3100 + n * 4 + i];
-        if (b & 0x40) { ch[i].sfx = -1; continue; }   /* slot disabled */
-        int sfx = b & 0x3f;
-        if (sfx >= 64) { ch[i].sfx = -1; continue; }
-        p8_audio_sfx(sfx, i, 0, 0);
-        ch[i].loop = 1;
-    }
+    music_start_pattern(n);
 }
 
-/* Per-sample effect adjustment: returns the effective pitch (float)
- * and volume (float 0..1) at the given fraction-through-note. */
+/* Per-sample effect: modifies pitch and volume based on effect type. */
 static void apply_effect(const p8_channel *c, float frac,
-                          float *out_pitch, float *out_vol) {
-    float pitch = (float)c->cur_pitch;
-    float vol   = (float)c->cur_vol / 7.0f;
+                          float *out_freq, float *out_vol) {
+    float freq = pitch_to_freq((float)c->cur_pitch);
+    float vol  = (float)c->cur_vol / 7.0f;
+
     switch (c->cur_effect) {
-    case 0: break;                      /* none */
-    case 1: {                            /* slide from prev pitch */
-        pitch = (1.0f - frac) * (float)c->prev_pitch + frac * (float)c->cur_pitch;
+    case 0: break;  /* none */
+    case 1: { /* slide from previous pitch/vol */
+        float prev_freq = pitch_to_freq((float)c->prev_pitch);
+        freq = prev_freq + (freq - prev_freq) * frac;
+        if (c->prev_vol > 0) {
+            float pv = (float)c->prev_vol / 7.0f;
+            vol = pv + (vol - pv) * frac;
+        }
         break;
     }
-    case 2: {                            /* vibrato — ±0.5 semitone @ ~8Hz */
-        pitch += 0.5f * sinf(frac * 2.0f * (float)M_PI * 4.0f);
+    case 2: { /* vibrato — ±0.5 semitone at ~7.5 Hz */
+        int spd = c->note_samples > 0 ? c->note_samples / TICKS_PER_SPEED : 1;
+        float ofs_per_sec = (float)SR / (float)(TICKS_PER_SPEED * spd);
+        float note_offset = frac;  /* 0..1 within note */
+        float abs_offset = (float)c->note_id + note_offset;
+        float t = fabsf(fmodf(7.5f * abs_offset / ofs_per_sec, 1.0f) - 0.5f) - 0.25f;
+        freq = freq + (freq * 1.059463094359f - freq) * t;
         break;
     }
-    case 3: {                            /* drop to 0 over note */
-        pitch = pitch * (1.0f - frac);
+    case 3: { /* drop to 0 */
+        freq *= (1.0f - frac);
         break;
     }
-    case 4: {                            /* fade in */
+    case 4: { /* fade in */
         vol *= frac;
         break;
     }
-    case 5: {                            /* fade out */
+    case 5: { /* fade out */
         vol *= (1.0f - frac);
         break;
     }
-    case 6:                              /* fast arp (4 notes/tick) */
-    case 7: {                            /* slow arp (2 notes/tick) */
-        /* arp not yet implemented — needs to look at next 3 notes */
+    case 6: /* arpeggio fast */
+    case 7: { /* arpeggio slow */
+        int spd = c->note_samples > 0 ? c->note_samples / TICKS_PER_SPEED : 1;
+        float ofs_per_sec = (float)SR / (float)(TICKS_PER_SPEED * spd);
+        int m = (spd <= 8 ? 32 : 16) / (c->cur_effect == 6 ? 4 : 8);
+        if (m < 1) m = 1;
+        float abs_offset = (float)c->note_id + frac;
+        int n = (int)((float)m * 7.5f * abs_offset / ofs_per_sec);
+        int base = c->note_id & ~3;
+        int arp_note = base | (n & 3);
+        if (arp_note >= NOTES_PER_SFX) arp_note = NOTES_PER_SFX - 1;
+        uint8_t ap, aw, av, ae;
+        read_note(c->sfx, arp_note, &ap, &aw, &av, &ae);
+        freq = pitch_to_freq((float)ap);
         break;
     }
     }
-    *out_pitch = pitch;
-    *out_vol   = vol;
+    *out_freq = freq;
+    *out_vol  = vol;
 }
 
 void p8_audio_render(int16_t *out, int n_samples) {
+    float music_inc = 1.0f / (float)TICKS_PER_SPEED;  /* per-sample music clock advance */
+
     for (int i = 0; i < n_samples; i++) {
+        /* Advance music clock */
+        if (music_pat >= 0) {
+            music_offset += music_inc;
+            if (music_offset >= music_length) {
+                music_advance();
+            }
+        }
+
         float mix = 0.0f;
         for (int k = 0; k < NCH; k++) {
             p8_channel *c = &ch[k];
             if (c->sfx < 0) continue;
             if (c->samples_left <= 0) {
-                c->note++;
+                c->note_id++;
                 start_note(k);
                 if (c->sfx < 0) continue;
             }
+
             float frac = 1.0f - (float)c->samples_left / (float)c->note_samples;
-            float p, v;
-            apply_effect(c, frac, &p, &v);
-            /* Re-derive phase increment for slid/dropped pitches.
-             * Doing this every sample would be expensive; do every
-             * 64 samples to amortize. */
-            if ((c->samples_left & 63) == 0) {
-                c->phase_inc = pitch_to_inc((int)p);
-            }
-            c->phase += c->phase_inc;
-            uint16_t ph = (uint16_t)(c->phase >> 16);
-            float s = wave_sample(c->cur_wave, ph, &c->noise_lfsr);
-            mix += s * v * 0.25f;     /* per-channel gain */
+            float freq, vol;
+            apply_effect(c, frac, &freq, &vol);
+
+            /* Advance phase */
+            float phase_inc = freq / (float)SR;
+            c->phase += phase_inc;
+            if (c->phase >= 1.0f) c->phase -= (int)c->phase;
+            c->noise_advance += phase_inc;
+
+            float s = wave_sample(c->cur_wave, c->phase, c->noise_advance,
+                                   &c->noise_sample, (float)c->cur_pitch);
+            mix += s * vol;
             c->samples_left--;
         }
+        /* 4 channels at ~±0.5 peak each * vol ≤1.0 → mix can reach ±2.0.
+         * Scale by 0.5 to keep in [-1,1] range. */
+        mix *= 0.5f;
         if (mix >  1.0f) mix =  1.0f;
         if (mix < -1.0f) mix = -1.0f;
         out[i] = (int16_t)(mix * 32767.0f);
@@ -319,7 +469,10 @@ void p8_audio_render(int16_t *out, int n_samples) {
 int p8_audio_stat(int n) {
     if (n >= 16 && n <= 19) return ch[n - 16].sfx;
     if (n >= 20 && n <= 23) {
-        return ch[n - 20].sfx >= 0 ? ch[n - 20].note : -1;
+        return ch[n - 20].sfx >= 0 ? ch[n - 20].note_id : -1;
     }
+    if (n == 24) return music_pat;
+    if (n == 25) return (music_pat >= 0) ? (int)music_offset : 0;
+    if (n == 26) return (music_pat >= 0) ? 1 : 0;  /* music playing flag */
     return 0;
 }
