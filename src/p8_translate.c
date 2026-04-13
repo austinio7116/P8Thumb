@@ -1743,8 +1743,12 @@ static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
                     continue;
                 }
             }
-            /* Match `for NAMELIST in EXPR do` — inject `_ENV = __p8_env(_ENV)`
-             * at start of body if NAMELIST contains _ENV. */
+            /* Match `for NAMELIST in EXPR do` — if NAMELIST contains _ENV,
+             * rename the loop variable to __p8v and inject
+             *   local _ENV = __p8_env(__p8v)
+             * at start of body. Can't inject `_ENV=__p8_env(_ENV)` because
+             * by the time the body runs, `_ENV` IS the loop variable and
+             * `__p8_env` (a bare identifier) can't be found through it. */
             if (at_boundary &&
                 i + 4 <= len &&
                 src[i+0]=='f' && src[i+1]=='o' && src[i+2]=='r' &&
@@ -1775,9 +1779,28 @@ static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
                                      rc=='d' && q+1 < len && src[q+1]=='o' &&
                                      (q+2 == len || !is_id((unsigned char)src[q+2])) &&
                                      (q==0 || !is_id((unsigned char)src[q-1]))) {
-                                /* Emit through `do`, then inject */
-                                buf_puts(&o, src + i, (q + 2) - i);
-                                buf_str(&o, " _ENV=__p8_env(_ENV) ");
+                                /* Emit `for `, then the NAMELIST with _ENV
+                                 * replaced by __p8v, then ` in EXPR do`,
+                                 * then `local _ENV=__p8_env(__p8v) `. */
+                                buf_puts(&o, "for ", 4);
+                                /* Copy namelist up to name_end, replacing _ENV */
+                                size_t np = p;
+                                while (np < name_end) {
+                                    if (np + 4 <= name_end &&
+                                        src[np]=='_' && src[np+1]=='E' &&
+                                        src[np+2]=='N' && src[np+3]=='V' &&
+                                        (np == p || !is_id((unsigned char)src[np-1])) &&
+                                        (np+4 == name_end || !is_id((unsigned char)src[np+4]))) {
+                                        buf_puts(&o, "__p8v", 5);
+                                        np += 4;
+                                    } else {
+                                        buf_putc(&o, src[np]);
+                                        np++;
+                                    }
+                                }
+                                /* Emit from `in` through `do` */
+                                buf_puts(&o, src + name_end, (q + 2) - name_end);
+                                buf_str(&o, " local _ENV=__p8_env(__p8v) ");
                                 i = q + 2;
                                 goto continue_loop;
                             }
@@ -1792,14 +1815,15 @@ static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
                     }
                 }
             }
-            /* Match `function [name](PARAMLIST)` — inject at start of body. */
+            /* Match `function [name](PARAMLIST)` — if any param is _ENV,
+             * rename it to __p8v and inject `local _ENV = __p8_env(__p8v)`
+             * at start of body. Same chicken-and-egg reasoning as for-loop. */
             if (at_boundary &&
                 i + 8 <= len &&
                 src[i+0]=='f' && src[i+1]=='u' && src[i+2]=='n' &&
                 src[i+3]=='c' && src[i+4]=='t' && src[i+5]=='i' &&
                 src[i+6]=='o' && src[i+7]=='n' &&
                 (i+8 == len || !is_id((unsigned char)src[i+8]))) {
-                /* Skip to `(` */
                 size_t p = i + 8;
                 while (p < len && src[p] != '(' && src[p] != '\n') p++;
                 if (p < len && src[p] == '(') {
@@ -1808,8 +1832,25 @@ static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
                     size_t params_end = scan_name_list(src, len, params_start,
                                                         &has_env, ')');
                     if (has_env && params_end < len && src[params_end] == ')') {
-                        buf_puts(&o, src + i, (params_end + 1) - i);
-                        buf_str(&o, " _ENV=__p8_env(_ENV) ");
+                        /* Emit `function ...(` then params with _ENV
+                         * renamed to __p8v, then `)`, then inject. */
+                        buf_puts(&o, src + i, params_start - i);  /* function ... ( */
+                        size_t np = params_start;
+                        while (np < params_end) {
+                            if (np + 4 <= params_end &&
+                                src[np]=='_' && src[np+1]=='E' &&
+                                src[np+2]=='N' && src[np+3]=='V' &&
+                                (np == params_start || !is_id((unsigned char)src[np-1])) &&
+                                (np+4 == params_end || !is_id((unsigned char)src[np+4]))) {
+                                buf_puts(&o, "__p8v", 5);
+                                np += 4;
+                            } else {
+                                buf_putc(&o, src[np]);
+                                np++;
+                            }
+                        }
+                        buf_putc(&o, ')');
+                        buf_str(&o, " local _ENV=__p8_env(__p8v) ");
                         i = params_end + 1;
                         goto continue_loop;
                     }
