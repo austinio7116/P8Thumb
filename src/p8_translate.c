@@ -1555,6 +1555,172 @@ static char *rewrite_compounds(const char *src, size_t len, size_t *out_len) {
 }
 
 /* ================================================================== */
+/* Phase 4: _ENV compatibility                                         */
+/*                                                                     */
+/* PICO-8 carts often write `local _ENV = t` (or compound forms like
+ * `local g, _ENV = _ENV, en`) to redirect bare identifier access to
+ * t's fields (Lua 5.2 _ENV semantics), while still expecting global
+ * functions like pal/spr/btn to be reachable. Real PICO-8 does this
+ * implicitly. Our Lua 5.2 does not.
+ *
+ * Rewrite: in any `local LHS = RHS` where LHS contains `_ENV`, wrap
+ * the corresponding RHS expression with __p8_env(…).
+ *
+ * Examples:
+ *   local _ENV = X              →  local _ENV = __p8_env(X)
+ *   local g, _ENV = _ENV, en    →  local g, _ENV = _ENV, __p8_env(en)
+ *
+ * The __p8_env helper (registered in p8.c) ensures the target has a
+ * metatable with __index = _G so global lookups still work.
+ * ================================================================== */
+
+/* Find the end of an expression starting at p, respecting nesting of
+ * parens/brackets/braces and string literals. Stops at top-level ',',
+ * ';', '\n', or end-of-line-comment. Returns end offset (exclusive). */
+static size_t scan_expr_end(const char *src, size_t len, size_t p) {
+    int paren = 0, brack = 0, brace = 0;
+    int rstate = 0;
+    while (p < len) {
+        char c = src[p];
+        if (rstate == 0) {
+            if (c == '\'') rstate = 1;
+            else if (c == '"') rstate = 2;
+            else if (c == '(') paren++;
+            else if (c == ')') { if (paren > 0) paren--; else break; }
+            else if (c == '[') brack++;
+            else if (c == ']') { if (brack > 0) brack--; else break; }
+            else if (c == '{') brace++;
+            else if (c == '}') { if (brace > 0) brace--; else break; }
+            else if (paren == 0 && brack == 0 && brace == 0 &&
+                     (c == '\n' || c == ';' ||
+                      (c == ',' && paren == 0 && brack == 0 && brace == 0))) break;
+            else if (c == '-' && p+1 < len && src[p+1]=='-') break;
+        } else if (rstate == 1) {
+            if (c == '\\' && p+1 < len) p++;
+            else if (c == '\'') rstate = 0;
+        } else if (rstate == 2) {
+            if (c == '\\' && p+1 < len) p++;
+            else if (c == '"') rstate = 0;
+        }
+        p++;
+    }
+    return p;
+}
+
+static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
+    buf_t o = {0};
+    buf_grow(&o, len + 64);
+
+    size_t i = 0;
+    int state = 0;  /* 0=code, 1=single-quote str, 2=double-quote str, 3=line comment */
+    while (i < len) {
+        char c = src[i];
+        if (state == 0) {
+            if (c == '\'') { state = 1; buf_putc(&o, c); i++; continue; }
+            if (c == '"')  { state = 2; buf_putc(&o, c); i++; continue; }
+            if (c == '-' && i+1 < len && src[i+1] == '-') {
+                state = 3; buf_puts(&o, "--", 2); i += 2; continue;
+            }
+            /* Match `local <idents> = <exprs>` — only at word boundary. */
+            int at_boundary = (i == 0) || !is_id((unsigned char)src[i-1]);
+            if (at_boundary &&
+                i + 5 <= len &&
+                src[i+0]=='l' && src[i+1]=='o' && src[i+2]=='c' &&
+                src[i+3]=='a' && src[i+4]=='l' &&
+                (i+5 == len || !is_id((unsigned char)src[i+5])) ) {
+                /* Parse LHS idents, looking for _ENV. */
+                size_t k = i + 5;
+                while (k < len && (src[k]==' '||src[k]=='\t')) k++;
+                int env_index = -1;   /* position of _ENV in LHS (0-based) */
+                int n_idents = 0;
+                size_t lhs_start = k;
+                /* Walk identifiers + commas until we see '=' or something else. */
+                for (;;) {
+                    /* Must start with identifier char */
+                    if (k >= len || !(is_id((unsigned char)src[k]) &&
+                                      !(src[k] >= '0' && src[k] <= '9'))) {
+                        /* Not a valid local declaration */
+                        n_idents = 0; break;
+                    }
+                    size_t id_start = k;
+                    while (k < len && is_id((unsigned char)src[k])) k++;
+                    size_t id_len = k - id_start;
+                    if (id_len == 4 && src[id_start]=='_' && src[id_start+1]=='E' &&
+                        src[id_start+2]=='N' && src[id_start+3]=='V') {
+                        if (env_index < 0) env_index = n_idents;
+                    }
+                    n_idents++;
+                    /* Skip whitespace */
+                    while (k < len && (src[k]==' '||src[k]=='\t')) k++;
+                    if (k < len && src[k] == ',') {
+                        k++;
+                        while (k < len && (src[k]==' '||src[k]=='\t')) k++;
+                        continue;
+                    }
+                    break;
+                }
+                if (env_index >= 0 && n_idents > 0 &&
+                    k < len && src[k] == '=' &&
+                    (k+1 == len || src[k+1] != '=')) {
+                    /* We have `local ... _ENV ... = ...` — walk the
+                     * RHS, wrapping the env_index-th expression with
+                     * __p8_env(). */
+                    /* Emit everything up to and including '=' */
+                    buf_puts(&o, src + i, (k + 1) - i);
+                    /* Walk RHS expressions */
+                    size_t p = k + 1;
+                    while (p < len && (src[p]==' '||src[p]=='\t')) p++;
+                    for (int idx = 0; idx < n_idents; idx++) {
+                        size_t e_end = scan_expr_end(src, len, p);
+                        /* Trim trailing whitespace */
+                        size_t e_trimmed = e_end;
+                        while (e_trimmed > p &&
+                               (src[e_trimmed-1]==' '||src[e_trimmed-1]=='\t'))
+                            e_trimmed--;
+                        /* Emit leading space */
+                        buf_putc(&o, ' ');
+                        if (idx == env_index) {
+                            buf_str(&o, "__p8_env(");
+                            buf_puts(&o, src + p, e_trimmed - p);
+                            buf_putc(&o, ')');
+                        } else {
+                            buf_puts(&o, src + p, e_trimmed - p);
+                        }
+                        p = e_end;
+                        /* Skip comma if present */
+                        if (idx + 1 < n_idents) {
+                            if (p < len && src[p] == ',') {
+                                buf_putc(&o, ',');
+                                p++;
+                                while (p < len && (src[p]==' '||src[p]=='\t')) p++;
+                            } else {
+                                /* Fewer RHS values than LHS idents —
+                                 * remaining get nil. Stop. */
+                                break;
+                            }
+                        }
+                    }
+                    i = p;
+                    (void)lhs_start;
+                    continue;
+                }
+            }
+        } else if (state == 1) {
+            if (c == '\\' && i+1 < len) { buf_putc(&o, c); buf_putc(&o, src[i+1]); i += 2; continue; }
+            if (c == '\'') state = 0;
+        } else if (state == 2) {
+            if (c == '\\' && i+1 < len) { buf_putc(&o, c); buf_putc(&o, src[i+1]); i += 2; continue; }
+            if (c == '"') state = 0;
+        } else if (state == 3) {
+            if (c == '\n') state = 0;
+        }
+        buf_putc(&o, c);
+        i++;
+    }
+    return buf_finish(&o, out_len);
+}
+
+/* ================================================================== */
 /* Public API                                                          */
 /* ================================================================== */
 char *p8_translate_full(char *src, size_t len, size_t *out_len) {
@@ -1593,10 +1759,17 @@ char *p8_translate_full(char *src, size_t len, size_t *out_len) {
      *
      * This is a single-buffer pass — no per-token mallocs. */
     size_t s3_len = 0;
-    char *result = rewrite_compounds(s2, s2_len, &s3_len);
+    char *s3 = rewrite_compounds(s2, s2_len, &s3_len);
     free(s2);
+    if (!s3) return NULL;
+
+    /* Step 4: _ENV compatibility. Rewrite `local _ENV = X` so the
+     * assigned table inherits _G for global function lookups. */
+    size_t s4_len = 0;
+    char *result = rewrite_env_locals(s3, s3_len, &s4_len);
+    free(s3);
     if (!result) return NULL;
 
-    if (out_len) *out_len = s3_len;
+    if (out_len) *out_len = s4_len;
     return result;
 }

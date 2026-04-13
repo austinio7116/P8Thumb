@@ -121,6 +121,31 @@ int p8_vm_init(p8_vm *vm, size_t heap_cap) {
     lua_getfield(vm->L, -1, "yield");   lua_setglobal(vm->L, "yield");
     lua_pop(vm->L, 1);  /* pop coroutine table */
 
+    /* PICO-8 _ENV compatibility helper.
+     *
+     * PICO-8 carts commonly write `local _ENV = t` to redirect free
+     * identifier access to `t`'s fields (Lua 5.2 semantics). They
+     * still expect global functions like pal/spr/btn to be reachable
+     * from inside that scope. The idiomatic Lua 5.2 way to do this
+     * is to set a metatable on `t` with `__index = _G` — but PICO-8
+     * carts don't do this themselves. PICO-8's Lua applies the
+     * fallback implicitly.
+     *
+     * We mimic that with a helper: __p8_env(t) ensures `t` has a
+     * metatable with `__index = _G` and returns `t`. Our translator
+     * rewrites `local _ENV = X` to `local _ENV = __p8_env(X)`. */
+    const char *env_helper =
+        "function __p8_env(t)\n"
+        "  if type(t) ~= 'table' then return t end\n"
+        "  if getmetatable(t) == nil then\n"
+        "    setmetatable(t, {__index = _G})\n"
+        "  end\n"
+        "  return t\n"
+        "end\n";
+    if (luaL_loadstring(vm->L, env_helper) == LUA_OK) {
+        lua_pcall(vm->L, 0, 0, 0);
+    }
+
     return 0;
 }
 

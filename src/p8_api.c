@@ -178,7 +178,11 @@ static int l_circfill(lua_State *L) {
 static int l_pal(lua_State *L) {
     TRACE("pal");
     p8_machine *m = get_machine(L);
-    if (lua_gettop(L) == 0) { p8_pal_reset(m); return 0; }
+    /* No args, or nil first arg → reset both palettes. */
+    if (lua_gettop(L) == 0 || lua_isnil(L, 1)) {
+        p8_pal_reset(m);
+        return 0;
+    }
     /* Table form: first arg is a table, second (optional) is palette index. */
     if (lua_istable(L, 1)) {
         int p = argi(L, 2, 0);
@@ -212,6 +216,19 @@ static int l_palt(lua_State *L) {
         for (int i = 0; i < 16; i++) {
             if (i == 0) m->mem[P8_DS_DRAW_PAL + i] |= 0x10;
             else        m->mem[P8_DS_DRAW_PAL + i] &= ~0x10;
+        }
+        return 0;
+    }
+    /* Single-arg form: palt(bitmask) where bit N = color N transparent.
+     * Two-arg form: palt(color, transparent_bool). */
+    if (lua_gettop(L) == 1 && lua_isnumber(L, 1)) {
+        unsigned int mask = (unsigned int)lua_tonumber(L, 1);
+        for (int i = 0; i < 16; i++) {
+            if (mask & (1u << (15 - i))) {
+                m->mem[P8_DS_DRAW_PAL + i] |= 0x10;
+            } else {
+                m->mem[P8_DS_DRAW_PAL + i] &= ~0x10;
+            }
         }
         return 0;
     }
