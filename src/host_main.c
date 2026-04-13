@@ -206,8 +206,22 @@ int main(int argc, char **argv) {
                 running = 0;
         }
 
-        /* Update input state from keyboard */
-        p8_input_begin_frame(&input, poll_buttons());
+        /* Update input state from keyboard, or random input if
+         * P8_FUZZ_INPUT=1 (used by fuzz harness to exercise more
+         * code paths than just the title screen). */
+        uint8_t btns = poll_buttons();
+        if (getenv("P8_FUZZ_INPUT")) {
+            /* Random buttons. Press each button independently with
+             * 30% probability per frame. */
+            unsigned r = (unsigned)(frame_count * 2654435761u);
+            uint8_t fuzz_btns = 0;
+            for (int b = 0; b < 6; b++) {
+                r = r * 2654435761u + 1;
+                if ((r % 100) < 30) fuzz_btns |= (1 << b);
+            }
+            btns |= fuzz_btns;
+        }
+        p8_input_begin_frame(&input, btns);
 
         /* _update() then _draw() */
         if (p8_api_call_optional(&vm, update_fn) != 0) running = 0;

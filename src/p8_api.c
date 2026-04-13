@@ -1005,9 +1005,14 @@ static int l_p8_tonum(lua_State *L) {
     /* PICO-8 tonum is lenient: nil → nil, bool → nil, numbers
      * pass through, strings get parsed (returning nil if not
      * parseable). NEVER errors. Real carts call this on
-     * arbitrary inputs and expect a graceful nil back. */
+     * arbitrary inputs and expect a graceful nil back.
+     *
+     * NOTE: use lua_type(L,1)==LUA_TNUMBER, NOT lua_isnumber.
+     * lua_isnumber returns true for strings that look like
+     * numbers (Lua's auto-coercion), and lua_pushvalue would
+     * then push the original string unchanged. */
     if (lua_isnoneornil(L, 1)) { lua_pushnil(L); return 1; }
-    if (lua_isnumber(L, 1))     { lua_pushvalue(L, 1); return 1; }
+    if (lua_type(L, 1) == LUA_TNUMBER) { lua_pushvalue(L, 1); return 1; }
     if (lua_isboolean(L, 1))    { lua_pushnil(L); return 1; }
     const char *s = lua_tostring(L, 1);
     if (!s) { lua_pushnil(L); return 1; }
