@@ -1607,6 +1607,44 @@ static size_t scan_expr_end(const char *src, size_t len, size_t p) {
     return p;
 }
 
+/* Scan an identifier-or-comma list starting at p. Returns end offset
+ * (position of the terminator char) and sets *has_env if any of the
+ * names is "_ENV". Terminators handled: `in` keyword, `)`, `do`. */
+static size_t scan_name_list(const char *src, size_t len, size_t p,
+                             int *has_env, char terminator) {
+    *has_env = 0;
+    int in_ident = 0;
+    size_t id_start = p;
+    while (p < len) {
+        char c = src[p];
+        if (is_id((unsigned char)c)) {
+            if (!in_ident) { id_start = p; in_ident = 1; }
+        } else {
+            if (in_ident) {
+                /* Close the identifier token; check if it's _ENV */
+                size_t idl = p - id_start;
+                if (idl == 4 && src[id_start]=='_' && src[id_start+1]=='E' &&
+                    src[id_start+2]=='N' && src[id_start+3]=='V') {
+                    *has_env = 1;
+                }
+                in_ident = 0;
+                /* Check if this identifier is "in" keyword (for for-loops) */
+                if (terminator == 'i' && idl == 2 &&
+                    src[id_start]=='i' && src[id_start+1]=='n') {
+                    return id_start;  /* `in` keyword starts here */
+                }
+            }
+            if (c == terminator) return p;
+            if (c == ',' || c == ' ' || c == '\t') { p++; continue; }
+            if (terminator == ')' && c == ')') return p;
+            /* Anything else → abort (malformed or unexpected) */
+            return p;
+        }
+        p++;
+    }
+    return p;
+}
+
 static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
     buf_t o = {0};
     buf_grow(&o, len + 64);
@@ -1705,6 +1743,78 @@ static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
                     continue;
                 }
             }
+            /* Match `for NAMELIST in EXPR do` — inject `_ENV = __p8_env(_ENV)`
+             * at start of body if NAMELIST contains _ENV. */
+            if (at_boundary &&
+                i + 4 <= len &&
+                src[i+0]=='f' && src[i+1]=='o' && src[i+2]=='r' &&
+                (src[i+3]==' ' || src[i+3]=='\t')) {
+                size_t p = i + 3;
+                while (p < len && (src[p]==' '||src[p]=='\t')) p++;
+                int has_env = 0;
+                size_t name_end = scan_name_list(src, len, p, &has_env, 'i');
+                if (has_env && name_end + 2 <= len &&
+                    src[name_end]=='i' && src[name_end+1]=='n' &&
+                    (name_end+2 == len ||
+                     !is_id((unsigned char)src[name_end+2]))) {
+                    /* Find matching `do` at top level */
+                    size_t q = name_end + 2;
+                    int paren=0, brack=0, brace=0, rstate=0;
+                    while (q < len) {
+                        char rc = src[q];
+                        if (rstate == 0) {
+                            if (rc == '\'') rstate = 1;
+                            else if (rc == '"') rstate = 2;
+                            else if (rc == '(') paren++;
+                            else if (rc == ')' && paren > 0) paren--;
+                            else if (rc == '[') brack++;
+                            else if (rc == ']' && brack > 0) brack--;
+                            else if (rc == '{') brace++;
+                            else if (rc == '}' && brace > 0) brace--;
+                            else if (paren==0 && brack==0 && brace==0 &&
+                                     rc=='d' && q+1 < len && src[q+1]=='o' &&
+                                     (q+2 == len || !is_id((unsigned char)src[q+2])) &&
+                                     (q==0 || !is_id((unsigned char)src[q-1]))) {
+                                /* Emit through `do`, then inject */
+                                buf_puts(&o, src + i, (q + 2) - i);
+                                buf_str(&o, " _ENV=__p8_env(_ENV) ");
+                                i = q + 2;
+                                goto continue_loop;
+                            }
+                        } else if (rstate == 1) {
+                            if (rc == '\\' && q+1 < len) q++;
+                            else if (rc == '\'') rstate = 0;
+                        } else if (rstate == 2) {
+                            if (rc == '\\' && q+1 < len) q++;
+                            else if (rc == '"') rstate = 0;
+                        }
+                        q++;
+                    }
+                }
+            }
+            /* Match `function [name](PARAMLIST)` — inject at start of body. */
+            if (at_boundary &&
+                i + 8 <= len &&
+                src[i+0]=='f' && src[i+1]=='u' && src[i+2]=='n' &&
+                src[i+3]=='c' && src[i+4]=='t' && src[i+5]=='i' &&
+                src[i+6]=='o' && src[i+7]=='n' &&
+                (i+8 == len || !is_id((unsigned char)src[i+8]))) {
+                /* Skip to `(` */
+                size_t p = i + 8;
+                while (p < len && src[p] != '(' && src[p] != '\n') p++;
+                if (p < len && src[p] == '(') {
+                    size_t params_start = p + 1;
+                    int has_env = 0;
+                    size_t params_end = scan_name_list(src, len, params_start,
+                                                        &has_env, ')');
+                    if (has_env && params_end < len && src[params_end] == ')') {
+                        buf_puts(&o, src + i, (params_end + 1) - i);
+                        buf_str(&o, " _ENV=__p8_env(_ENV) ");
+                        i = params_end + 1;
+                        goto continue_loop;
+                    }
+                }
+            }
         } else if (state == 1) {
             if (c == '\\' && i+1 < len) { buf_putc(&o, c); buf_putc(&o, src[i+1]); i += 2; continue; }
             if (c == '\'') state = 0;
@@ -1716,6 +1826,7 @@ static char *rewrite_env_locals(const char *src, size_t len, size_t *out_len) {
         }
         buf_putc(&o, c);
         i++;
+        continue_loop: ;
     }
     return buf_finish(&o, out_len);
 }

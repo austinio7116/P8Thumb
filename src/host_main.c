@@ -49,21 +49,22 @@ static uint8_t poll_buttons(void) {
  * universal, no library needed. Used by --screenshot for headless
  * validation. */
 static void dump_ppm(const p8_machine *m, const char *path) {
-    static const uint8_t pal_rgb[16][3] = {
-        {0x00,0x00,0x00},{0x1d,0x2b,0x53},{0x7e,0x25,0x53},{0x00,0x87,0x51},
-        {0xab,0x52,0x36},{0x5f,0x57,0x4f},{0xc2,0xc3,0xc7},{0xff,0xf1,0xe8},
-        {0xff,0x00,0x4d},{0xff,0xa3,0x00},{0xff,0xec,0x27},{0x00,0xe4,0x36},
-        {0x29,0xad,0xff},{0x83,0x76,0x9c},{0xff,0x77,0xa8},{0xff,0xcc,0xaa},
-    };
+    /* Route through p8_machine_present so screenshots match exactly
+     * what the device LCD displays — including secret palette (128+)
+     * mappings. Convert RGB565 → RGB888 per pixel. */
+    static uint16_t scan[128 * 128];
+    p8_machine_present(m, scan);
     FILE *f = fopen(path, "wb");
     if (!f) { perror(path); return; }
     fprintf(f, "P6\n128 128\n255\n");
-    for (int y = 0; y < 128; y++) {
-        for (int x = 0; x < 128; x++) {
-            uint8_t c = p8_fb_pget_raw(m, x, y);
-            uint8_t mapped = m->mem[P8_DS_SCREEN_PAL + c] & 0x0f;
-            fwrite(pal_rgb[mapped], 3, 1, f);
-        }
+    for (int i = 0; i < 128 * 128; i++) {
+        uint16_t px = scan[i];
+        uint8_t r = (uint8_t)(((px >> 11) & 0x1f) << 3);
+        uint8_t g = (uint8_t)(((px >>  5) & 0x3f) << 2);
+        uint8_t b = (uint8_t)(( px        & 0x1f) << 3);
+        /* Replicate high bits into low bits for accuracy */
+        r |= r >> 5;  g |= g >> 6;  b |= b >> 5;
+        fputc(r, f); fputc(g, f); fputc(b, f);
     }
     fclose(f);
     fprintf(stderr, "wrote %s\n", path);
@@ -211,13 +212,18 @@ int main(int argc, char **argv) {
          * code paths than just the title screen). */
         uint8_t btns = poll_buttons();
         if (getenv("P8_FUZZ_INPUT")) {
-            /* Random buttons. Press each button independently with
-             * 30% probability per frame. */
+            /* Random buttons biased toward A (button 4) so we get
+             * past title screens and into actual gameplay. Press A
+             * pulse-style every ~30 frames; other buttons random. */
             unsigned r = (unsigned)(frame_count * 2654435761u);
             uint8_t fuzz_btns = 0;
+            /* Button 4 (A/O): hold for 5 frames every 30 frames */
+            if ((frame_count % 30) < 5) fuzz_btns |= (1 << 4);
+            /* Other buttons: 25% per frame */
             for (int b = 0; b < 6; b++) {
+                if (b == 4) continue;
                 r = r * 2654435761u + 1;
-                if ((r % 100) < 30) fuzz_btns |= (1 << b);
+                if ((r % 100) < 25) fuzz_btns |= (1 << b);
             }
             btns |= fuzz_btns;
         }
@@ -258,6 +264,31 @@ int main(int argc, char **argv) {
         if (shot_frames > 0 && frame_count >= shot_frames) {
             dump_ppm(&machine, shot_path);
             running = 0;
+        }
+
+        /* Periodic screenshot mode for fuzz harness:
+         *   P8_SCREENSHOT_INTERVAL=N (frames between shots)
+         *   P8_SCREENSHOT_PREFIX=path  (output basename, "_NNNN.ppm" appended)
+         *   P8_SCREENSHOT_LIMIT=K (stop after K shots; 0 = no limit) */
+        {
+            static int interval = -1;
+            static const char *prefix = NULL;
+            static int limit = 0;
+            static int taken = 0;
+            if (interval < 0) {
+                const char *iv = getenv("P8_SCREENSHOT_INTERVAL");
+                interval = iv ? atoi(iv) : 0;
+                prefix = getenv("P8_SCREENSHOT_PREFIX");
+                const char *lm = getenv("P8_SCREENSHOT_LIMIT");
+                limit = lm ? atoi(lm) : 0;
+            }
+            if (interval > 0 && prefix && (frame_count % interval) == 0) {
+                char path[512];
+                snprintf(path, sizeof(path), "%s_%04d.ppm", prefix, taken);
+                dump_ppm(&machine, path);
+                taken++;
+                if (limit > 0 && taken >= limit) running = 0;
+            }
         }
     }
 
