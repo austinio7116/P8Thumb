@@ -77,10 +77,12 @@ typedef struct p8_machine {
     const uint8_t *rom;
     size_t         rom_len;
 
-    /* PICO-8 16-color palette as RGB565, mirroring the default palette.
-     * Indexed by the *screen* palette mapping (DS_SCREEN_PAL) at present
-     * time, not the raw color index — see p8_machine_present(). */
-    uint16_t rgb565_palette[16];
+    /* PICO-8's 32-color system palette as RGB565. Indices 0..15 are
+     * the official base colors, 128..143 are the secret palette.
+     * Layout: [0..15] = base, [16..31] = secret (offset by -112 from
+     * the 128..143 indices). See p8_machine_present() for the lookup:
+     * a screen palette entry with bit 7 set maps to the secret range. */
+    uint16_t rgb565_palette[32];
 } p8_machine;
 
 void p8_machine_reset(p8_machine *m);

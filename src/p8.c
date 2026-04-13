@@ -109,15 +109,6 @@ int p8_vm_init(p8_vm *vm, size_t heap_cap) {
         lua_pop(vm->L, 1);
     }
 
-    /* PICO-8 _ENV fallback: create a shared metatable {__index = _G}
-     * and store it in the registry. Our foreach/all implementations
-     * will set this metatable on table elements before calling the
-     * callback, so `function(_ENV) ... end` patterns can find globals. */
-    lua_newtable(vm->L);                           /* mt = {} */
-    lua_rawgeti(vm->L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS); /* push _G */
-    lua_setfield(vm->L, -2, "__index");            /* mt.__index = _G */
-    lua_setfield(vm->L, LUA_REGISTRYINDEX, "p8_env_mt");  /* registry.p8_env_mt = mt */
-
     /* PICO-8 coroutine aliases:
      *   cocreate = coroutine.create
      *   coresume = coroutine.resume

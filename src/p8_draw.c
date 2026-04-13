@@ -122,10 +122,17 @@ void p8_clip(p8_machine *m, int x, int y, int w, int h, int reset) {
 /* pal(c0,c1,p): remap color c0 → c1 in palette p (0=draw, 1=screen).
  * Phase 1+2 supports both. With no args (c0<0), reset palette. */
 void p8_pal_set(p8_machine *m, int c0, int c1, int p) {
-    int base = (p == 1) ? P8_DS_SCREEN_PAL : P8_DS_DRAW_PAL;
-    /* Preserve transparency bit (high nibble) on draw palette. */
-    uint8_t old = m->mem[base + (c0 & 0x0f)];
-    m->mem[base + (c0 & 0x0f)] = (uint8_t)((old & 0xf0) | (c1 & 0x0f));
+    if (p == 1) {
+        /* Screen palette: full 8-bit index (masked to 0x8f per spec).
+         * Bit 7 selects the secret palette; bits 0-3 pick within. */
+        m->mem[P8_DS_SCREEN_PAL + (c0 & 0x0f)] = (uint8_t)(c1 & 0x8f);
+    } else {
+        /* Draw palette: preserve transparency bit (0x10), overwrite
+         * low nibble. Draw palette can only pick from the 16 screen
+         * palette slots, so only the low nibble is meaningful. */
+        uint8_t old = m->mem[P8_DS_DRAW_PAL + (c0 & 0x0f)];
+        m->mem[P8_DS_DRAW_PAL + (c0 & 0x0f)] = (uint8_t)((old & 0xf0) | (c1 & 0x0f));
+    }
 }
 
 void p8_palt(p8_machine *m, int c, int t) {

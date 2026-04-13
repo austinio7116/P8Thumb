@@ -171,10 +171,33 @@ static int l_circfill(lua_State *L) {
     return 0;
 }
 
+/* pal() with no args: reset all palettes.
+ * pal(c0, c1, [p]): remap color c0 → c1 in palette p (0=draw, 1=screen).
+ * pal(tbl, [p]):    apply a whole palette map from table tbl.
+ *                   Table keys 0..15 (or 1..16) → target colors. */
 static int l_pal(lua_State *L) {
     TRACE("pal");
     p8_machine *m = get_machine(L);
     if (lua_gettop(L) == 0) { p8_pal_reset(m); return 0; }
+    /* Table form: first arg is a table, second (optional) is palette index. */
+    if (lua_istable(L, 1)) {
+        int p = argi(L, 2, 0);
+        /* PICO-8 tables may be 0-indexed or 1-indexed for palette maps.
+         * Check for [0] first; if present, use 0..15; otherwise 1..16. */
+        lua_rawgeti(L, 1, 0);
+        int zero_based = !lua_isnil(L, -1);
+        lua_pop(L, 1);
+        int start = zero_based ? 0 : 1;
+        for (int i = 0; i < 16; i++) {
+            lua_rawgeti(L, 1, start + i);
+            if (!lua_isnil(L, -1)) {
+                int c1 = (int)lua_tointeger(L, -1);
+                p8_pal_set(m, i, c1, p);
+            }
+            lua_pop(L, 1);
+        }
+        return 0;
+    }
     int c0 = argi(L, 1, 0);
     int c1 = argi(L, 2, 0);
     int p  = argi(L, 3, 0);
@@ -1308,15 +1331,11 @@ static int l_foreach(lua_State *L) {
             i++;
             continue;
         }
-        /* PICO-8 _ENV support: if the value is a table without a
-         * metatable, give it __index = _G so `function(_ENV)` patterns
-         * can find global functions like btn, spr, band, etc. */
-        if (lua_istable(L, -1) && !lua_getmetatable(L, -1)) {
-            lua_getfield(L, LUA_REGISTRYINDEX, "p8_env_mt");
-            lua_setmetatable(L, -2);
-        } else if (lua_istable(L, -2)) {
-            lua_pop(L, 1);  /* pop the metatable from getmetatable */
-        }
+        /* Just pass the value through untouched — matching real PICO-8.
+         * Carts using the `function(_ENV) ... end` pattern are
+         * responsible for setting up their own metatable with
+         * setmetatable(obj, {__index=_ENV}); the engine does not
+         * do it automatically. */
         /* Call fn(value), keeping a duplicate for shift detection. */
         lua_pushvalue(L, -1);            /* stack: value, value */
         lua_pushvalue(L, 2);             /* stack: value, value, fn */
