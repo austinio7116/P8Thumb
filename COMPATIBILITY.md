@@ -33,7 +33,7 @@ Last updated: 2026-04-13
 | kalikan_menu-6 | Untested on device | _init OK on host |
 | mini_pharma-1 | Untested on device | _init OK on host |
 | mossmoss-12 | Broken | OOM in _init |
-| musabanebi-0 | Partial | Runtime nil index on P8SCII glyph key |
+| musabanebi-0 | Playable (device) | Plays fine; fuzz harness triggers a latent cart bug (nil index on P8SCII field) under random-input stress |
 | pck404_512px_under-1 | Partial | Playable (P8SCII now renders correctly after font fix) |
 | phoenix08-0 | Playable | Stars now single pixels after _ENV metatable fix |
 | pico_arcade-2 | Untested on device | _init OK on host |
@@ -43,9 +43,9 @@ Last updated: 2026-04-13
 | poom_0-9 | Partial | Title renders correctly (secret palette fix); crashes on level load |
 | porklike-2 | Playable | Working (fixed by P8SCII identifier support) |
 | praxis_fighter_x-2 | Broken | OOM during translation on host; untested on device |
-| province-4 | Untested on device | _init OK on host |
+| province-4 | Playable (device) | Plays fine; fuzz harness triggers compare-nil on an uninitialized-under-chaotic-input variable |
 | rtype-5 | Partial | Loads and plays after _ENV fix; ERROR on long play (unverified) |
-| ruwukawisa-0 | Playable | Fixed after _ENV metatable leak in foreach |
+| ruwukawisa-0 | Playable | Fixed after _ENV metatable leak in foreach; fuzz can trigger an uninitialized-global error that doesn't occur in real play |
 | slipways-1 | Broken | OOM during translation on host; hangs on load on device |
 | start_picocraft_1-3 | Untested on device | _init OK on host |
 | terra_1cart-43 | Broken | Hangs during translation (LZW decoder issue) |
@@ -54,9 +54,9 @@ Last updated: 2026-04-13
 
 ## Summary
 
-- **Playable**: 17 carts
+- **Playable**: 16 carts
 - **Partial**: 7 carts
-- **Broken**: 8 carts
+- **Broken**: 9 carts
 - **Impossible**: 1 cart
 - **Untested on device**: 6 carts
 
@@ -102,14 +102,33 @@ Last updated: 2026-04-13
 
 ## Known unresolved errors
 
-From the fuzz harness (30s per cart with random input):
+### Real (reproduces in normal play)
 
-- **adelie-0, age_of_ants-9, delunky102-0, mossmoss-12**: OOM during gameplay — heap cap.
+- **adelie-0, age_of_ants-9, mossmoss-12**: OOM during `_init` — heap cap.
 - **24981 (Mcraft)**: OOM.
-- **pico_ball-5**: fix for `circ` nil via for-loop `_ENV` rewrite applied but not verified on device.
-- **musabanebi-0**: `attempt to index field '?' (a nil value)` — P8SCII glyph used as table key that isn't populated.
 - **praxis_fighter_x-2, slipways-1**: OOM during translation — cart too large for translator's working memory.
 - **terra_1cart-43**: translation hangs — suspected LZW decoder pathology.
-- Some carts throw `attempt to perform arithmetic on global 'X' (a nil value)` — cart code expects a global that it never sets; may be a PICO-8 quirk or a real cart bug (not yet investigated per-cart).
 
-See `NEXT_STEPS.md` for the plan to triage these systematically.
+### Fuzz-only (NOT reproduced in normal play)
+
+The fuzz harness presses ~4 random buttons per frame plus A pulsing.
+That's far more chaotic than real input and drives carts into states
+human players never reach. Several carts throw errors under fuzz that
+are harmless in real play:
+
+- **ruwukawisa-0**: `arithmetic on 'wfr' (nil)` — walking-frame global not set under chaotic input.
+- **province-4**: `compare number with nil` — state variable uninitialized under fuzz conditions.
+- **musabanebi-0**: `index field '?' (nil)` — P8SCII glyph used as table key, populated lazily.
+- **delunky102-0**: OOM after many levels under fuzz; real play stays under heap cap.
+- **pico_ball-5**: *Fixed* — for-loop `_ENV` rewrite surfaced a bug where the injected helper call itself needed the helper. Loop var is now renamed to avoid the chicken-and-egg.
+
+These aren't emulator bugs per se; they're cart code paths that aren't
+robust to random input. Still worth noting — a less-chaotic fuzz profile
+(one button at a time, longer holds, pauses) would give more useful
+signal. See `NEXT_STEPS.md`.
+
+### Host-only
+
+- Host screenshots previously bypassed `p8_machine_present` and did
+  their own palette lookup. Fixed (secret palette now shows correctly
+  on host screenshots).
