@@ -117,6 +117,7 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+    p8_api_post_load(&vm);
 
     /* --- SDL window + audio ----------------------------------------- */
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {

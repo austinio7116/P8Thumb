@@ -1155,6 +1155,10 @@ int main(void) {
             p8_log_to_file("load: ok");
         }
 
+        /* Override any Lua-defined functions with C native versions
+         * (e.g. px9_decomp needs uint32_t precision). */
+        p8_api_post_load(&vm);
+
         /* Force a GC cycle to reclaim compile/load transients. */
         lua_gc(vm.L, LUA_GCCOLLECT, 0);
 

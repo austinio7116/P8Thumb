@@ -23,6 +23,10 @@ void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input);
  * cleanly; nonzero on Lua error. Errors print to stderr. */
 int p8_api_call_optional(p8_vm *vm, const char *name);
 
+/* Force-register C native overrides that must shadow any Lua
+ * definitions from the cart. Call after cart top-level code runs. */
+void p8_api_post_load(p8_vm *vm);
+
 /* Optional binding-call trace hook. If set to non-NULL, every
  * traced binding will call this with its name on entry. The device
  * firmware sets this to p8_log_ring so a hardfault dump shows
