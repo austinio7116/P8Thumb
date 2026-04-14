@@ -160,7 +160,14 @@ target_link_libraries(p8run_device PRIVATE
     hardware_irq
     hardware_flash
     hardware_sync
+    pico_multicore
     tinyusb_device
+)
+# Core 1 stack: SDK default is 16KB in SCRATCH_X which overflows.
+# We pass our own stack via multicore_launch_core1_with_stack,
+# so the SDK's built-in stack just needs to be minimal.
+target_compile_definitions(p8run_device PRIVATE
+    PICO_CORE1_STACK_SIZE=0x100
     tinyusb_board
 )
 # Stdio: no USB CDC via pico_stdio_usb (would clash with composite),
