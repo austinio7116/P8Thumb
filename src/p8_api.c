@@ -206,17 +206,32 @@ static int l_pal(lua_State *L) {
         int p = argi(L, 2, 0);
         /* PICO-8 tables may be 0-indexed or 1-indexed for palette maps.
          * Check for [0] first; if present, use 0..15; otherwise 1..16. */
+        /* PICO-8 pal(table): table index = color slot.
+         * If table[0] exists → 0-indexed (table[0]→screen[0]).
+         * If only table[1..] → 1-indexed (table[1]→screen[1]). */
         lua_rawgeti(L, 1, 0);
         int zero_based = !lua_isnil(L, -1);
         lua_pop(L, 1);
-        int start = zero_based ? 0 : 1;
-        for (int i = 0; i < 16; i++) {
-            lua_rawgeti(L, 1, start + i);
-            if (!lua_isnil(L, -1)) {
-                int c1 = (int)lua_tointeger(L, -1);
-                p8_pal_set(m, i, c1, p);
+        if (zero_based) {
+            for (int i = 0; i < 16; i++) {
+                lua_rawgeti(L, 1, i);
+                if (!lua_isnil(L, -1)) {
+                    int c1 = (int)lua_tointeger(L, -1);
+                    p8_pal_set(m, i, c1, p);
+                }
+                lua_pop(L, 1);
             }
-            lua_pop(L, 1);
+        } else {
+            /* 1-indexed: table[k] → screen[k], for k=1..15.
+             * Screen[0] is left unchanged (keeps default). */
+            for (int k = 1; k <= 15; k++) {
+                lua_rawgeti(L, 1, k);
+                if (!lua_isnil(L, -1)) {
+                    int c1 = (int)lua_tointeger(L, -1);
+                    p8_pal_set(m, k, c1, p);
+                }
+                lua_pop(L, 1);
+            }
         }
         return 0;
     }
