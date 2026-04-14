@@ -271,8 +271,19 @@ static char *pre_tokenize(const char *src, size_t len, size_t *out_len) {
                         }
                         i = j2; continue;
                     }
-                    /* P8SCII escape → \xHH */
-                    { char esc[5]; snprintf(esc,5,"\\x%02x",(unsigned)nx);
+                    /* P8SCII escape: \* \# \- \| \+ \^ map to
+                     * bytes 0x01-0x06 (not their ASCII values). */
+                    { int p8byte = -1;
+                      switch (nx) {
+                        case '*': p8byte = 0x01; break;
+                        case '#': p8byte = 0x02; break;
+                        case '-': p8byte = 0x03; break;
+                        case '|': p8byte = 0x04; break;
+                        case '+': p8byte = 0x05; break;
+                        case '^': p8byte = 0x06; break;
+                        default:  p8byte = (unsigned)nx; break;
+                      }
+                      char esc[5]; snprintf(esc,5,"\\x%02x",p8byte);
                       buf_str(&o,esc); i+=2; continue; }
                 }
                 if (ch >= 0x80) {

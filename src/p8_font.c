@@ -181,19 +181,129 @@ const uint8_t font_hi[128][5] = {
     /* 255 */ {  0,   0,   0,   0,   0},
 };
 
+/* Parse a P8SCII parameter value: '0'-'9'→0-9, 'a'+→10+ */
+static int p8scii_param(const char **p) {
+    unsigned char ch = (unsigned char)**p;
+    (*p)++;
+    if (ch >= '0' && ch <= '9') return ch - '0';
+    if (ch >= 'a') return ch - 'a' + 10;
+    return 0;
+}
+
 int p8_font_draw(p8_machine *m, const char *text, int x, int y, int c) {
     if (!text) return x;
     int cur_x = x;
     int cur_y = y;
-    for (; *text; text++) {
-        unsigned char ch = (unsigned char)*text;
-        if (ch == '\n') {
-            cur_x = x;
-            cur_y += P8_FONT_CELL_H;
+    while (*text) {
+        unsigned char ch = (unsigned char)*text++;
+
+        /* 0x00: terminate */
+        if (ch == 0x00) break;
+
+        /* 0x01 \*: repeat next char P0 times */
+        if (ch == 0x01) {
+            if (!*text) break;
+            int count = p8scii_param(&text);
+            if (!*text) break;
+            unsigned char rc = (unsigned char)*text++;
+            for (int i = 0; i < count; i++) {
+                /* Recursively render the repeated char would be complex;
+                 * for now just advance the cursor as if printed. */
+                if (rc >= 128) cur_x += 8;
+                else cur_x += P8_FONT_CELL_W;
+            }
             continue;
         }
+        /* 0x02 \#: set background color — 1 param */
+        if (ch == 0x02) { if (*text) p8scii_param(&text); continue; }
+
+        /* 0x03 \-: shift cursor X by (P0-16) — 1 param */
+        if (ch == 0x03) {
+            if (*text) { int v = p8scii_param(&text); cur_x += v - 16; }
+            continue;
+        }
+        /* 0x04 \|: shift cursor Y by (P0-16) — 1 param */
+        if (ch == 0x04) {
+            if (*text) { int v = p8scii_param(&text); cur_y += v - 16; }
+            continue;
+        }
+        /* 0x05 \+: shift cursor by (P0-16, P1-16) — 2 params */
+        if (ch == 0x05) {
+            if (*text) { int h = p8scii_param(&text);
+            if (*text) { int v = p8scii_param(&text);
+                cur_x += h - 16; cur_y += v - 16; }}
+            continue;
+        }
+        /* 0x06 \^: special command prefix — variable params */
+        if (ch == 0x06) {
+            if (!*text) break;
+            unsigned char cmd = (unsigned char)*text++;
+            /* Sub-commands with no extra params */
+            if (cmd == 'g' || cmd == 'h') continue;
+            /* Flag toggles: w,t,=,p,i,b,# — no extra params */
+            if (cmd == 'w' || cmd == 't' || cmd == '=' ||
+                cmd == 'p' || cmd == 'i' || cmd == 'b' || cmd == '#')
+                continue;
+            /* Skip digits 1-9 (frame delays) — no extra params */
+            if (cmd >= '1' && cmd <= '9') continue;
+            /* - (disable flag): consumes 1 more byte */
+            if (cmd == '-') { if (*text) text++; continue; }
+            /* c,d,s,x,y,r: 1 param */
+            if (cmd == 'c' || cmd == 'd' || cmd == 's' ||
+                cmd == 'x' || cmd == 'y' || cmd == 'r')
+                { if (*text) p8scii_param(&text); continue; }
+            /* j: 2 params */
+            if (cmd == 'j') {
+                if (*text) p8scii_param(&text);
+                if (*text) p8scii_param(&text);
+                continue;
+            }
+            /* . (inline 8x8 char): 8 raw bytes */
+            if (cmd == '.') {
+                for (int i = 0; i < 8 && *text; i++) text++;
+                continue;
+            }
+            /* : (inline hex char): 16 hex chars */
+            if (cmd == ':') {
+                for (int i = 0; i < 16 && *text; i++) text++;
+                continue;
+            }
+            /* @ (poke): 4 hex addr + 4 hex count + data — skip all */
+            /* ! (poke remaining): skip rest of string */
+            if (cmd == '!' || cmd == '@') break;
+            continue;  /* unknown sub-command — skip */
+        }
+        /* 0x07 \a: audio — skip until space or end */
+        if (ch == 0x07) {
+            while (*text && *text != ' ' && *text != '\n') text++;
+            if (*text == ' ') text++;  /* consume the terminating space */
+            continue;
+        }
+        /* 0x08 \b: backspace */
+        if (ch == 0x08) { cur_x -= P8_FONT_CELL_W; continue; }
+        /* 0x09 \t: tab */
+        if (ch == 0x09) { cur_x = ((cur_x / 16) + 1) * 16; continue; }
+        /* 0x0A \n: newline */
+        if (ch == 0x0A) { cur_x = x; cur_y += P8_FONT_CELL_H; continue; }
+        /* 0x0B \v: decorate — 2 params (offset + char) */
+        if (ch == 0x0B) {
+            if (*text) text++;  /* P0 */
+            if (*text) text++;  /* decoration char */
+            continue;
+        }
+        /* 0x0C \f: set foreground color — 1 param */
+        if (ch == 0x0C) {
+            if (*text) c = p8scii_param(&text) & 0x0f;
+            continue;
+        }
+        /* 0x0D \r: carriage return */
+        if (ch == 0x0D) { cur_x = x; continue; }
+        /* 0x0E: switch to custom font — skip */
+        /* 0x0F: switch to default font — skip */
+        if (ch == 0x0E || ch == 0x0F) continue;
+
+        /* Printable characters */
         if (ch >= 128) {
-            /* Wide P8SCII glyph: 7×5 in 8×6 cell */
             const uint8_t *g = font_hi[ch - 128];
             for (int row = 0; row < 5; row++) {
                 uint8_t bits = g[row];
@@ -202,9 +312,8 @@ int p8_font_draw(p8_machine *m, const char *text, int x, int y, int c) {
                         p8_pset(m, cur_x + col, cur_y + row, c);
                 }
             }
-            cur_x += 8;  /* wide cell */
-        } else {
-            /* ASCII glyph: 3×5 in 4×6 cell */
+            cur_x += 8;
+        } else if (ch >= 0x10) {
             uint16_t g = font_lo[ch];
             for (int row = 0; row < 5; row++) {
                 int bits = (g >> (row * 3)) & 0x7;

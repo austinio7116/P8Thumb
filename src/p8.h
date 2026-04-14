@@ -24,11 +24,9 @@ extern "C" {
  * 64 KB P8 memory map and framebuffers are accounted for. */
 #ifndef P8_LUA_HEAP_CAP
 /* Device: 520 KB SRAM − ~148 KB BSS − 16 KB stack = ~356 KB for
- * libc heap. With the XIP bytecode patch, Proto.code[] arrays
- * live in flash (not heap), so the Lua heap only holds strings,
- * tables, closures, and GC metadata. 300 KB cap leaves ~56 KB
- * for libc overhead + malloc fragmentation. */
-#define P8_LUA_HEAP_CAP (300 * 1024)
+ * libc heap. With XIP bytecode and malloc-free picker/menu,
+ * fragmentation is minimal. 300 KB cap leaves ~56 KB for libc. */
+#define P8_LUA_HEAP_CAP (280 * 1024)
 #endif
 
 typedef struct p8_vm {
