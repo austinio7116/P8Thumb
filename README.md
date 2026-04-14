@@ -22,7 +22,7 @@ PICO-8 is a trademark of Lexaloffle Games. ThumbyP8 is an independent, clean-roo
 
 ### 1. Flash the firmware
 
-Download [`firmware.uf2`](firmware.uf2) from this repo (click the file, then "Download raw file").
+Download [`firmware_p8.uf2`](firmware_p8.uf2) from this repo (click the file, then "Download raw file").
 
 > **Warning:** Flashing ThumbyP8 replaces whatever is currently on your Thumby Color (the stock MicroPython system, any games, etc). To go back, reflash the original Thumby Color firmware the same way.
 
@@ -30,7 +30,7 @@ To flash:
 1. Power off the Thumby Color
 2. Hold **DOWN** on the d-pad and power on — the device enters BOOTSEL mode
 3. It appears as a USB drive called `RPI-RP2350` on your computer
-4. Drag `firmware.uf2` onto that drive
+4. Drag `firmware_p8.uf2` onto that drive
 5. The device reboots automatically into ThumbyP8
 
 ### 2. Add carts
