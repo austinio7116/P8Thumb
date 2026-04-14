@@ -53,8 +53,10 @@ typedef struct {
 #define P8_MENU_ACT_QUIT      1
 
 /* Run the modal menu loop. `fb` is the 128×128 RGB565 scanline buffer.
+ * `scratch` is a 32KB buffer for the darkened backdrop (avoids malloc).
  * Returns when the user picks Resume / activates an Action / presses B. */
 p8_menu_result_t p8_menu_run(uint16_t        *fb,
+                              uint16_t        *scratch,
                               const char      *title,
                               const char      *subtitle,
                               p8_menu_item_t  *items,

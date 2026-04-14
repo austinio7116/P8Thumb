@@ -170,7 +170,9 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
                     .min = 0, .max = 100, .enabled = true };
 
                 p8_machine_present(m, scanline);
-                p8_menu_run(scanline, "ThumbyP8", "settings",
+                p8_menu_run(scanline,
+                            (uint16_t *)(m->mem + 0x8000),
+                            "ThumbyP8", "settings",
                             items, ni);
                 while (p8_buttons_menu_pressed()) sleep_ms(10);
                 menu_was_pressed = 0;
@@ -215,20 +217,17 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
             int painted = 0;
             if (bmp_bytes) {
                 /* Dynamically allocated so it returns to the heap
-                 * when the picker exits — saves 32 KB of BSS that
-                 * would otherwise be wasted during gameplay. */
-                uint16_t *thumb = (uint16_t *)malloc(128 * 128 * sizeof(uint16_t));
-                if (thumb && p8_bmp_load_128(bmp_bytes, bmp_len, thumb) == 0) {
+                 * it's 32KB and we overwrite it with p8_machine_present next. */
+                if (p8_bmp_load_128(bmp_bytes, bmp_len, scanline) == 0) {
                     for (int y = 0; y < 128; y++) {
                         for (int x = 0; x < 128; x++) {
                             int pi = rgb565_to_p8_color(
-                                thumb[y * 128 + x], m->rgb565_palette);
+                                scanline[y * 128 + x], m->rgb565_palette);
                             p8_pset(m, x, y, pi);
                         }
                     }
                     painted = 1;
                 }
-                if (thumb) free(thumb);
                 free(bmp_bytes);
             }
             if (!painted) {

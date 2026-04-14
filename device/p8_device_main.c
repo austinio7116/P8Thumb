@@ -1015,46 +1015,20 @@ int main(void) {
             continue;
         }
 
-        /* Show "Loading..." screen with cart thumbnail while we
-         * set up the VM and load bytecode from flash. */
+        /* Dim the picker's current display and overlay "loading..." */
         {
-            /* Try to load the BMP thumbnail */
-            char bmp_name[P8_PICKER_NAME_MAX];
-            strncpy(bmp_name, cart_entries[chosen].name, sizeof(bmp_name) - 1);
-            bmp_name[sizeof(bmp_name) - 1] = 0;
-            size_t bL = strlen(bmp_name);
-            if (bL >= 5 && strcasecmp(bmp_name + bL - 5, ".luac") == 0) {
-                bmp_name[bL - 5] = 0;
-            }
-            strncat(bmp_name, ".bmp",
-                    sizeof(bmp_name) - strlen(bmp_name) - 1);
-
+            for (int px = 0; px < 128*128; px++)
+                scanline[px] = ((scanline[px] >> 1) & 0x7BEF);
             p8_machine_reset(&machine);
             p8_camera(&machine, 0, 0);
-            /* Load and display thumbnail if available */
-            char bmp_path[80];
-            snprintf(bmp_path, sizeof(bmp_path), "/carts/%s", bmp_name);
-            if (load_bmp_file(bmp_path, scanline) == 0) {
-                /* Dim the thumbnail */
-                for (int px = 0; px < 128*128; px++) {
-                    uint16_t c = scanline[px];
-                    scanline[px] = ((c >> 1) & 0x7BEF);  /* halve RGB */
-                }
-            } else {
-                memset(scanline, 0, sizeof(scanline));
-            }
-            /* Overlay "Loading..." text */
             p8_cls(&machine, 0);
             p8_font_draw(&machine, "loading...", 36, 58, 7);
-            /* Composite text onto thumbnail */
             const uint8_t *fb = &machine.mem[P8_FB_BASE];
             for (int y = 54; y < 68; y++) {
                 for (int x = 32; x < 96; x++) {
                     uint8_t c = (x & 1) ? (fb[(y<<6)+(x>>1)] >> 4)
                                         : (fb[(y<<6)+(x>>1)] & 0x0f);
-                    if (c == 7) {  /* white text pixel */
-                        scanline[y * 128 + x] = 0xFFFF;
-                    }
+                    if (c == 7) scanline[y * 128 + x] = 0xFFFF;
                 }
             }
             p8_lcd_wait_idle();
@@ -1320,7 +1294,9 @@ int main(void) {
                     /* Present the last game frame to scanline for the menu overlay */
                     p8_machine_present(&machine, scanline);
 
-                    p8_menu_result_t mr = p8_menu_run(scanline, "ThumbyP8",
+                    p8_menu_result_t mr = p8_menu_run(scanline,
+                        (uint16_t *)&machine.mem[0x8000],
+                        "ThumbyP8",
                         cart_entries[chosen].name, items, ni);
 
                     if (mr.kind == P8_MENU_ACTION && mr.action_id == P8_MENU_ACT_QUIT) {
@@ -1364,21 +1340,18 @@ int main(void) {
                 }
             }
 
-            /* Audio: fill whatever room the ring buffer has. At 20fps
-             * the IRQ consumes ~1100 samples between frames; at 30fps
-             * ~735. Must render ALL of them or the ring underruns and
-             * the IRQ plays silence → pops/crackle. */
+            /* Audio: fill in 512-sample chunks to keep BSS small. */
             {
-                static int16_t audio_buf[2048];
+                static int16_t audio_buf[512];
                 int room = p8_audio_pwm_room();
-                if (room > 2048) room = 2048;
-                if (room > 0) {
-                    p8_audio_render(audio_buf, room);
+                while (room > 0) {
+                    int n = room < 512 ? room : 512;
+                    p8_audio_render(audio_buf, n);
                     if (master_volume != VOL_UNITY) {
                         if (master_volume <= 0) {
-                            for (int i2 = 0; i2 < room; i2++) audio_buf[i2] = 0;
+                            for (int i2 = 0; i2 < n; i2++) audio_buf[i2] = 0;
                         } else {
-                            for (int i2 = 0; i2 < room; i2++) {
+                            for (int i2 = 0; i2 < n; i2++) {
                                 int32_t s2 = (int32_t)audio_buf[i2] * master_volume / VOL_UNITY;
                                 if (s2 >  32767) s2 =  32767;
                                 if (s2 < -32768) s2 = -32768;
@@ -1386,7 +1359,8 @@ int main(void) {
                             }
                         }
                     }
-                    p8_audio_pwm_push(audio_buf, room);
+                    p8_audio_pwm_push(audio_buf, n);
+                    room -= n;
                 }
             }
 
