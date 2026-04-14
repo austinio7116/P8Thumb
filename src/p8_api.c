@@ -178,9 +178,27 @@ static int l_circfill(lua_State *L) {
 static int l_pal(lua_State *L) {
     TRACE("pal");
     p8_machine *m = get_machine(L);
+    int n = lua_gettop(L);
     /* No args, or nil first arg → reset both palettes. */
-    if (lua_gettop(L) == 0 || lua_isnil(L, 1)) {
+    if (n == 0 || lua_isnil(L, 1)) {
         p8_pal_reset(m);
+        return 0;
+    }
+    /* Single-number arg: reset just that palette (0 = draw, 1 = screen).
+     * Carts use `pal(0)` after silhouette drawing to reset the draw
+     * palette. */
+    if (n == 1 && lua_type(L, 1) == LUA_TNUMBER) {
+        int p = (int)lua_tointeger(L, 1);
+        if (p == 0) {
+            for (int i = 0; i < 16; i++) {
+                m->mem[P8_DS_DRAW_PAL + i] = (uint8_t)i;
+            }
+            m->mem[P8_DS_DRAW_PAL + 0] |= 0x10;  /* color 0 transparent */
+        } else if (p == 1) {
+            for (int i = 0; i < 16; i++) {
+                m->mem[P8_DS_SCREEN_PAL + i] = (uint8_t)i;
+            }
+        }
         return 0;
     }
     /* Table form: first arg is a table, second (optional) is palette index. */
