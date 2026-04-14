@@ -1075,58 +1075,99 @@ int main(void) {
                 menu_was_pressed = 0;
             }
 
-            /* Call _update / _draw with explicit error capture so
-             * any Lua runtime error gets surfaced to the user.
-             * Each phase pushes a ring entry before AND after the
-             * call so a hardfault dump shows precisely which call
-             * was in flight. The "post" entry only lands if the
-             * call returned cleanly — its absence in the ring is
-             * the smoking gun for the faulting phase. */
-            for (int phase = 0; phase < 2; phase++) {
-                const char *fn = (phase == 0) ? update_fn : "_draw";
-                lua_getglobal(vm.L, fn);
-                if (!lua_isfunction(vm.L, -1)) {
-                    lua_pop(vm.L, 1);
-                    continue;
+            /* --- Update + Draw with auto-frameskip -------------------------
+             *
+             * For 60fps carts (_update60): if the previous frame took
+             * longer than 16.7ms, call _update60 multiple times before
+             * a single _draw, so game logic keeps correct speed even
+             * when we can't render every frame. This matches real
+             * PICO-8's behavior.
+             *
+             * For 30fps carts (_update): no frameskip — one update,
+             * one draw per cycle.
+             */
+            {
+                /* How many update ticks to run this cycle. For 60fps
+                 * carts, accumulate debt based on actual elapsed time. */
+                static uint64_t last_frame_us = 0;
+                uint64_t now = time_us_64();
+                int updates_needed = 1;
+
+                if (has_update60 && last_frame_us > 0) {
+                    uint64_t elapsed = now - last_frame_us;
+                    /* Each update tick = 16667µs (1/60s). How many
+                     * ticks fit in the elapsed time? Cap at 4 to
+                     * prevent spiral-of-death. */
+                    updates_needed = (int)(elapsed / 16667);
+                    if (updates_needed < 1) updates_needed = 1;
+                    if (updates_needed > 4) updates_needed = 4;
                 }
-                if ((frame % 30) == 0 && phase == 0) {
-                    char tag[32];
-                    snprintf(tag, sizeof(tag), "frame %lu", (unsigned long)frame);
-                    p8_log_ring(tag);
+                last_frame_us = now;
+
+                /* Run updates */
+                for (int u = 0; u < updates_needed; u++) {
+                    lua_getglobal(vm.L, update_fn);
+                    if (lua_isfunction(vm.L, -1)) {
+                        if ((frame % 30) == 0 && u == 0) {
+                            char tag[32];
+                            snprintf(tag, sizeof(tag), "frame %lu",
+                                     (unsigned long)frame);
+                            p8_log_ring(tag);
+                        }
+                        if (lua_pcall(vm.L, 0, 0, 0) != LUA_OK) {
+                            const char *m = lua_tostring(vm.L, -1);
+                            snprintf(err_msg, sizeof(err_msg),
+                                     "%s: %s", update_fn,
+                                     m ? m : "(no msg)");
+                            lua_pop(vm.L, 1);
+                            p8_log_to_file(err_msg);
+                            goto cart_error;
+                        }
+                    } else {
+                        lua_pop(vm.L, 1);
+                    }
                 }
-                if (lua_pcall(vm.L, 0, 0, 0) != LUA_OK) {
-                    const char *m = lua_tostring(vm.L, -1);
-                    snprintf(err_msg, sizeof(err_msg),
-                             "%s: %s", fn, m ? m : "(no msg)");
+
+                /* Run _draw once */
+                lua_getglobal(vm.L, "_draw");
+                if (lua_isfunction(vm.L, -1)) {
+                    if (lua_pcall(vm.L, 0, 0, 0) != LUA_OK) {
+                        const char *m = lua_tostring(vm.L, -1);
+                        snprintf(err_msg, sizeof(err_msg),
+                                 "_draw: %s", m ? m : "(no msg)");
+                        lua_pop(vm.L, 1);
+                        p8_log_to_file(err_msg);
+                        goto cart_error;
+                    }
+                } else {
                     lua_pop(vm.L, 1);
-                    p8_log_ring("LUA ERROR");
-                    p8_log_to_file(err_msg);
-                    goto cart_error;
                 }
             }
 
-            /* Audio scratch in BSS, NOT on the stack — at 2 KB it
-             * was eating into the 4 KB Pico SDK default stack and
-             * combined with deep Lua VM calls during _update/_draw
-             * was causing hard-to-diagnose stack-overflow hardfaults
-             * mid-game. */
-            static int16_t audio_buf[1024];
-            int n = P8_AUDIO_SAMPLE_RATE / target_fps;
-            if (n > 1024) n = 1024;
-            p8_audio_render(audio_buf, n);
-            if (master_volume != VOL_UNITY) {
-                if (master_volume <= 0) {
-                    for (int i2 = 0; i2 < n; i2++) audio_buf[i2] = 0;
-                } else {
-                    for (int i2 = 0; i2 < n; i2++) {
-                        int32_t s2 = (int32_t)audio_buf[i2] * master_volume / VOL_UNITY;
-                        if (s2 >  32767) s2 =  32767;
-                        if (s2 < -32768) s2 = -32768;
-                        audio_buf[i2] = (int16_t)s2;
+            /* Audio: render based on ring buffer room, not fixed count.
+             * This ensures the ring stays fed regardless of actual fps,
+             * eliminating stuttering on slow frames. */
+            {
+                static int16_t audio_buf[1024];
+                int room = p8_audio_pwm_room();
+                if (room > 0) {
+                    int n = room < 1024 ? room : 1024;
+                    p8_audio_render(audio_buf, n);
+                    if (master_volume != VOL_UNITY) {
+                        if (master_volume <= 0) {
+                            for (int i2 = 0; i2 < n; i2++) audio_buf[i2] = 0;
+                        } else {
+                            for (int i2 = 0; i2 < n; i2++) {
+                                int32_t s2 = (int32_t)audio_buf[i2] * master_volume / VOL_UNITY;
+                                if (s2 >  32767) s2 =  32767;
+                                if (s2 < -32768) s2 = -32768;
+                                audio_buf[i2] = (int16_t)s2;
+                            }
+                        }
                     }
+                    p8_audio_pwm_push(audio_buf, n);
                 }
             }
-            p8_audio_pwm_push(audio_buf, n);
 
             /* FPS counter overlay — toggled via pause menu. */
             if (show_fps_toggle) {
