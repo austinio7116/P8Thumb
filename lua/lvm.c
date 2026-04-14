@@ -527,15 +527,46 @@ void luaV_finishOp (lua_State *L) {
         else { Protect(luaV_arith(L, ra, rb, rc, tm)); } }
 
 
+/* Computed gotos: GCC/Clang's &&label extension gives ~15-20% speedup
+ * on the bytecode dispatch loop by avoiding branch prediction overhead
+ * compared to a switch statement. Falls back to switch on MSVC etc. */
+#if defined(__GNUC__) || defined(__clang__)
+#define LUA_USE_JUMPTABLE 1
+#endif
+
+#ifdef LUA_USE_JUMPTABLE
+
+#define vmdispatch(o)   goto *disptab[o];
+#define vmcase(op,b)    L_##op: {b} i = *(ci->u.l.savedpc++); ra = RA(i); goto *disptab[GET_OPCODE(i)];
+#define vmcasenb(op,b)  L_##op: {b}
+
+#else
+
 #define vmdispatch(o)	switch(o)
 #define vmcase(l,b)	case l: {b}  break;
 #define vmcasenb(l,b)	case l: {b}		/* nb = no break */
+
+#endif
 
 void luaV_execute (lua_State *L) {
   CallInfo *ci = L->ci;
   LClosure *cl;
   TValue *k;
   StkId base;
+#ifdef LUA_USE_JUMPTABLE
+  static const void *const disptab[NUM_OPCODES] = {
+    &&L_OP_MOVE, &&L_OP_LOADK, &&L_OP_LOADKX, &&L_OP_LOADBOOL,
+    &&L_OP_LOADNIL, &&L_OP_GETUPVAL, &&L_OP_GETTABUP, &&L_OP_GETTABLE,
+    &&L_OP_SETTABUP, &&L_OP_SETUPVAL, &&L_OP_SETTABLE, &&L_OP_NEWTABLE,
+    &&L_OP_SELF, &&L_OP_ADD, &&L_OP_SUB, &&L_OP_MUL, &&L_OP_DIV,
+    &&L_OP_MOD, &&L_OP_POW, &&L_OP_UNM, &&L_OP_NOT, &&L_OP_LEN,
+    &&L_OP_CONCAT, &&L_OP_JMP, &&L_OP_EQ, &&L_OP_LT, &&L_OP_LE,
+    &&L_OP_TEST, &&L_OP_TESTSET, &&L_OP_CALL, &&L_OP_TAILCALL,
+    &&L_OP_RETURN, &&L_OP_FORLOOP, &&L_OP_FORPREP, &&L_OP_TFORCALL,
+    &&L_OP_TFORLOOP, &&L_OP_SETLIST, &&L_OP_CLOSURE, &&L_OP_VARARG,
+    &&L_OP_EXTRAARG
+  };
+#endif
  newframe:  /* reentry point when frame changes (call/return) */
   lua_assert(ci == L->ci);
   cl = clLvalue(ci->func);

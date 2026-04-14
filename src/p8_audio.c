@@ -80,9 +80,23 @@ static int   music_fade_stop_at_zero = 0;
 
 /* --------- helpers --------------------------------------------------- */
 
-/* Pitch → frequency. Key 33 = A4 = 440 Hz. */
-static float pitch_to_freq(float pitch) {
-    return 440.0f * expf(((pitch - 33.0f) / 12.0f) * 0.6931471805599453f);
+/* Pre-computed pitch → frequency table. Only 64 possible pitches (0-63).
+ * Key 33 = A4 = 440 Hz. Avoids calling expf() at runtime. */
+static float pitch_freq_lut[64];
+
+static void init_pitch_lut(void) {
+    for (int i = 0; i < 64; i++) {
+        pitch_freq_lut[i] = 440.0f * expf(((float)i - 33.0f) / 12.0f * 0.6931471805599453f);
+    }
+}
+
+static inline float pitch_to_freq(float pitch) {
+    int p = (int)pitch;
+    if (p < 0) p = 0; if (p > 63) p = 63;
+    /* Interpolate for fractional pitches (effects like slide/vibrato) */
+    float frac = pitch - (float)p;
+    if (frac < 0.001f || p >= 63) return pitch_freq_lut[p];
+    return pitch_freq_lut[p] + (pitch_freq_lut[p + 1] - pitch_freq_lut[p]) * frac;
 }
 
 /* Read a 16-bit note word and unpack fields. */
@@ -181,6 +195,7 @@ static void music_start_pattern(int pat);
 
 void p8_audio_init(p8_machine *m) {
     g_machine = m;
+    init_pitch_lut();
     memset(ch, 0, sizeof(ch));
     for (int i = 0; i < NCH; i++) {
         ch[i].sfx = -1;
