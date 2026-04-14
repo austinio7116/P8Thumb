@@ -186,10 +186,10 @@ lua/                   ← Vendored Lua 5.2.4
 - Everything the cart author wrote
 
 **What runs as native C** (called from Lua via the C API):
-- Every PICO-8 API binding in `src/p8_api.c` (~80 functions)
-- Drawing primitives in `src/p8_draw.c` (Bresenham line, midpoint circle, sprite blit, tilemap, palette remap)
-- Audio synth in `src/p8_audio.c` (4 channels, 8 waveforms, effects)
-- Font rendering in `src/p8_font.c`
+- Every PICO-8 API binding in `src/p8_api.c` (~100 functions)
+- Drawing primitives in `src/p8_draw.c` (line, rect, rrect, circ, oval, sprite blit, sspr, tline, tilemap, fillp, palette)
+- Audio synth in `src/p8_audio.c` (4 channels, 8 waveforms, effects, music pattern advancement with loop/stop flags, fade in/out)
+- Font rendering in `src/p8_font.c` (full P8SCII character set: ASCII 32–127 + glyphs 128–255)
 
 **The boundary in practice:** When Celeste calls `circfill(64, 64, 8, 7)`:
 1. Lua's `lvm.c` executes the CALL instruction
@@ -204,7 +204,7 @@ lua/                   ← Vendored Lua 5.2.4
 
 **Fixed-point bitwise operations:** PICO-8 uses 16.16 fixed-point for all bitwise ops. The runtime functions (`shl`, `shr`, `band`, `bor`, etc.) convert to/from fixed-point internally, operating on the 32-bit integer representation then converting back to float.
 
-**PICO-8 environment support:** Carts that use `foreach(t, function(_ENV) ... end)` or `for _ENV in all(t) do ... end` rely on table elements inheriting global function lookups. The runtime sets a `{__index = _G}` metatable on table elements passed through `foreach` and `all` so globals like `btn`, `spr`, `band` are accessible from the cart's environment tables.
+**PICO-8 `_ENV` support:** Carts that use `local _ENV = t`, `for _ENV in all(t) do ... end`, or `function(_ENV) ... end` expect bare identifiers (like `pal`, `spr`, `btn`) to still resolve to globals even though `_ENV` has been redirected. PICO-8 does this implicitly. ThumbyP8 handles it via a source-level rewrite: every `_ENV` binding site is transformed so the bound table gets a `{__index = _G}` metatable, providing automatic global fallback.
 
 **String indexing:** PICO-8's `str[i]` returns the ordinal (byte value) of the character at position `i`. This is implemented via a custom `__index` on the string metatable.
 
@@ -277,14 +277,11 @@ All test carts compile successfully through the on-device pipeline. Runtime comp
 ### Known Limitations
 
 - **Lua heap cap is 300 KB.** Very large carts may OOM during `_init`.
-- **`fillp` is a stub** — fill patterns don't render.
-- **`tline` is a stub** — mode-7/floor effects don't render.
-- **`reload` is a stub** — runtime ROM restore doesn't work.
-- **`cstore`/`dget`/`dset` are stubs** — no persistent save data.
-- **`rrect`/`rrectfill`** render as regular rectangles (no rounding).
-- **No multi-cart support** — `load()` won't load other carts.
-- **No mouse input** — carts requiring mouse won't work.
-- **P8SCII special characters** display as numeric values, not glyphs.
+- **Numerics use IEEE float**, not PICO-8's 16.16 fixed-point. Most carts don't notice; a few physics-heavy carts may drift.
+- **Audio arpeggio effects (6, 7) are silent.** Music still plays but arpeggio passages are missing notes.
+- **No multi-cart support** — `load()` won't load other carts. POOM's level-select triggers a `load("#poom_1")` that we can't handle.
+- **No mouse input** — carts requiring `stat(32..39)` for mouse won't work.
+- **`menuitem()` is a no-op** — custom pause menu entries don't appear.
 
 ---
 
