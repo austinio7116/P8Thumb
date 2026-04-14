@@ -111,6 +111,24 @@ static p8_input       input;
 static p8_cart_entry  cart_entries[P8_PICKER_MAX_CARTS];
 static FATFS          fs;
 
+/* Load a 128×128 BMP from a file path into a uint16_t scanline buffer.
+ * Returns 0 on success, -1 on failure. */
+#include "p8_bmp.h"
+static int load_bmp_file(const char *path, uint16_t *out) {
+    FIL f;
+    if (f_open(&f, path, FA_READ) != FR_OK) return -1;
+    UINT sz = (UINT)f_size(&f);
+    if (sz > 65536 || sz < 70) { f_close(&f); return -1; }
+    unsigned char *buf = (unsigned char *)malloc(sz);
+    if (!buf) { f_close(&f); return -1; }
+    UINT br = 0;
+    f_read(&f, buf, sz, &br);
+    f_close(&f);
+    int rc = p8_bmp_load_128(buf, (size_t)br, out);
+    free(buf);
+    return rc;
+}
+
 /* --- Persistent settings --------------------------------------------- */
 #define VOL_MIN   0
 #define VOL_UNITY 15
@@ -481,13 +499,16 @@ static int convert_pending_carts(p8_machine *m, uint16_t *sl) {
 
     if (!found) return 0;
 
-    /* Convert this one cart */
+    /* Convert this one cart — show a clean status screen */
     p8_machine_reset(m);
     p8_camera(m, 0, 0);
-    p8_cls(m, 1);
-    p8_font_draw(m, "ThumbyP8", 40, 4, 7);
-    p8_font_draw(m, stem, 4, 36, 11);
-    p8_font_draw(m, "converting...", 24, 56, 10);
+    p8_cls(m, 0);
+    p8_font_draw(m, "ThumbyP8", 40, 4, 6);
+    p8_rectfill(m, 0, 18, 127, 18, 5);  /* divider line */
+    p8_font_draw(m, stem, 4, 24, 7);
+    p8_font_draw(m, "converting...", 4, 36, 10);
+    /* Simple progress bar frame */
+    p8_rect(m, 4, 50, 123, 58, 5);
     p8_machine_present(m, sl);
     p8_lcd_wait_idle();
     p8_lcd_present(sl);
@@ -508,16 +529,30 @@ static int convert_pending_carts(p8_machine *m, uint16_t *sl) {
     /* Reboot to reclaim heap for next cart */
     p8_flash_disk_flush();
 
+    /* Show result with thumbnail if conversion succeeded */
+    if (rc == 0) {
+        char bmp_path[80];
+        snprintf(bmp_path, sizeof(bmp_path), "/carts/%s.bmp", stem);
+        if (load_bmp_file(bmp_path, sl) == 0) {
+            /* Dim the thumbnail slightly */
+            for (int px = 0; px < 128*128; px++) {
+                uint16_t c = sl[px];
+                sl[px] = ((c >> 1) & 0x7BEF);
+            }
+            p8_lcd_wait_idle();
+            p8_lcd_present(sl);
+            sleep_ms(800);
+        }
+    }
     p8_machine_reset(m);
     p8_camera(m, 0, 0);
-    p8_cls(m, 1);
-    p8_font_draw(m, rc == 0 ? "converted:" : "FAILED:", 4, 46, rc == 0 ? 11 : 8);
-    p8_font_draw(m, stem, 4, 56, 7);
-    p8_font_draw(m, "rebooting...", 28, 72, 6);
+    p8_cls(m, 0);
+    p8_font_draw(m, rc == 0 ? "converted" : "FAILED", 4, 56, rc == 0 ? 11 : 8);
+    p8_font_draw(m, stem, 4, 66, 7);
     p8_machine_present(m, sl);
     p8_lcd_wait_idle();
     p8_lcd_present(sl);
-    sleep_ms(1000);
+    sleep_ms(500);
 
     watchdog_reboot(0, 0, 0);
     while (1) tight_loop_contents();
@@ -841,6 +876,52 @@ int main(void) {
             while (!p8_buttons_menu_pressed()) sleep_ms(50);
             p8_vm_panic_disarm();
             continue;
+        }
+
+        /* Show "Loading..." screen with cart thumbnail while we
+         * set up the VM and load bytecode from flash. */
+        {
+            /* Try to load the BMP thumbnail */
+            char bmp_name[P8_PICKER_NAME_MAX];
+            strncpy(bmp_name, cart_entries[chosen].name, sizeof(bmp_name) - 1);
+            bmp_name[sizeof(bmp_name) - 1] = 0;
+            size_t bL = strlen(bmp_name);
+            if (bL >= 5 && strcasecmp(bmp_name + bL - 5, ".luac") == 0) {
+                bmp_name[bL - 5] = 0;
+            }
+            strncat(bmp_name, ".bmp",
+                    sizeof(bmp_name) - strlen(bmp_name) - 1);
+
+            p8_machine_reset(&machine);
+            p8_camera(&machine, 0, 0);
+            /* Load and display thumbnail if available */
+            char bmp_path[80];
+            snprintf(bmp_path, sizeof(bmp_path), "/carts/%s", bmp_name);
+            if (load_bmp_file(bmp_path, scanline) == 0) {
+                /* Dim the thumbnail */
+                for (int px = 0; px < 128*128; px++) {
+                    uint16_t c = scanline[px];
+                    scanline[px] = ((c >> 1) & 0x7BEF);  /* halve RGB */
+                }
+            } else {
+                memset(scanline, 0, sizeof(scanline));
+            }
+            /* Overlay "Loading..." text */
+            p8_cls(&machine, 0);
+            p8_font_draw(&machine, "loading...", 36, 58, 7);
+            /* Composite text onto thumbnail */
+            const uint8_t *fb = &machine.mem[P8_FB_BASE];
+            for (int y = 54; y < 68; y++) {
+                for (int x = 32; x < 96; x++) {
+                    uint8_t c = (x & 1) ? (fb[(y<<6)+(x>>1)] >> 4)
+                                        : (fb[(y<<6)+(x>>1)] & 0x0f);
+                    if (c == 7) {  /* white text pixel */
+                        scanline[y * 128 + x] = 0xFFFF;
+                    }
+                }
+            }
+            p8_lcd_wait_idle();
+            p8_lcd_present(scanline);
         }
 
         p8_vm vm;
