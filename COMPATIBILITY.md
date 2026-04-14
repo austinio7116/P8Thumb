@@ -1,6 +1,6 @@
 # ThumbyP8 Cart Compatibility
 
-Last updated: 2026-04-13
+Last updated: 2026-04-14
 
 ## Status Key
 - **Playable** — loads, controls work, plays to completion or reasonable extent
@@ -14,9 +14,9 @@ Last updated: 2026-04-13
 |------|--------|-------|
 | 24981 (Mcraft) | Impossible | OOM on device |
 | 49232 | Playable | Working |
-| adelie-0 | Broken | OOM during _init |
+| adelie-0 | Playable | Working at 280KB heap cap |
 | age_of_ants-9 | Broken | OOM during _update |
-| air_delivery_1-3 | Working | Some performance issues |
+| air_delivery_1-3 | Playable | Working |
 | beam4-2 | Playable | Working |
 | celeste | Playable | Working |
 | celeste_classic_2-5 | Broken | Loads but only shows clouds, no gameplay |
@@ -27,16 +27,16 @@ Last updated: 2026-04-13
 | fafomajoje-0 (Dungeon) | Playable | Working |
 | flipknight-0 | Playable | Working |
 | fromrust_a-4 | Broken | Does not load |
-| fsgupicozombiegarden121-0 | Broken | Needs mouse input (not supported) |
+| fsgupicozombiegarden121-0 | Broken | Needs mouse input (d-pad simulation possible, not yet implemented) |
 | highstakes-2 | Playable | Working |
-| hotwax-5 | Partial | Loads but gets stuck on game start |
+| hotwax-5 | Playable | Working |
 | kalikan_menu-6 | Partial | Level load issue |
-| mini_pharma-1 | Partial | Loads but not playable |
+| mini_pharma-1 | Playable | Working |
 | mossmoss-12 | Broken | OOM in _init |
 | musabanebi-0 | Playable | Working |
-| pck404_512px_under-1 | Partial | Working |
+| pck404_512px_under-1 | Playable | Working, P8SCII text fixed |
 | phoenix08-0 | Playable | Working |
-| pico_arcade-2 | Partial | Loads but no games start |
+| pico_arcade-2 | Partial | Multi-cart launcher — requires load() to chain-load sub-carts (not yet implemented) |
 | pico_ball-5 | Partial | Audio - but not loading graphics |
 | picohot-0 | Partial | Loads after P8SCII font + _ENV fixes; some in-game errors may remain |
 | picovalley-2 | Playable | Working - not played much |
@@ -50,26 +50,36 @@ Last updated: 2026-04-13
 | start_picocraft_1-3 | Broken | Hangs on load |
 | terra_1cart-43 | Broken | Hangs on load |
 | tinygolfpuzzles-1 | Playable | Working |
-| woodworm-0 | Untested on device | Graphical issues |
+| woodworm-0 | Playable | Working |
 
 ## Summary
 
-- **Playable**: 18 carts
-- **Partial**: 8 carts
-- **Broken**: 11 carts
+- **Playable**: 24 carts
+- **Partial**: 5 carts
+- **Broken**: 9 carts
 - **Impossible**: 1 cart
-- **Untested on device**: 1 cart
 
 ## Known Limitations
 
-- Carts using mouse input (e.g. fsgupicozombiegarden) won't work — no mouse on Thumby Color
-- Carts that OOM on a 300KB Lua heap can't run on device (300KB is the safe cap; hitting this with complex games is unavoidable)
+- Carts using mouse input need d-pad simulation (not yet implemented)
+- Carts that OOM on a 280KB Lua heap can't run on device (280KB balances Lua heap vs libc headroom)
+- `load()` for multi-cart launchers not yet implemented
 - Arpeggio audio effects (fx 6 and 7) are silent — most music still sounds recognizable
 - `extcmd`, `cstore`, `run`, `reset` etc. are no-ops (intentional for single-cart device)
 - `menuitem()` is a no-op (custom pause menu entries not supported)
 - Numerics use IEEE float, not PICO-8's 16.16 fixed-point — precision differs in low bits; some physics-heavy carts may drift
 
 ## Recent Fixes
+
+### 2026-04-14
+- **Heap fragmentation fix**: eliminated 32KB mallocs in picker thumbnail, menu backdrop, and loading screen that fragmented libc heap. Root cause of adelie and other borderline carts failing.
+- **Audio buffer**: 2048→512 entries with chunked fill. Saves 3KB BSS.
+- **Heap cap**: 300KB→280KB. Better balance between Lua heap and libc headroom.
+- **P8SCII translator fix**: `\^` `\*` `\#` `\-` `\|` `\+` escapes now map to correct control bytes (0x06, 0x01-0x05) instead of ASCII values. Fixes `^I` `^T` `^W` showing as text in 512px_under.
+- **P8SCII font renderer**: full control code handling (0x00-0x0F) with correct parameter byte counts. `\f` (color), `\^` (command prefix + sub-commands), `\a` (audio), cursor movement, tabs, etc.
+- **Save flush rate-limited**: `dset()` writes to file immediately but FAT flush at most once/second + on cart exit. Reduces flash wear and potential corruption.
+- **nil coerces to 0 in arithmetic** (PICO-8 compat): `nil + 1` returns 1 instead of erroring.
+- **#number**: returns length of string form.
 
 ### 2026-04-13
 - `_ENV` compatibility: source rewriter handles `local _ENV = X`, `local a, _ENV = A, X`, `for _ENV in EXPR do`, and `function(_ENV)` patterns. Injects `_ENV = __p8_env(_ENV)` so bare identifiers fall through to globals.
@@ -104,7 +114,7 @@ Last updated: 2026-04-13
 
 ### Real (reproduces in normal play)
 
-- **adelie-0, age_of_ants-9, mossmoss-12**: OOM during `_init` — heap cap.
+- **age_of_ants-9, mossmoss-12**: OOM during `_init` — heap cap.
 - **24981 (Mcraft)**: OOM.
 - **praxis_fighter_x-2, slipways-1**: OOM during translation — cart too large for translator's working memory.
 - **terra_1cart-43**: translation hangs — suspected LZW decoder pathology.

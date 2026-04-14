@@ -84,7 +84,14 @@ void p8_cartdata_save(p8_machine *m) {
         UINT bw = 0;
         f_write(&f, &m->mem[0x5e00], 256, &bw);
         f_close(&f);
-        p8_flash_disk_flush();
+        /* Rate-limit flash flushes to at most once per second to
+         * reduce wear and avoid FAT corruption from rapid writes. */
+        static uint32_t last_flush_ms = 0;
+        uint32_t now = (uint32_t)(time_us_64() / 1000);
+        if (now - last_flush_ms >= 1000) {
+            p8_flash_disk_flush();
+            last_flush_ms = now;
+        }
     }
 }
 
@@ -1438,6 +1445,10 @@ after_cart: ;
          * pointers from this VM cycle don't fire into freed ring
          * slots. */
         p8_trace_hook = NULL;
+        if (g_cartdata_active) {
+            p8_flash_disk_flush();  /* flush any pending save data */
+            g_cartdata_active = 0;
+        }
     }
     return 0;
 }
