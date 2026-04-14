@@ -1082,6 +1082,7 @@ int main(void) {
              * was in flight. The "post" entry only lands if the
              * call returned cleanly — its absence in the ring is
              * the smoking gun for the faulting phase. */
+            static uint32_t t_update_us = 0, t_draw_us = 0, t_audio_us = 0;
             for (int phase = 0; phase < 2; phase++) {
                 const char *fn = (phase == 0) ? update_fn : "_draw";
                 lua_getglobal(vm.L, fn);
@@ -1089,13 +1090,12 @@ int main(void) {
                     lua_pop(vm.L, 1);
                     continue;
                 }
-                /* Periodic frame marker so the ring shows progress. */
                 if ((frame % 30) == 0 && phase == 0) {
                     char tag[32];
                     snprintf(tag, sizeof(tag), "frame %lu", (unsigned long)frame);
                     p8_log_ring(tag);
                 }
-                p8_log_ring(phase == 0 ? "update enter" : "draw enter");
+                uint32_t t0 = (uint32_t)time_us_64();
                 if (lua_pcall(vm.L, 0, 0, 0) != LUA_OK) {
                     const char *m = lua_tostring(vm.L, -1);
                     snprintf(err_msg, sizeof(err_msg),
@@ -1105,7 +1105,9 @@ int main(void) {
                     p8_log_to_file(err_msg);
                     goto cart_error;
                 }
-                p8_log_ring(phase == 0 ? "update ok" : "draw ok");
+                uint32_t dt = (uint32_t)time_us_64() - t0;
+                if (phase == 0) t_update_us = dt;
+                else            t_draw_us = dt;
             }
 
             /* Audio scratch in BSS, NOT on the stack — at 2 KB it
@@ -1116,7 +1118,11 @@ int main(void) {
             static int16_t audio_buf[1024];
             int n = P8_AUDIO_SAMPLE_RATE / target_fps;
             if (n > 1024) n = 1024;
-            p8_audio_render(audio_buf, n);
+            {
+                uint32_t ta0 = (uint32_t)time_us_64();
+                p8_audio_render(audio_buf, n);
+                t_audio_us = (uint32_t)time_us_64() - ta0;
+            }
             /* Master volume scaling (same approach as ThumbyNES):
              * scale in the render path, not the IRQ. Unity at
              * VOL_UNITY means no gain change. Clamp to int16. */
@@ -1139,20 +1145,32 @@ int main(void) {
                 static uint32_t fps_last_us = 0;
                 static int fps_display = 0;
                 static int fps_count = 0;
+                static uint32_t d_upd = 0, d_drw = 0, d_aud = 0;
                 uint32_t now_us = (uint32_t)time_us_64();
                 fps_count++;
                 if (now_us - fps_last_us >= 1000000) {
                     fps_display = fps_count;
                     fps_count = 0;
                     fps_last_us = now_us;
+                    /* Snapshot timing for display (ms) */
+                    d_upd = t_update_us / 1000;
+                    d_drw = t_draw_us / 1000;
+                    d_aud = t_audio_us / 1000;
                 }
                 int16_t saved_cx = p8_camera_x(&machine);
                 int16_t saved_cy = p8_camera_y(&machine);
                 p8_camera(&machine, 0, 0);
-                char fps_str[8];
+                char fps_str[32];
                 snprintf(fps_str, sizeof(fps_str), "%d", fps_display);
                 int fw = (int)strlen(fps_str) * P8_FONT_CELL_W;
                 p8_font_draw(&machine, fps_str, 127 - fw, 1, 11);
+                /* Show timing breakdown: U=update D=draw A=audio (ms) */
+                char time_str[32];
+                snprintf(time_str, sizeof(time_str), "u%lud%lua%lu",
+                         (unsigned long)d_upd, (unsigned long)d_drw,
+                         (unsigned long)d_aud);
+                int tw = (int)strlen(time_str) * P8_FONT_CELL_W;
+                p8_font_draw(&machine, time_str, 127 - tw, 7, 11);
                 p8_set_camera(&machine, saved_cx, saved_cy);
             }
 

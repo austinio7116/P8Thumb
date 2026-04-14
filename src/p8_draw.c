@@ -68,14 +68,9 @@ static inline void pset_screen_remapped(p8_machine *m, int sx, int sy, int c) {
 /* --- public primitives ----------------------------------------------- */
 
 void p8_cls(p8_machine *m, int c) {
-    /* PICO-8 cls also resets the cursor; we model that. Camera is
-     * unchanged. The fill ignores the draw palette (PICO-8 quirk:
-     * cls writes the raw color, no pal()). */
     uint8_t cc = (uint8_t)(c & 0x0f);
     uint8_t byte = (uint8_t)(cc | (cc << 4));
-    for (int i = 0; i < P8_FB_BYTES; i++) {
-        m->mem[P8_FB_BASE + i] = byte;
-    }
+    memset(&m->mem[P8_FB_BASE], byte, P8_FB_BYTES);
     m->mem[P8_DS_CURSOR_X] = 0;
     m->mem[P8_DS_CURSOR_Y] = 0;
 }
@@ -366,16 +361,54 @@ void p8_rrect(p8_machine *m, int x, int y, int w, int h, int r, int c) {
 
 void p8_circfill(p8_machine *m, int cx, int cy, int r, int c) {
     if (r < 0) return;
-    /* Filled-circle scanline approach: for each y in [-r,r], compute
-     * x extent and fill. */
+    if (r == 0) { pset_world(m, cx, cy, c); return; }
+
+    int camx = p8_camera_x(m), camy = p8_camera_y(m);
+    int clip_x0 = m->mem[P8_DS_CLIP_X0], clip_y0 = m->mem[P8_DS_CLIP_Y0];
+    int clip_x1 = m->mem[P8_DS_CLIP_X1], clip_y1 = m->mem[P8_DS_CLIP_Y1];
+
+    /* Check for fill pattern */
+    uint16_t pat = (uint16_t)m->mem[P8_DS_FILLPAT_LO]
+                 | ((uint16_t)m->mem[P8_DS_FILLPAT_HI] << 8);
+    uint8_t col0 = m->mem[P8_DS_DRAW_PAL + (c & 0x0f)] & 0x0f;
+    uint8_t col1 = m->mem[P8_DS_DRAW_PAL + ((c >> 4) & 0x0f)] & 0x0f;
+    int transp = m->mem[P8_DS_FILLPAT_T] & 1;
+    uint8_t *fb = &m->mem[P8_FB_BASE];
+
     for (int dy = -r; dy <= r; dy++) {
-        /* x extent where dx*dx + dy*dy <= r*r */
+        int sy = (cy + dy) - camy;
+        if (sy < clip_y0 || sy >= clip_y1 || sy < 0 || sy >= P8_SCREEN_H) continue;
+
         int rr = r * r - dy * dy;
-        if (rr < 0) continue;
         int dx = 0;
         while ((dx + 1) * (dx + 1) <= rr) dx++;
-        for (int x = cx - dx; x <= cx + dx; x++) {
-            pset_world(m, x, cy + dy, c);
+
+        int x0 = (cx - dx) - camx;
+        int x1 = (cx + dx) - camx;
+        if (x0 < clip_x0) x0 = clip_x0;
+        if (x1 >= clip_x1) x1 = clip_x1 - 1;
+        if (x0 < 0) x0 = 0;
+        if (x1 >= P8_SCREEN_W) x1 = P8_SCREEN_W - 1;
+
+        int fb_row = sy << 6;
+        for (int sx = x0; sx <= x1; sx++) {
+            uint8_t mapped;
+            if (pat != 0) {
+                int bit = 15 - ((sx & 3) + 4 * (sy & 3));
+                if ((pat >> bit) & 1) {
+                    if (transp) continue;
+                    mapped = col1;
+                } else {
+                    mapped = col0;
+                }
+            } else {
+                mapped = col0;
+            }
+            int faddr = fb_row + (sx >> 1);
+            if (sx & 1)
+                fb[faddr] = (fb[faddr] & 0x0f) | (mapped << 4);
+            else
+                fb[faddr] = (fb[faddr] & 0xf0) | mapped;
         }
     }
 }
@@ -482,17 +515,39 @@ void p8_sspr(p8_machine *m,
     uint8_t *gfx = &m->mem[P8_GFX_BASE];
     uint8_t *fb  = &m->mem[P8_FB_BASE];
 
+    /* DDA (Bresenham) stepping: avoid per-pixel integer division.
+     * Use fixed-point 16.16 source coordinates that step by
+     * (sw<<16)/dw per destination pixel. */
+    int32_t x_step = (sw << 16) / dw;
+    int32_t y_step = (sh << 16) / dh;
+
     for (int py = vis_y0; py < vis_y1; py++) {
-        int src_y = sy + (flip_y ? (dh - 1 - py) : py) * sh / dh;
+        int32_t src_y_fp;
+        if (flip_y)
+            src_y_fp = ((int32_t)sy << 16) + (int32_t)(dh - 1 - py) * y_step;
+        else
+            src_y_fp = ((int32_t)sy << 16) + (int32_t)py * y_step;
+        int src_y = src_y_fp >> 16;
+        if ((unsigned)src_y >= 128) continue;
+
         int ddy = dy0 + py;
         int fb_row = ddy << 6;
+        int gfx_row = src_y << 6;
+
+        int32_t src_x_fp;
+        if (flip_x)
+            src_x_fp = ((int32_t)sx << 16) + (int32_t)(dw - 1 - vis_x0) * x_step;
+        else
+            src_x_fp = ((int32_t)sx << 16) + (int32_t)vis_x0 * x_step;
+        int32_t x_inc = flip_x ? -x_step : x_step;
 
         for (int px = vis_x0; px < vis_x1; px++) {
-            int src_x = sx + (flip_x ? (dw - 1 - px) : px) * sw / dw;
-            if ((unsigned)src_x >= 128 || (unsigned)src_y >= 128) continue;
+            int src_x = src_x_fp >> 16;
+            src_x_fp += x_inc;
+            if ((unsigned)src_x >= 128) continue;
 
             /* Inline 4bpp read */
-            int gaddr = (src_y << 6) + (src_x >> 1);
+            int gaddr = gfx_row + (src_x >> 1);
             uint8_t col = (src_x & 1) ? (gfx[gaddr] >> 4) : (gfx[gaddr] & 0x0f);
 
             uint8_t mapped = pal_lut[col];
@@ -533,6 +588,19 @@ void p8_mset(p8_machine *m, int x, int y, int v) {
 }
 
 void p8_map(p8_machine *m, int cx, int cy, int sx, int sy, int cw, int ch, int layer) {
+    /* Pre-build palette LUT once for all tiles */
+    uint8_t pal_lut[16];
+    for (int i = 0; i < 16; i++) {
+        uint8_t e = m->mem[P8_DS_DRAW_PAL + i];
+        pal_lut[i] = (e & 0x10) ? 0xff : (e & 0x0f);
+    }
+
+    int camx = p8_camera_x(m), camy = p8_camera_y(m);
+    int clip_x0 = m->mem[P8_DS_CLIP_X0], clip_y0 = m->mem[P8_DS_CLIP_Y0];
+    int clip_x1 = m->mem[P8_DS_CLIP_X1], clip_y1 = m->mem[P8_DS_CLIP_Y1];
+    uint8_t *gfx = &m->mem[P8_GFX_BASE];
+    uint8_t *fb  = &m->mem[P8_FB_BASE];
+
     for (int j = 0; j < ch; j++) {
         for (int i = 0; i < cw; i++) {
             int n = p8_mget(m, cx + i, cy + j);
@@ -541,7 +609,40 @@ void p8_map(p8_machine *m, int cx, int cy, int sx, int sy, int cw, int ch, int l
                 int flags = m->mem[P8_GFF_BASE + n];
                 if ((flags & layer) == 0) continue;
             }
-            p8_spr(m, n, sx + i * 8, sy + j * 8, 1, 1, 0, 0);
+            /* Inline 8×8 tile blit (no flip, w=h=1) */
+            int tile_sx = (n & 0x0f) * 8;
+            int tile_sy = (n >> 4) * 8;
+            int dx0 = sx + i * 8 - camx;
+            int dy0 = sy + j * 8 - camy;
+
+            /* Quick reject */
+            if (dx0 + 8 <= clip_x0 || dx0 >= clip_x1 ||
+                dy0 + 8 <= clip_y0 || dy0 >= clip_y1 ||
+                dx0 + 8 <= 0 || dx0 >= P8_SCREEN_W ||
+                dy0 + 8 <= 0 || dy0 >= P8_SCREEN_H) continue;
+
+            for (int py = 0; py < 8; py++) {
+                int screen_y = dy0 + py;
+                if (screen_y < clip_y0 || screen_y >= clip_y1 ||
+                    screen_y < 0 || screen_y >= P8_SCREEN_H) continue;
+                int gfx_row = (tile_sy + py) << 6;
+                int fb_row  = screen_y << 6;
+                for (int px = 0; px < 8; px++) {
+                    int screen_x = dx0 + px;
+                    if (screen_x < clip_x0 || screen_x >= clip_x1 ||
+                        screen_x < 0 || screen_x >= P8_SCREEN_W) continue;
+                    int gx = tile_sx + px;
+                    int gaddr = gfx_row + (gx >> 1);
+                    uint8_t col = (gx & 1) ? (gfx[gaddr] >> 4) : (gfx[gaddr] & 0x0f);
+                    uint8_t mapped = pal_lut[col];
+                    if (mapped == 0xff) continue;
+                    int faddr = fb_row + (screen_x >> 1);
+                    if (screen_x & 1)
+                        fb[faddr] = (fb[faddr] & 0x0f) | (mapped << 4);
+                    else
+                        fb[faddr] = (fb[faddr] & 0xf0) | mapped;
+                }
+            }
         }
     }
 }
