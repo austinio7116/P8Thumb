@@ -27,6 +27,14 @@ int p8_api_call_optional(p8_vm *vm, const char *name);
  * definitions from the cart. Call after cart top-level code runs. */
 void p8_api_post_load(p8_vm *vm);
 
+/* Custom menu items registered by menuitem(). Returns count (0-5).
+ * Labels are stored internally; pointers valid until next menuitem call. */
+int p8_api_get_menuitems(const char **labels, int max);
+
+/* Invoke menuitem callback for slot idx (0-based) with button bitmask.
+ * Returns 1 if the callback returned true (keep menu open), 0 otherwise. */
+int p8_api_menuitem_invoke(p8_vm *vm, int idx, int buttons);
+
 /* Optional binding-call trace hook. If set to non-NULL, every
  * traced binding will call this with its name on entry. The device
  * firmware sets this to p8_log_ring so a hardfault dump shows

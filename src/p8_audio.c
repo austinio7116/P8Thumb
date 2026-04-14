@@ -451,16 +451,12 @@ static void apply_effect(const p8_channel *c, float frac,
         vol *= (1.0f - frac);
         break;
     }
-    case 6: /* arpeggio fast */
-    case 7: { /* arpeggio slow */
-        int spd = c->note_samples > 0 ? c->note_samples / TICKS_PER_SPEED : 1;
-        float ofs_per_sec = (float)SR / (float)(TICKS_PER_SPEED * spd);
-        int m = (spd <= 8 ? 32 : 16) / (c->cur_effect == 6 ? 4 : 8);
-        if (m < 1) m = 1;
-        float abs_offset = (float)c->note_id + frac;
-        int n = (int)((float)m * 7.5f * abs_offset / ofs_per_sec);
+    case 6: /* arpeggio fast — cycle 4 notes, 4 times per note */
+    case 7: { /* arpeggio slow — cycle 4 notes, 2 times per note */
+        int cycles = (c->cur_effect == 6) ? 4 : 2;
+        int arp_idx = (int)(frac * cycles * 4) % 4;
         int base = c->note_id & ~3;
-        int arp_note = base | (n & 3);
+        int arp_note = base + arp_idx;
         if (arp_note >= NOTES_PER_SFX) arp_note = NOTES_PER_SFX - 1;
         uint8_t ap, aw, av, ae;
         read_note(c->sfx, arp_note, &ap, &aw, &av, &ae);

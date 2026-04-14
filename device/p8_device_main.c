@@ -1243,12 +1243,26 @@ int main(void) {
                 uint32_t held_ms = ((uint32_t)time_us_64() - menu_hold_start) / 1000;
                 if (held_ms > 400) {
                     /* Build menu items */
-                    p8_menu_item_t items[8];
+                    #define P8_MENU_ACT_CUSTOM_BASE 100
+                    p8_menu_item_t items[16];
                     int ni = 0;
 
                     items[ni++] = (p8_menu_item_t){
                         .kind = P8_MENU_KIND_ACTION, .label = "Resume",
                         .enabled = true, .action_id = P8_MENU_ACT_RESUME };
+
+                    /* Cart-registered custom menu items */
+                    {
+                        const char *mi_labels[5];
+                        int mi_count = p8_api_get_menuitems(mi_labels, 5);
+                        for (int mi = 0; mi < mi_count; mi++) {
+                            items[ni++] = (p8_menu_item_t){
+                                .kind = P8_MENU_KIND_ACTION,
+                                .label = mi_labels[mi],
+                                .enabled = true,
+                                .action_id = P8_MENU_ACT_CUSTOM_BASE + mi };
+                        }
+                    }
 
                     items[ni++] = (p8_menu_item_t){
                         .kind = P8_MENU_KIND_SLIDER, .label = "Volume",
@@ -1313,6 +1327,13 @@ int main(void) {
                     if (mr.kind == P8_MENU_ACTION && mr.action_id == P8_MENU_ACT_QUIT) {
                         return_to_picker = 1;
                         break;
+                    }
+                    /* Handle cart-registered custom menu items */
+                    if (mr.kind == P8_MENU_ACTION &&
+                        mr.action_id >= P8_MENU_ACT_CUSTOM_BASE) {
+                        int ci = mr.action_id - P8_MENU_ACT_CUSTOM_BASE;
+                        /* Button bitmask: A was pressed = bits 4+5+6 */
+                        p8_api_menuitem_invoke(&vm, ci, 0x70);
                     }
                     /* Save settings in case volume/FPS changed. */
                     settings_save();

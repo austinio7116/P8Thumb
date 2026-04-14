@@ -17,6 +17,7 @@ Last updated: 2026-04-14
 | adelie-0 | Playable | Working at 280KB heap cap |
 | age_of_ants-9 | Broken | OOM during _update |
 | air_delivery_1-3 | Playable | Working |
+| baba_demake-9 | Playable | Working (pairs(nil) fix) |
 | beam4-2 | Playable | Working |
 | celeste | Playable | Working |
 | celeste_classic_2-5 | Playable | Working (C native px9_decomp fix) |
@@ -25,12 +26,15 @@ Last updated: 2026-04-14
 | digger-2 | Playable | Working |
 | dominion_ex-4 | Playable | Working |
 | fafomajoje-0 (Dungeon) | Playable | Working |
+| fighter_street_ii-1 | Broken | OOM when starting a fight |
 | flipknight-0 | Playable | Working |
 | fromrust_a-4 | Broken | Does not load |
 | fsgupicozombiegarden121-0 | Broken | Needs mouse input (d-pad simulation possible, not yet implemented) |
+| grandmothership-4 | Broken | Hangs on loading |
 | highstakes-2 | Playable | Working |
 | hotwax-5 | Playable | Working |
 | kalikan_menu-6 | Partial | Level load issue |
+| marble_merger-5 | Playable | Working |
 | mini_pharma-1 | Playable | Working |
 | mossmoss-12 | Broken | OOM in _init |
 | musabanebi-0 | Playable | Working |
@@ -47,16 +51,17 @@ Last updated: 2026-04-14
 | rtype-5 | Playable | Some performance issues |
 | ruwukawisa-0 | Playable | Some performance issues |
 | slipways-1 | Broken | OOM - angs on load on device |
-| start_picocraft_1-3 | Broken | Hangs on load |
+| start_picocraft_1-3 | Broken | Hangs on load (px9_decomp fixed but still hangs) |
+| subsurface-2 | Playable | Working, some performance issues |
 | terra_1cart-43 | Broken | Hangs on load |
 | tinygolfpuzzles-1 | Playable | Working |
 | woodworm-0 | Playable | Working |
 
 ## Summary
 
-- **Playable**: 25 carts
+- **Playable**: 28 carts
 - **Partial**: 5 carts
-- **Broken**: 8 carts
+- **Broken**: 10 carts
 - **Impossible**: 1 cart
 
 ## Known Limitations
@@ -64,10 +69,8 @@ Last updated: 2026-04-14
 - Carts using mouse input need d-pad simulation (not yet implemented)
 - Carts that OOM on a 280KB Lua heap can't run on device (280KB balances Lua heap vs libc headroom)
 - `load()` for multi-cart launchers not yet implemented
-- Arpeggio audio effects (fx 6 and 7) are silent — most music still sounds recognizable
 - `extcmd`, `cstore`, `run`, `reset` etc. are no-ops (intentional for single-cart device)
-- `menuitem()` is a no-op (custom pause menu entries not supported)
-- Numerics use IEEE float, not PICO-8's 16.16 fixed-point — precision differs in low bits; some physics-heavy carts may drift
+- Numerics use IEEE single-precision float, not PICO-8's 16.16 fixed-point — precision differs in low bits; some physics-heavy carts may drift. Bitwise-heavy algorithms (e.g. PX9 compression) are handled via C native implementations to avoid precision loss.
 
 ## Recent Fixes
 
@@ -77,6 +80,10 @@ Last updated: 2026-04-14
 - **Heap cap**: 300KB→280KB. Better balance between Lua heap and libc headroom.
 - **P8SCII translator fix**: `\^` `\*` `\#` `\-` `\|` `\+` escapes now map to correct control bytes (0x06, 0x01-0x05) instead of ASCII values. Fixes `^I` `^T` `^W` showing as text in 512px_under.
 - **P8SCII font renderer**: full control code handling (0x00-0x0F) with correct parameter byte counts. `\f` (color), `\^` (command prefix + sub-commands), `\a` (audio), cursor movement, tabs, etc.
+- **C native px9_decomp**: fixes celeste_classic_2 and start_picocraft. Lua version lost bits in the 32-bit bit cache due to float precision. C version uses uint32_t, reads machine memory directly, uses static arrays to avoid 256KB stack overflow on device.
+- **pairs(nil) returns empty iterator**: PICO-8 compat fix — fixes baba_demake which passes nil to pairs().
+- **Audio arpeggio effects (6, 7)**: fixed rate calculation that caused arp notes to never cycle. Now properly cycles through 4-note groups.
+- **menuitem() implemented**: carts can register up to 5 custom pause menu items with labels and Lua callbacks. Callbacks receive button bitmask; return true to keep menu open.
 - **Save flush rate-limited**: `dset()` writes to file immediately but FAT flush at most once/second + on cart exit. Reduces flash wear and potential corruption.
 - **nil coerces to 0 in arithmetic** (PICO-8 compat): `nil + 1` returns 1 instead of erroring.
 - **#number**: returns length of string form.

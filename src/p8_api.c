@@ -1115,7 +1115,61 @@ static int l_p8_printh(lua_State *L) {
 
 /* menuitem — not yet implemented (would add entries to pause menu).
  * No-op stub for now; carts that call it continue without errors. */
-static int l_p8_menuitem(lua_State *L) { TRACE("menuitem"); (void)L; return 0; }
+/* PICO-8 menuitem(index, [label], [callback])
+ * Up to 5 custom items (index 1-5). Stored as Lua registry refs. */
+#define P8_MAX_MENUITEMS 5
+static struct {
+    int   ref_cb;       /* LUA_NOREF if empty */
+    char  label[32];
+} g_menuitems[P8_MAX_MENUITEMS];
+static int g_menuitems_inited = 0;
+
+static void menuitems_init(void) {
+    if (g_menuitems_inited) return;
+    for (int i = 0; i < P8_MAX_MENUITEMS; i++)
+        g_menuitems[i].ref_cb = LUA_NOREF;
+    g_menuitems_inited = 1;
+}
+
+static int l_p8_menuitem(lua_State *L) {
+    TRACE("menuitem");
+    menuitems_init();
+    if (lua_isnoneornil(L, 1)) {
+        /* menuitem() — clear all */
+        for (int i = 0; i < P8_MAX_MENUITEMS; i++) {
+            if (g_menuitems[i].ref_cb != LUA_NOREF)
+                luaL_unref(L, LUA_REGISTRYINDEX, g_menuitems[i].ref_cb);
+            g_menuitems[i].ref_cb = LUA_NOREF;
+            g_menuitems[i].label[0] = 0;
+        }
+        return 0;
+    }
+    int idx = (int)lua_tonumber(L, 1) - 1;  /* 1-based → 0-based */
+    if (idx < 0 || idx >= P8_MAX_MENUITEMS) return 0;
+    if (lua_isnoneornil(L, 2)) {
+        /* menuitem(index) — clear this slot */
+        if (g_menuitems[idx].ref_cb != LUA_NOREF)
+            luaL_unref(L, LUA_REGISTRYINDEX, g_menuitems[idx].ref_cb);
+        g_menuitems[idx].ref_cb = LUA_NOREF;
+        g_menuitems[idx].label[0] = 0;
+        return 0;
+    }
+    /* menuitem(index, label, callback) — set */
+    const char *label = lua_tostring(L, 2);
+    if (label) {
+        strncpy(g_menuitems[idx].label, label, sizeof(g_menuitems[idx].label) - 1);
+        g_menuitems[idx].label[sizeof(g_menuitems[idx].label) - 1] = 0;
+    }
+    if (g_menuitems[idx].ref_cb != LUA_NOREF)
+        luaL_unref(L, LUA_REGISTRYINDEX, g_menuitems[idx].ref_cb);
+    if (lua_isfunction(L, 3)) {
+        lua_pushvalue(L, 3);
+        g_menuitems[idx].ref_cb = luaL_ref(L, LUA_REGISTRYINDEX);
+    } else {
+        g_menuitems[idx].ref_cb = LUA_NOREF;
+    }
+    return 0;
+}
 
 /* cartdata(name) — open persistent storage slot identified by name.
  * The 256-byte region at 0x5e00-0x5eff is loaded with any previously
@@ -1804,6 +1858,40 @@ void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input) {
     lua_setglobal(L, "__orig_pairs");
     lua_pushcfunction(L, l_p8_pairs);
     lua_setglobal(L, "pairs");
+}
+
+int p8_api_get_menuitems(const char **labels, int max) {
+    menuitems_init();
+    int count = 0;
+    for (int i = 0; i < P8_MAX_MENUITEMS && count < max; i++) {
+        if (g_menuitems[i].ref_cb != LUA_NOREF && g_menuitems[i].label[0]) {
+            labels[count++] = g_menuitems[i].label;
+        }
+    }
+    return count;
+}
+
+int p8_api_menuitem_invoke(p8_vm *vm, int idx, int buttons) {
+    menuitems_init();
+    /* Map display index back to slot index (skip empty slots) */
+    int slot = -1, count = 0;
+    for (int i = 0; i < P8_MAX_MENUITEMS; i++) {
+        if (g_menuitems[i].ref_cb != LUA_NOREF && g_menuitems[i].label[0]) {
+            if (count == idx) { slot = i; break; }
+            count++;
+        }
+    }
+    if (slot < 0) return 0;
+    lua_State *L = vm->L;
+    lua_rawgeti(L, LUA_REGISTRYINDEX, g_menuitems[slot].ref_cb);
+    lua_pushinteger(L, buttons);
+    if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+        lua_pop(L, 1);
+        return 0;
+    }
+    int keep_open = lua_toboolean(L, -1);
+    lua_pop(L, 1);
+    return keep_open;
 }
 
 void p8_api_post_load(p8_vm *vm) {
