@@ -1410,6 +1410,27 @@ static int l_foreach(lua_State *L) {
     return 0;
 }
 
+/* PICO-8 compat: pairs(nil) returns an empty iterator instead of erroring. */
+static int p8_pairs_empty_next(lua_State *L) {
+    lua_pushnil(L);
+    return 1;
+}
+static int l_p8_pairs(lua_State *L) {
+    if (lua_isnil(L, 1) || lua_isnone(L, 1)) {
+        lua_pushcfunction(L, p8_pairs_empty_next);
+        lua_pushnil(L);
+        lua_pushnil(L);
+        return 3;
+    }
+    /* Delegate to standard pairs() — call the original saved in registry */
+    lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
+    lua_getfield(L, -1, "__orig_pairs");
+    lua_remove(L, -2);
+    lua_pushvalue(L, 1);
+    lua_call(L, 1, 3);
+    return 3;
+}
+
 /* --- registration ---------------------------------------------------- */
 
 /* px9_decomp(x0, y0, src, vget, vset) — C implementation of the
@@ -1776,6 +1797,13 @@ void p8_api_install(p8_vm *vm, p8_machine *machine, p8_input *input) {
         lua_pushcfunction(L, r->func);
         lua_setglobal(L, r->name);
     }
+
+    /* PICO-8 compat: pairs(nil) → empty iterator. Save original
+     * pairs to __orig_pairs in _G, then override with our wrapper. */
+    lua_getglobal(L, "pairs");
+    lua_setglobal(L, "__orig_pairs");
+    lua_pushcfunction(L, l_p8_pairs);
+    lua_setglobal(L, "pairs");
 }
 
 void p8_api_post_load(p8_vm *vm) {
