@@ -111,6 +111,53 @@ static p8_input       input;
 static p8_cart_entry  cart_entries[P8_PICKER_MAX_CARTS];
 static FATFS          fs;
 
+/* --- Persistent settings --------------------------------------------- */
+#define VOL_MIN   0
+#define VOL_UNITY 15
+#define VOL_MAX   30
+
+static int master_volume   = VOL_MAX;
+static int show_fps_toggle = 0;
+
+#define SETTINGS_PATH "/settings.dat"
+
+typedef struct {
+    uint8_t  magic[4];       /* "P8S\0" */
+    uint8_t  version;
+    uint8_t  volume;         /* 0..30 */
+    uint8_t  show_fps;       /* 0 or 1 */
+    uint8_t  _pad;
+} p8_settings_t;
+
+static void settings_load(void) {
+    FIL f;
+    if (f_open(&f, SETTINGS_PATH, FA_READ) != FR_OK) return;
+    p8_settings_t s;
+    UINT br = 0;
+    f_read(&f, &s, sizeof(s), &br);
+    f_close(&f);
+    if (br < sizeof(s)) return;
+    if (s.magic[0] != 'P' || s.magic[1] != '8' ||
+        s.magic[2] != 'S' || s.magic[3] != 0) return;
+    if (s.volume <= VOL_MAX) master_volume = s.volume;
+    show_fps_toggle = s.show_fps ? 1 : 0;
+}
+
+static void settings_save(void) {
+    p8_settings_t s = {
+        .magic = {'P', '8', 'S', 0},
+        .version = 1,
+        .volume = (uint8_t)master_volume,
+        .show_fps = (uint8_t)show_fps_toggle,
+    };
+    FIL f;
+    if (f_open(&f, SETTINGS_PATH, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK) return;
+    UINT bw = 0;
+    f_write(&f, &s, sizeof(s), &bw);
+    f_close(&f);
+    p8_flash_disk_flush();
+}
+
 static void write_frame_count(p8_machine *m, uint32_t fc) {
     m->mem[P8_DRAWSTATE + 0x34] = (uint8_t)(fc & 0xff);
     m->mem[P8_DRAWSTATE + 0x35] = (uint8_t)((fc >> 8) & 0xff);
@@ -672,6 +719,9 @@ int main(void) {
      * USB host gets a chance to see the disk. */
     p8_flash_disk_flush();
 
+    /* Load persistent settings (volume, FPS toggle). */
+    settings_load();
+
     /* Always log a boot marker so the user has *something* in
      * /thumbyp8.log even when no cart errors fire. Helpful for
      * confirming the log path is alive. */
@@ -968,11 +1018,6 @@ int main(void) {
         uint64_t cart_start_us = time_us_64();
 
         /* Run until the user exits via menu, or a Lua error fires. */
-        #define VOL_MIN   0
-        #define VOL_UNITY 15
-        #define VOL_MAX   30
-        static int show_fps_toggle = 1;
-        static int master_volume = VOL_MAX;
         int return_to_picker = 0;
         char err_msg[160] = {0};
         uint32_t menu_hold_start = 0;
@@ -1064,6 +1109,8 @@ int main(void) {
                         return_to_picker = 1;
                         break;
                     }
+                    /* Save settings in case volume/FPS changed. */
+                    settings_save();
                     /* Resume — reset frame timer so the game doesn't
                      * fast-forward to catch up with elapsed real time. */
                     while (p8_buttons_menu_pressed()) sleep_ms(10);
