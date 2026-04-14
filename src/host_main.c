@@ -233,17 +233,19 @@ int main(int argc, char **argv) {
         if (p8_api_call_optional(&vm, update_fn) != 0) running = 0;
         if (p8_api_call_optional(&vm, "_draw")    != 0) running = 0;
 
-        /* Audio: queue one frame's worth of samples (synth runs at
-         * 22050 Hz, so 30 fps → 735 samples/frame; 60 fps → 367). */
+        /* Audio: always queue enough samples to keep the output fed.
+         * Render based on what SDL has consumed rather than a fixed
+         * count, to avoid underruns on slow frames. Cap the queue
+         * at ~200ms to limit latency. */
         if (audio_dev != 0) {
-            int n = P8_AUDIO_SAMPLE_RATE / target_fps;
-            int16_t buf[2048];
-            if (n > (int)(sizeof(buf) / sizeof(buf[0]))) n = sizeof(buf)/sizeof(buf[0]);
-            p8_audio_render(buf, n);
-            /* Avoid building up audio latency: skip if the queue is
-             * already full (>3 frames buffered). */
-            if (SDL_GetQueuedAudioSize(audio_dev) < (Uint32)(n * 2 * 4)) {
-                SDL_QueueAudio(audio_dev, buf, n * sizeof(int16_t));
+            Uint32 queued = SDL_GetQueuedAudioSize(audio_dev);
+            Uint32 max_bytes = P8_AUDIO_SAMPLE_RATE * sizeof(int16_t) / 5; /* 200ms */
+            if (queued < max_bytes) {
+                int need = (int)(max_bytes - queued) / (int)sizeof(int16_t);
+                if (need > 2048) need = 2048;
+                int16_t buf[2048];
+                p8_audio_render(buf, need);
+                SDL_QueueAudio(audio_dev, buf, need * sizeof(int16_t));
             }
         }
 

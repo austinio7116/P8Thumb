@@ -25,7 +25,7 @@
 #define AUDIO_ENABLE_PIN  20
 #define TIMER_SLICE        4
 #define SAMPLE_RATE     22050
-#define PWM_WRAP          512   /* 9-bit DAC */
+#define PWM_WRAP          512   /* 9-bit DAC (matches ThumbyNES) */
 
 /* Ring buffer: ~3 frames @ 30 fps worth of samples = 2205 frames.
  * Round up to a power of 2 for fast wrap. */

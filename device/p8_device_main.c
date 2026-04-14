@@ -972,7 +972,7 @@ int main(void) {
         #define VOL_UNITY 15
         #define VOL_MAX   30
         static int show_fps_toggle = 1;
-        static int master_volume = VOL_UNITY;
+        static int master_volume = VOL_MAX;
         int return_to_picker = 0;
         char err_msg[160] = {0};
         uint32_t menu_hold_start = 0;
@@ -1099,20 +1099,21 @@ int main(void) {
                 }
             }
 
-            /* Audio: render based on ring buffer room, not fixed count.
-             * This ensures the ring stays fed regardless of actual fps,
-             * eliminating stuttering on slow frames. */
+            /* Audio: fill whatever room the ring buffer has. At 20fps
+             * the IRQ consumes ~1100 samples between frames; at 30fps
+             * ~735. Must render ALL of them or the ring underruns and
+             * the IRQ plays silence → pops/crackle. */
             {
-                static int16_t audio_buf[1024];
+                static int16_t audio_buf[2048];
                 int room = p8_audio_pwm_room();
+                if (room > 2048) room = 2048;
                 if (room > 0) {
-                    int n = room < 1024 ? room : 1024;
-                    p8_audio_render(audio_buf, n);
+                    p8_audio_render(audio_buf, room);
                     if (master_volume != VOL_UNITY) {
                         if (master_volume <= 0) {
-                            for (int i2 = 0; i2 < n; i2++) audio_buf[i2] = 0;
+                            for (int i2 = 0; i2 < room; i2++) audio_buf[i2] = 0;
                         } else {
-                            for (int i2 = 0; i2 < n; i2++) {
+                            for (int i2 = 0; i2 < room; i2++) {
                                 int32_t s2 = (int32_t)audio_buf[i2] * master_volume / VOL_UNITY;
                                 if (s2 >  32767) s2 =  32767;
                                 if (s2 < -32768) s2 = -32768;
@@ -1120,7 +1121,7 @@ int main(void) {
                             }
                         }
                     }
-                    p8_audio_pwm_push(audio_buf, n);
+                    p8_audio_pwm_push(audio_buf, room);
                 }
             }
 

@@ -529,9 +529,10 @@ void p8_audio_render(int16_t *out, int n_samples) {
             mix += s * vol;
             c->samples_left--;
         }
-        /* 4 channels at ~±0.5 peak each * vol ≤1.0 → mix can reach ±2.0.
-         * Scale by 0.5 to keep in [-1,1] range. */
-        mix *= 0.5f;
+        /* Scale mix. 4 channels at ±0.5 peak can sum to ±2.0.
+         * Use 0.7 as a compromise — louder than 0.5 (which was too
+         * quiet) but leaves headroom to avoid constant clipping. */
+        mix *= 0.7f;
         if (mix >  1.0f) mix =  1.0f;
         if (mix < -1.0f) mix = -1.0f;
         out[i] = (int16_t)(mix * 32767.0f);
