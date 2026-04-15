@@ -48,6 +48,33 @@ Each `.p8.png` is automatically converted to playable bytecode at boot (one cart
 
 Use **◀ ▶** in the picker to browse carts (shows the cart's label art). Press **A** to launch.
 
+#### Picker controls
+
+| Input | Action |
+|-------|--------|
+| **◀ / ▶** | Previous / next cart |
+| **A** | Launch selected cart |
+| **B** (short tap) | Toggle favorite (⭐ shown top-left when active) |
+| **B** (hold 5s) | Show DELETE CART warning overlay |
+| **B** (hold 10s) | Delete cart and all sidecars (.luac, .rom, .bmp, .meta, .sav, .p8.png) |
+| **MENU** (long-press) | Open picker settings menu |
+
+Releasing **B** before 10 seconds cancels the delete.
+
+#### Picker settings menu
+
+Long-press MENU from the picker to open:
+
+| Item | Description |
+|------|-------------|
+| **Favs only** | Filter view to show only favorited carts |
+| **Sort** | Cart order: alphabetical / favorites first / most played |
+| **Volume** | Master audio volume (slider 0–30) |
+| **Show FPS** | Toggle FPS counter overlay |
+| **Disk** | Filesystem usage |
+
+Favorites, play counts, filter state, sort mode, and last-selected cart all persist across reboots. Play count shows in the top-right corner of the picker when > 0.
+
 ### 4. In-game menu
 
 <p align="center">
@@ -56,12 +83,15 @@ Use **◀ ▶** in the picker to browse carts (shows the cart's label art). Pres
 
 Long-press **MENU** (>400ms) during gameplay to open the pause menu:
 - **Resume** — return to the game
+- **Cart-registered items** — custom entries added via `menuitem()` (up to 5)
 - **Volume** — master audio (slider)
 - **Show FPS** — toggle FPS counter
 - **Disk** / **Battery** — info displays
-- **Quit to picker** — exit the current cart
+- **Quit to picker** — save settings and reboot back to the picker
 
-The same menu is available from the picker (without Quit).
+Carts can register custom pause menu items via `menuitem(index, label, callback)`. The callback receives a button bitmask and can return `true` to keep the menu open.
+
+**Quit to picker** does a full reboot — this ensures the Lua heap is fully reclaimed for the next cart, avoiding any chance of fragmentation or leaked state.
 
 ### 5. Troubleshooting
 
@@ -212,9 +242,14 @@ lua/                   ← Vendored Lua 5.2.4
 
 ### Layer 3: XIP Bytecode Execution
 
-Compiled `.luac` bytecode is programmed into a dedicated "active cart" region in QSPI flash (256 KB at 13 MB offset). When `luaL_loadbuffer` loads the bytecode, a patched `lundump.c` detects that the source pointer is in the XIP address range (0x10000000–0x11000000) and stores `Proto.code[]` as a direct pointer into flash instead of copying to heap. This saves ~30-50 KB of Lua heap per cart.
+Compiled `.luac` bytecode is programmed into a dedicated "active cart" region in QSPI flash (256 KB at 13 MB offset). When `luaL_loadbuffer` loads the bytecode, a patched `lundump.c` detects that the source pointer is in the XIP address range (0x10000000–0x11000000) and stores these Proto arrays as direct pointers into flash instead of copying to heap:
 
-A corresponding patch in `lfunc.c` ensures the GC doesn't try to free XIP-resident code arrays.
+- `Proto.code[]` — bytecode instructions (4 bytes per op)
+- `Proto.lineinfo[]` — source line for each instruction (4 bytes per op)
+
+This saves 40–80 KB of Lua heap per cart. Corresponding patches in `lfunc.c` ensure the GC doesn't try to free XIP-resident arrays.
+
+Debug info (local variable names, upvalue names) is stripped during `lua_dump` to save additional 5–20 KB. Line numbers are kept — error messages still show `cart:670: ...` style locations.
 
 ### Layer 4: Hardware Drivers
 
@@ -236,8 +271,8 @@ A corresponding patch in `lfunc.c` ensures the GC doesn't try to free XIP-reside
 ├── ~148 KB  BSS (machine state, scanline buffer, flash cache, statics)
 ├── 16 KB    Stack (PICO_STACK_SIZE=0x4000, needed for Lua C→Lua→C recursion)
 ├── ~356 KB  Heap, of which:
-│   ├── 300 KB  Lua VM heap cap
-│   └── ~56 KB  Cart load transients (freed before _init)
+│   ├── 280 KB  Lua VM heap cap
+│   └── ~76 KB  libc headroom + cart load transients (freed before _init)
 
 16 MB QSPI Flash
 ├── 0–1 MB       Firmware (~715 KB)
@@ -258,13 +293,31 @@ Long-press MENU (>400 ms) during gameplay to open:
 | Item | Type | Description |
 |------|------|-------------|
 | Resume | Action | Close menu, return to game |
+| *(cart items)* | Action | Up to 5 entries registered via `menuitem()` |
 | Volume | Slider 0–30 | Master audio volume (unity at 15) |
 | Show FPS | Toggle | FPS counter overlay (top-right, green) |
 | Disk | Info | Used/total KB with progress bar |
 | Battery | Info | Percentage with progress bar |
-| Quit to picker | Action | Exit current cart |
+| Quit to picker | Action | Save settings, flush flash, reboot to picker |
 
 The menu renders as a translucent overlay on top of the dimmed game frame.
+
+## Favorites, Delete, and Sort
+
+The picker remembers which carts you like and how often you play them. State is stored in three small files at the root of the FAT filesystem:
+
+| File | Contents |
+|------|----------|
+| `/.favs` | Newline-separated list of favorite cart stems |
+| `/.plays` | `stem=count` per line — launch count per cart |
+| `/.picker_pref` | Binary: show-favs-only toggle, sort mode, last-selected cart |
+
+All three are mutated in RAM during picker use and flushed to flash on:
+- Cart launch (plays incremented)
+- Picker exit (all three saved + `p8_flash_disk_flush()`)
+- Cart delete (full reboot to rescan the filesystem)
+
+Deleting a cart removes every sidecar: `.luac`, `.rom`, `.bmp`, `.meta`, `.sav`, and `.p8.png` — the cart is gone completely and won't re-convert on next boot. Drop the `.p8.png` back onto the USB drive if you want it back.
 
 ---
 
@@ -276,12 +329,11 @@ All test carts compile successfully through the on-device pipeline. Runtime comp
 
 ### Known Limitations
 
-- **Lua heap cap is 300 KB.** Very large carts may OOM during `_init`.
-- **Numerics use IEEE float**, not PICO-8's 16.16 fixed-point. Most carts don't notice; a few physics-heavy carts may drift.
-- **Audio arpeggio effects (6, 7) are silent.** Music still plays but arpeggio passages are missing notes.
-- **No multi-cart support** — `load()` won't load other carts. POOM's level-select triggers a `load("#poom_1")` that we can't handle.
-- **No mouse input** — carts requiring `stat(32..39)` for mouse won't work.
-- **`menuitem()` is a no-op** — custom pause menu entries don't appear.
+- **Lua heap cap is 280 KB.** Very large carts may OOM during `_init` or level transitions. Balances Lua heap against libc headroom.
+- **Numerics use IEEE single-precision float**, not PICO-8's 16.16 fixed-point. Most carts don't notice; a few physics-heavy carts may drift in the low bits. Bitwise-heavy algorithms (e.g. PX9 compression) are handled via C native implementations where needed — see `px9_decomp` in `p8_api.c`.
+- **No multi-cart support** — `load()` is a no-op. Carts that chain-load (POOM, pico_arcade) can't continue past the first cart.
+- **No mouse input** — carts requiring `stat(32..39)` for mouse won't work. D-pad simulation is possible but not yet implemented.
+- **`extcmd`, `cstore`, `run`, `reset`** are no-ops (intentional for a single-cart-per-session device).
 
 ---
 
