@@ -26,16 +26,22 @@
 #include "ltm.h"
 
 
+/* ThumbyP8: aggressive GC for constrained 280KB heap. Default 200%
+ * pause means GC waits until memory doubles before collecting —
+ * on a tight heap that means every collection is an emergency GC
+ * triggered by allocation failure (maximum pause, maximum peak).
+ * 110% pause = collect when memory grows 10% beyond last GC size.
+ * 400% stepmul = collect 4x faster than allocation rate. */
 #if !defined(LUAI_GCPAUSE)
-#define LUAI_GCPAUSE	200  /* 200% */
+#define LUAI_GCPAUSE	110
 #endif
 
 #if !defined(LUAI_GCMAJOR)
-#define LUAI_GCMAJOR	200  /* 200% */
+#define LUAI_GCMAJOR	110
 #endif
 
 #if !defined(LUAI_GCMUL)
-#define LUAI_GCMUL	200 /* GC runs 'twice the speed' of memory allocation */
+#define LUAI_GCMUL	400
 #endif
 
 

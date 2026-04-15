@@ -965,7 +965,8 @@ int main(void) {
         p8_input_reset(&input);
 
         int chosen = p8_picker_run(&machine, &input, scanline,
-                                    cart_entries, n_carts);
+                                    cart_entries, n_carts,
+                                    &master_volume, &show_fps_toggle);
         if (chosen < 0 || chosen >= n_carts) chosen = 0;
 
         /* Persist the cart we're about to launch so the log file
@@ -1325,8 +1326,12 @@ int main(void) {
                         cart_entries[chosen].name, items, ni);
 
                     if (mr.kind == P8_MENU_ACTION && mr.action_id == P8_MENU_ACT_QUIT) {
-                        return_to_picker = 1;
-                        break;
+                        /* Save settings, flush, and reboot to fully
+                         * reclaim heap (lua_close can panic on OOM). */
+                        settings_save();
+                        p8_flash_disk_flush();
+                        watchdog_reboot(0, 0, 0);
+                        while (1) tight_loop_contents();
                     }
                     /* Handle cart-registered custom menu items */
                     if (mr.kind == P8_MENU_ACTION &&

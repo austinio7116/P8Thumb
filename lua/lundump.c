@@ -168,9 +168,19 @@ static void LoadDebug(LoadState* S, Proto* f)
  int i,n;
  f->source=LoadString(S);
  n=LoadInt(S);
- f->lineinfo=luaM_newvector(S->L,n,int);
  f->sizelineinfo=n;
- LoadVector(S,f->lineinfo,n,sizeof(int));
+ /* ThumbyP8 XIP patch: keep lineinfo in flash like code[]. */
+ {
+  size_t nbytes = (size_t)n * sizeof(int);
+  if (IS_XIP_ADDR(S->Z->p) && S->Z->n >= nbytes) {
+   f->lineinfo = (int *)(S->Z->p);
+   S->Z->p += nbytes;
+   S->Z->n -= nbytes;
+  } else {
+   f->lineinfo=luaM_newvector(S->L,n,int);
+   LoadVector(S,f->lineinfo,n,sizeof(int));
+  }
+ }
  n=LoadInt(S);
  f->locvars=luaM_newvector(S->L,n,LocVar);
  f->sizelocvars=n;

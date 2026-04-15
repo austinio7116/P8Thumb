@@ -32,7 +32,8 @@ int p8_picker_scan(p8_cart_entry *out, int max);
  * the framebuffer, presents to LCD. Returns the index of the chosen
  * cart in `entries[]`, or -1 if cancelled. */
 int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
-                   const p8_cart_entry *entries, int n_entries);
+                   const p8_cart_entry *entries, int n_entries,
+                   int *volume_ptr, int *show_fps_ptr);
 
 /* Read a cart file fully into a malloc'd buffer. Caller frees. */
 unsigned char *p8_picker_load_cart(const char *name, size_t *out_len);

@@ -120,14 +120,13 @@ static int paint_full_thumbnail(p8_machine *m, const char *cart_name) {
 /* --- main picker loop ----------------------------------------------- */
 
 int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
-                   const p8_cart_entry *entries, int n_entries) {
+                   const p8_cart_entry *entries, int n_entries,
+                   int *volume_ptr, int *show_fps_ptr) {
     if (n_entries <= 0) return -1;
     int sel = 0;
     int dirty = 1;
     uint32_t menu_hold_start = 0;
     int menu_was_pressed = 0;
-    static int picker_show_fps = 1;
-    static int picker_volume = 15;  /* VOL_UNITY */
 
     while (1) {
         p8_input_begin_frame(in, p8_buttons_read());
@@ -147,11 +146,11 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
                     .enabled = true, .action_id = P8_MENU_ACT_RESUME };
                 items[ni++] = (p8_menu_item_t){
                     .kind = P8_MENU_KIND_SLIDER, .label = "Volume",
-                    .value_ptr = &picker_volume, .min = 0, .max = 30,
+                    .value_ptr = volume_ptr, .min = 0, .max = 30,
                     .enabled = true };
                 items[ni++] = (p8_menu_item_t){
                     .kind = P8_MENU_KIND_TOGGLE, .label = "Show FPS",
-                    .value_ptr = &picker_show_fps, .enabled = true };
+                    .value_ptr = show_fps_ptr, .enabled = true };
                 static int disk_pct = 0;
                 static char disk_text[24];
                 {
