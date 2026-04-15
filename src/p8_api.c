@@ -472,10 +472,7 @@ static int l_p8_srand(lua_State *L) {
      * deterministic seed. */
     if (lua_isnoneornil(L, 1)) {
         p8_machine *m = get_machine(L);
-        uint32_t fc = (uint32_t)m->mem[P8_DRAWSTATE + 0x34]
-                    | ((uint32_t)m->mem[P8_DRAWSTATE + 0x35] << 8)
-                    | ((uint32_t)m->mem[P8_DRAWSTATE + 0x36] << 16)
-                    | ((uint32_t)m->mem[P8_DRAWSTATE + 0x37] << 24);
+        uint32_t fc = m->frame_count;
         srand(fc ? fc : 1);
     } else {
         srand((unsigned)argn0(L, 1));
@@ -607,10 +604,15 @@ static int l_p8_split(lua_State *L) {
             while (j + seplen <= slen && memcmp(s + j, sep, seplen) != 0) j++;
         }
         /* Push the slice [i..j) as a value into the table. */
-        if (convert) {
+        if (convert && j > i) {
+            /* PICO-8 split is lenient: strip leading/trailing whitespace
+             * before deciding if the slice looks numeric. */
+            size_t a = i, b = j;
+            while (a < b && (s[a] == ' ' || s[a] == '\t')) a++;
+            while (b > a && (s[b-1] == ' ' || s[b-1] == '\t')) b--;
             char *end;
-            double v = strtod(s + i, &end);
-            if (end == s + j && j > i) {
+            double v = strtod(s + a, &end);
+            if (b > a && end == s + b) {
                 lua_pushnumber(L, v);
             } else {
                 lua_pushlstring(L, s + i, j - i);
@@ -879,6 +881,58 @@ static int l_p8_cstore(lua_State *L)   { TRACE("cstore");   (void)L; return 0; }
 static int l_p8_serial(lua_State *L)   { TRACE("serial");   (void)L; return 0; }
 static int l_p8_stop  (lua_State *L)   { TRACE("stop");     (void)L; return 0; }
 static int l_p8_run   (lua_State *L)   { TRACE("run");      (void)L; return 0; }
+
+/* --- load(cart, [breadcrumb], [param_str]) -------------------------- */
+/* PICO-8's multi-cart load. Stores target cart stem + param string in
+ * static buffers; device_main.c detects this via p8_api_load_pending()
+ * after _draw returns and reboots into the target cart. Param is
+ * retrievable via stat(6) on the next cart. */
+#define P8_LOAD_STEM_MAX   48
+#define P8_LOAD_PARAM_MAX  256
+static char g_load_stem[P8_LOAD_STEM_MAX];
+static char g_load_param[P8_LOAD_PARAM_MAX];
+static int  g_load_pending = 0;
+/* stat(6) param: set by host/device at boot from saved marker file,
+ * or left empty. Read via stat(6). */
+static char g_stat6_param[P8_LOAD_PARAM_MAX];
+
+static int l_p8_load(lua_State *L) {
+    TRACE("load");
+    if (lua_isnoneornil(L, 1)) return 0;
+    const char *name = lua_tostring(L, 1);
+    if (!name) return 0;
+    /* Skip leading '#' if present (PICO-8 BBS-style cart IDs) */
+    if (name[0] == '#') name++;
+    strncpy(g_load_stem, name, P8_LOAD_STEM_MAX - 1);
+    g_load_stem[P8_LOAD_STEM_MAX - 1] = 0;
+    /* Arg 2 is the "breadcrumb" (unused). Arg 3 is the param string. */
+    g_load_param[0] = 0;
+    if (!lua_isnoneornil(L, 3)) {
+        const char *p = lua_tostring(L, 3);
+        if (p) {
+            strncpy(g_load_param, p, P8_LOAD_PARAM_MAX - 1);
+            g_load_param[P8_LOAD_PARAM_MAX - 1] = 0;
+        }
+    }
+    g_load_pending = 1;
+    return 0;
+}
+
+int p8_api_load_pending(const char **out_stem, const char **out_param) {
+    if (!g_load_pending) return 0;
+    if (out_stem)  *out_stem  = g_load_stem;
+    if (out_param) *out_param = g_load_param;
+    return 1;
+}
+
+void p8_api_set_stat6(const char *param) {
+    if (param) {
+        strncpy(g_stat6_param, param, P8_LOAD_PARAM_MAX - 1);
+        g_stat6_param[P8_LOAD_PARAM_MAX - 1] = 0;
+    } else {
+        g_stat6_param[0] = 0;
+    }
+}
 static int l_p8_reset (lua_State *L)   { TRACE("reset");    (void)L; return 0; }
 static int l_p8_ls    (lua_State *L)   { TRACE("ls");       (void)L; lua_newtable(L); return 1; }
 static int l_p8_holdframe(lua_State *L){ TRACE("holdframe");(void)L; return 0; }
@@ -1094,9 +1148,11 @@ static int l_p8_stat(lua_State *L) {
     if (n >= 16 && n <= 23) {
         /* Audio channel state */
         lua_pushinteger(L, p8_audio_stat(n));
-    } else if (n == 4 || n == 6 || n == 13) {
-        /* String-valued stats: clipboard, param string, cart filename.
-         * Return empty string (not 0) so #stat(6) works. */
+    } else if (n == 6) {
+        /* Param string passed via load(). Set at boot from marker file. */
+        lua_pushstring(L, g_stat6_param);
+    } else if (n == 4 || n == 13) {
+        /* Clipboard + cart filename — not supported, empty string. */
         lua_pushstring(L, "");
     } else {
         lua_pushinteger(L, 0);
@@ -1144,7 +1200,9 @@ static int l_p8_menuitem(lua_State *L) {
         }
         return 0;
     }
-    int idx = (int)lua_tonumber(L, 1) - 1;  /* 1-based → 0-based */
+    /* PICO-8 allows flag bits in the upper bytes (bit 8 = available
+     * outside pause, etc). Mask to the low nibble for the index. */
+    int idx = ((int)lua_tonumber(L, 1) & 0x0f) - 1;  /* 1-based → 0-based */
     if (idx < 0 || idx >= P8_MAX_MENUITEMS) return 0;
     if (lua_isnoneornil(L, 2)) {
         /* menuitem(index) — clear this slot */
@@ -1305,6 +1363,18 @@ static int l_p8_memset(lua_State *L) {
  * stash the last value we returned in upvalue 3 so the next call
  * can detect whether the slot was shifted (deleted) and re-read
  * the same index. */
+static int all_string_iter(lua_State *L) {
+    /* upvalues: 1=string, 2=next_index */
+    size_t slen;
+    const char *s = lua_tolstring(L, lua_upvalueindex(1), &slen);
+    lua_Integer i = (lua_Integer)lua_tointeger(L, lua_upvalueindex(2));
+    if (!s || (size_t)i >= slen) return 0;
+    lua_pushlstring(L, s + i, 1);
+    lua_pushinteger(L, i + 1);
+    lua_replace(L, lua_upvalueindex(2));
+    return 1;
+}
+
 static int all_iter(lua_State *L) {
     /* upvalues: 1=table, 2=last_index, 3=last_value */
     lua_Integer i = (lua_Integer)lua_tointeger(L, lua_upvalueindex(2));
@@ -1340,6 +1410,13 @@ static int all_iter(lua_State *L) {
 }
 static int l_p8_all(lua_State *L) {
     TRACE("all");
+    if (lua_type(L, 1) == LUA_TSTRING) {
+        /* PICO-8 compat: all(string) iterates over characters. */
+        lua_pushvalue(L, 1);
+        lua_pushinteger(L, 0);
+        lua_pushcclosure(L, all_string_iter, 2);
+        return 1;
+    }
     if (lua_isnoneornil(L, 1) || !lua_istable(L, 1)) {
         lua_newtable(L);
         lua_pushinteger(L, 0);
@@ -1727,6 +1804,7 @@ static const luaL_Reg p8_funcs[] = {
     { "serial",   l_p8_serial },
     { "stop",     l_p8_stop },
     { "run",      l_p8_run },
+    { "load",     l_p8_load },
     { "reset",    l_p8_reset },
     { "ls",       l_p8_ls },
     { "holdframe", l_p8_holdframe },

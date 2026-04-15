@@ -70,6 +70,12 @@
 typedef struct p8_machine {
     uint8_t mem[P8_MEM_SIZE];
 
+    /* Frame counter — incremented by host/device runner each frame.
+     * Used by srand() with no arg. Stored outside mem[] because
+     * 0x5f34..0x5f37 is reserved for PICO-8 GFX flags (carts poke
+     * bit 1 of 0x5f34 for inverted-circle mode, etc.). */
+    uint32_t frame_count;
+
     /* Pointer to the original cart ROM, preserved for reload().
      * On device, this points into XIP flash (zero SRAM cost). On
      * host, it points to a malloc'd copy. NULL = no ROM loaded (

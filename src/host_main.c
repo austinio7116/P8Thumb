@@ -185,13 +185,11 @@ int main(int argc, char **argv) {
     Uint32 next_tick = SDL_GetTicks();
     Uint32 start_ms  = SDL_GetTicks();
 
-    /* Write frame counter (legacy, used by some code) and accurate
-     * elapsed ms (used by time()/t()) into draw-state memory. */
+    /* Update internal frame counter (used by srand) and accurate
+     * elapsed ms (used by time()/t()). Frame count goes in a struct
+     * field, NOT in mem[] — 0x5f34 is reserved for PICO-8 GFX flags. */
     #define WRITE_TIME(m, fc, ms) do {                                       \
-        (m).mem[P8_DRAWSTATE + 0x34] = (uint8_t)((fc) & 0xff);               \
-        (m).mem[P8_DRAWSTATE + 0x35] = (uint8_t)(((fc) >> 8) & 0xff);        \
-        (m).mem[P8_DRAWSTATE + 0x36] = (uint8_t)(((fc) >> 16) & 0xff);       \
-        (m).mem[P8_DRAWSTATE + 0x37] = (uint8_t)(((fc) >> 24) & 0xff);       \
+        (m).frame_count = (fc);                                              \
         (m).mem[P8_DS_ELAPSED_MS + 0] = (uint8_t)((ms) & 0xff);              \
         (m).mem[P8_DS_ELAPSED_MS + 1] = (uint8_t)(((ms) >> 8) & 0xff);       \
         (m).mem[P8_DS_ELAPSED_MS + 2] = (uint8_t)(((ms) >> 16) & 0xff);      \
@@ -233,6 +231,16 @@ int main(int argc, char **argv) {
         /* _update() then _draw() */
         if (p8_api_call_optional(&vm, update_fn) != 0) running = 0;
         if (p8_api_call_optional(&vm, "_draw")    != 0) running = 0;
+
+        /* Cart called load() — log and stop (host doesn't chain-load). */
+        {
+            const char *lstem = NULL, *lparam = NULL;
+            if (p8_api_load_pending(&lstem, &lparam)) {
+                fprintf(stderr, "[host] load(\"%s\", _, \"%s\") — host stops here\n",
+                        lstem, lparam ? lparam : "");
+                running = 0;
+            }
+        }
 
         /* Audio: always queue enough samples to keep the output fed.
          * Render based on what SDL has consumed rather than a fixed

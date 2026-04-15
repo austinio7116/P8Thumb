@@ -223,10 +223,8 @@ static void settings_save(void) {
 }
 
 static void write_frame_count(p8_machine *m, uint32_t fc) {
-    m->mem[P8_DRAWSTATE + 0x34] = (uint8_t)(fc & 0xff);
-    m->mem[P8_DRAWSTATE + 0x35] = (uint8_t)((fc >> 8) & 0xff);
-    m->mem[P8_DRAWSTATE + 0x36] = (uint8_t)((fc >> 16) & 0xff);
-    m->mem[P8_DRAWSTATE + 0x37] = (uint8_t)((fc >> 24) & 0xff);
+    /* Stored in struct field, not mem[]. 0x5f34 is PICO-8 GFX flags. */
+    m->frame_count = fc;
 }
 
 static void write_elapsed_ms(p8_machine *m, uint32_t ms) {
@@ -543,6 +541,82 @@ static int convert_one_cart(const char *stem, p8_machine *m,
         char info[40];
         snprintf(info, sizeof(info), "translated: %d b", (int)translated_len);
         screen_log(m, sl, info);
+    }
+
+    /* Scan for load("#name") calls and mark each target as hidden so
+     * the sub-cart doesn't appear in the picker. */
+    {
+        const char *src = translated;
+        size_t slen = translated_len;
+        for (size_t i = 0; i + 6 < slen; i++) {
+            if (memcmp(src + i, "load", 4) != 0) continue;
+            if (i > 0 && (isalnum((unsigned char)src[i-1]) || src[i-1] == '_'))
+                continue;
+            /* Advance past "load" + optional whitespace + opener */
+            size_t j = i + 4;
+            while (j < slen && (src[j] == ' ' || src[j] == '\t')) j++;
+            if (j >= slen) continue;
+            char opener = src[j];
+            size_t str_start;
+            char quote = 0;
+            if (opener == '(') {
+                j++;
+                while (j < slen && (src[j] == ' ' || src[j] == '\t')) j++;
+                if (j >= slen) continue;
+                if (src[j] != '"' && src[j] != '\'') continue;
+                quote = src[j];
+                j++;
+            } else if (opener == '"' || opener == '\'') {
+                quote = opener;
+                j++;
+            } else {
+                continue;
+            }
+            str_start = j;
+            /* Find closing quote */
+            while (j < slen && src[j] != quote && src[j] != '\n') j++;
+            if (j >= slen || src[j] != quote) continue;
+            size_t str_end = j;
+            /* Skip leading '#' */
+            const char *name = src + str_start;
+            size_t name_len = str_end - str_start;
+            if (name_len > 0 && name[0] == '#') { name++; name_len--; }
+            if (name_len == 0 || name_len > 40) continue;
+
+            /* Append to /.hidden if not already there */
+            char hbuf[1024] = {0};
+            UINT br = 0;
+            FIL hf;
+            if (f_open(&hf, "/.hidden", FA_READ) == FR_OK) {
+                f_read(&hf, hbuf, sizeof(hbuf) - 1, &br);
+                f_close(&hf);
+            }
+            int found = 0;
+            size_t hi = 0;
+            while (hi < br) {
+                size_t hj = hi;
+                while (hj < br && hbuf[hj] != '\n') hj++;
+                if (hj - hi == name_len &&
+                    memcmp(&hbuf[hi], name, name_len) == 0) {
+                    found = 1; break;
+                }
+                hi = hj + 1;
+            }
+            if (!found && br + name_len + 2 < sizeof(hbuf)) {
+                if (f_open(&hf, "/.hidden",
+                           FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+                    UINT bw;
+                    if (br > 0) f_write(&hf, hbuf, br, &bw);
+                    f_write(&hf, name, name_len, &bw);
+                    f_write(&hf, "\n", 1, &bw);
+                    f_close(&hf);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "hidden: %.*s",
+                             (int)name_len, name);
+                    p8_log_to_file(msg);
+                }
+            }
+        }
     }
 
     screen_log(m, sl, "compiling...");
@@ -916,6 +990,9 @@ int main(void) {
      * Hold B at boot to skip conversion (recovery escape hatch). */
     if (p8_buttons_read() & (1 << P8_BTN_O)) {
         p8_log_to_file("convert: skipped (B held)");
+        /* Wait for B release so the picker doesn't inherit the press
+         * and immediately toggle a favorite or start the delete timer. */
+        while (p8_buttons_read() & (1 << P8_BTN_O)) sleep_ms(20);
     } else {
         int nc = convert_pending_carts(&machine, scanline);
         if (nc > 0) {
@@ -944,10 +1021,17 @@ int main(void) {
     }
 
     /* --- main outer loop: lobby → pick → run → repick on game exit -- */
-    /* Always start USB so users can add new carts. If carts already
-     * exist, auto-proceed to the picker after 3 seconds unless the
-     * user interacts (gives time to connect USB if needed). */
-    wait_for_carts();
+    /* If a pending load() from a previous cart is queued, skip the
+     * lobby and go straight to direct-launching that cart. */
+    {
+        FIL lf;
+        if (f_open(&lf, "/.pending_load", FA_READ) == FR_OK) {
+            f_close(&lf);
+            /* Skip wait_for_carts — go straight to the launch loop. */
+        } else {
+            wait_for_carts();
+        }
+    }
     /* Defensive: drain any leftover cache before going offline. */
     p8_flash_disk_flush();
 
@@ -964,9 +1048,58 @@ int main(void) {
         p8_machine_reset(&machine);
         p8_input_reset(&input);
 
-        int chosen = p8_picker_run(&machine, &input, scanline,
+        /* Check for pending load() from the previous cart. If set,
+         * skip the picker and launch the requested cart with the
+         * param string accessible via stat(6). */
+        int chosen = -1;
+        {
+            FIL lf;
+            if (f_open(&lf, "/.pending_load", FA_READ) == FR_OK) {
+                char buf[P8_PICKER_NAME_MAX + 256 + 4];
+                UINT br = 0;
+                f_read(&lf, buf, sizeof(buf) - 1, &br);
+                f_close(&lf);
+                f_unlink("/.pending_load");
+                p8_flash_disk_flush();
+                buf[br] = 0;
+                /* First line = stem, rest = param string */
+                char *nl = strchr(buf, '\n');
+                char target_stem[P8_PICKER_NAME_MAX];
+                if (nl) {
+                    *nl = 0;
+                    strncpy(target_stem, buf, sizeof(target_stem) - 1);
+                    target_stem[sizeof(target_stem) - 1] = 0;
+                    p8_api_set_stat6(nl + 1);
+                } else {
+                    strncpy(target_stem, buf, sizeof(target_stem) - 1);
+                    target_stem[sizeof(target_stem) - 1] = 0;
+                    p8_api_set_stat6("");
+                }
+                /* Find cart entry matching target_stem (+ .luac). */
+                char want[P8_PICKER_NAME_MAX + 8];
+                snprintf(want, sizeof(want), "%s.luac", target_stem);
+                for (int i = 0; i < n_carts; i++) {
+                    if (strcasecmp(cart_entries[i].name, want) == 0) {
+                        chosen = i;
+                        break;
+                    }
+                }
+                if (chosen < 0) {
+                    char msg[80];
+                    snprintf(msg, sizeof(msg),
+                             "load: no such cart '%s'", target_stem);
+                    p8_log_to_file(msg);
+                    p8_api_set_stat6("");
+                }
+            }
+        }
+
+        if (chosen < 0) {
+            p8_api_set_stat6("");
+            chosen = p8_picker_run(&machine, &input, scanline,
                                     cart_entries, n_carts,
                                     &master_volume, &show_fps_toggle);
+        }
         if (chosen < 0 || chosen >= n_carts) chosen = 0;
 
         /* Persist the cart we're about to launch so the log file
@@ -1374,6 +1507,34 @@ int main(void) {
                     lua_pop(vm.L, 1);
                     p8_log_to_file(err_msg);
                     goto cart_error;
+                }
+            }
+
+            /* Cart called load() — write pending marker, append target
+             * to hidden list so it doesn't clutter the picker, reboot. */
+            {
+                const char *lstem = NULL, *lparam = NULL;
+                if (p8_api_load_pending(&lstem, &lparam)) {
+                    FIL f;
+                    if (f_open(&f, "/.pending_load",
+                               FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+                        UINT bw;
+                        f_write(&f, lstem, strlen(lstem), &bw);
+                        f_write(&f, "\n", 1, &bw);
+                        if (lparam && *lparam) {
+                            f_write(&f, lparam, strlen(lparam), &bw);
+                        }
+                        f_close(&f);
+                    }
+                    /* Note: target was already added to /.hidden at
+                     * conversion time by the load() scanner. */
+                    if (g_cartdata_active) {
+                        p8_flash_disk_flush();
+                    }
+                    settings_save();
+                    p8_flash_disk_flush();
+                    watchdog_reboot(0, 0, 0);
+                    while (1) tight_loop_contents();
                 }
             }
 

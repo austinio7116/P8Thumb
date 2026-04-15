@@ -337,6 +337,27 @@ Deleting a cart removes every sidecar: `.luac`, `.rom`, `.bmp`, `.meta`, `.sav`,
 
 ---
 
+## Multi-Cart Games
+
+Some PICO-8 games are made of multiple carts that chain-load into each other via `load()`. Examples: **picoball** (main menu + match cart), **POOM** (levels split across carts), **pico_arcade** (launcher with 35+ sub-carts).
+
+ThumbyP8 supports `load()` by rebooting into the target cart. The workflow:
+
+1. **Collect all carts.** For a multi-cart game, you need every cart it references. For picoball, both `pico_ball.p8.png` AND `pico_ball_match.p8.png`. Missing sub-carts will cause the game to freeze at the transition.
+2. **Drop them all into `/carts/`.** They'll convert on the next boot.
+3. **Play normally.** When the game calls `load("#some_cart")`, the device saves state, reboots, and launches the target cart with the transition parameter passed via `stat(6)`. Transitions take ~1.5 seconds.
+
+**Naming:** `load("#foo")` looks for `foo.p8.png` / `foo.luac` on the device. The `#` prefix is stripped. If the cart author named their sub-cart differently on the BBS than the `load()` calls expect, rename the file to match.
+
+**Auto-hide:** When a cart is converted, ThumbyP8 scans its source for `load()` calls and adds each target to `/.hidden`, so sub-carts don't clutter the picker. Your picker shows only top-level entry points.
+
+**Cart-to-cart state:** The third argument to `load(cart, _, param)` is a string passed to the next cart, readable via `stat(6)`. Games use this to share match state, chosen options, etc. ThumbyP8 stores this in `/.pending_load` during the reboot.
+
+Games that currently work this way: picoball.
+Games that need more work: POOM (level load references sub-carts we'd need to package), pico_arcade (35 sub-carts by BBS ID — too many to collect manually, and the BBS cart ID scheme doesn't map to our filename lookup).
+
+---
+
 ## Cart Compatibility
 
 See [COMPATIBILITY.md](COMPATIBILITY.md) for per-cart test results.
@@ -347,7 +368,7 @@ All test carts compile successfully through the on-device pipeline. Runtime comp
 
 - **Lua heap cap is 280 KB.** Very large carts may OOM during `_init` or level transitions. Balances Lua heap against libc headroom.
 - **Numerics use IEEE single-precision float**, not PICO-8's 16.16 fixed-point. Most carts don't notice; a few physics-heavy carts may drift in the low bits. Bitwise-heavy algorithms (e.g. PX9 compression) are handled via C native implementations where needed — see `px9_decomp` in `p8_api.c`.
-- **No multi-cart support** — `load()` is a no-op. Carts that chain-load (POOM, pico_arcade) can't continue past the first cart.
+- **Multi-cart games need all sub-carts present** — `load()` chain-loads by rebooting into the target cart (see [Multi-Cart Games](#multi-cart-games) below). You must have the sub-cart `.p8.png` files on the device.
 - **No mouse input** — carts requiring `stat(32..39)` for mouse won't work. D-pad simulation is possible but not yet implemented.
 - **`extcmd`, `cstore`, `run`, `reset`** are no-ops (intentional for a single-cart-per-session device).
 

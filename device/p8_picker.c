@@ -31,6 +31,42 @@
 #include "p8_flash_disk.h"
 #include "ff.h"
 
+/* --- hidden-carts store --------------------------------------------- */
+
+/* /.hidden lists cart stems that should NOT appear in the picker.
+ * Populated automatically when a cart calls load() — the target cart
+ * is usually a sub-cart of a multi-cart game. */
+#define HIDDEN_PATH      "/.hidden"
+#define HIDDEN_BUF_SIZE  1024
+
+static char   hidden_buf[HIDDEN_BUF_SIZE];
+static size_t hidden_len = 0;
+
+static void hidden_load(void) {
+    hidden_len = 0;
+    FIL f;
+    if (f_open(&f, HIDDEN_PATH, FA_READ) != FR_OK) return;
+    UINT br = 0;
+    f_read(&f, hidden_buf, HIDDEN_BUF_SIZE - 1, &br);
+    f_close(&f);
+    hidden_len = br;
+    hidden_buf[hidden_len] = 0;
+}
+
+static int is_hidden(const char *stem) {
+    size_t name_len = strlen(stem);
+    size_t i = 0;
+    while (i < hidden_len) {
+        size_t j = i;
+        while (j < hidden_len && hidden_buf[j] != '\n') j++;
+        size_t line_len = j - i;
+        if (line_len == name_len && memcmp(&hidden_buf[i], stem, name_len) == 0)
+            return 1;
+        i = j + 1;
+    }
+    return 0;
+}
+
 /* --- favorites store ------------------------------------------------ */
 
 /* /.favs is a newline-separated list of cart stems (no .luac suffix).
@@ -364,11 +400,10 @@ static int build_view(const p8_cart_entry *entries, int n_entries,
     g_sort_entries = entries;
     int n = 0;
     for (int i = 0; i < n_entries; i++) {
-        if (show_favs_only) {
-            char stem[P8_PICKER_NAME_MAX];
-            stem_of(stem, sizeof(stem), entries[i].name);
-            if (!is_favorite(stem)) continue;
-        }
+        char stem[P8_PICKER_NAME_MAX];
+        stem_of(stem, sizeof(stem), entries[i].name);
+        if (is_hidden(stem)) continue;
+        if (show_favs_only && !is_favorite(stem)) continue;
         view[n++] = i;
     }
     int (*cmp)(const void *, const void *) = cmp_alpha;
@@ -442,9 +477,10 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
                    int *volume_ptr, int *show_fps_ptr) {
     if (n_entries <= 0) return -1;
 
-    /* Load favorites, play counts, and preferences. */
+    /* Load favorites, play counts, hidden list, and preferences. */
     favs_load();
     plays_load();
+    hidden_load();
     pref_load();
 
     /* Build the filtered + sorted view. If favs-only filter yields no

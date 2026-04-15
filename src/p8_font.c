@@ -13,6 +13,7 @@
 #include "p8_draw.h"
 
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
 
 /* ASCII 32-127: 3×5 packed into 16 bits.

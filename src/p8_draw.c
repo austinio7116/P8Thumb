@@ -9,6 +9,7 @@
 #include "p8_draw.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* --- low-level pixel ops with camera + clip + draw palette ----------- */
 
@@ -50,8 +51,6 @@ static inline void pset_world(p8_machine *m, int x, int y, int c) {
     if (!in_clip(m, sx, sy)) return;
     int col = resolve_fillp(m, sx, sy, c);
     if (col < 0) return;
-    /* low nibble = remapped color; high bit of pal entry = transparent
-     * (only used by sprite blit, ignored here). */
     uint8_t mapped = m->mem[P8_DS_DRAW_PAL + (col & 0x0f)] & 0x0f;
     p8_fb_pset_raw(m, sx, sy, mapped);
 }
@@ -359,13 +358,41 @@ void p8_rrect(p8_machine *m, int x, int y, int w, int h, int r, int c) {
     }
 }
 
+/* Helper: paint one pixel with current fillp + col0/col1. */
+static inline void circ_pix(uint8_t *fb, int sx, int sy, uint16_t pat,
+                             int transp, uint8_t col0, uint8_t col1, int fb_row) {
+    uint8_t mapped;
+    if (pat != 0) {
+        int bit = 15 - ((sx & 3) + 4 * (sy & 3));
+        if ((pat >> bit) & 1) {
+            if (transp) return;
+            mapped = col1;
+        } else {
+            mapped = col0;
+        }
+    } else {
+        mapped = col0;
+    }
+    int faddr = fb_row + (sx >> 1);
+    if (sx & 1)
+        fb[faddr] = (fb[faddr] & 0x0f) | (mapped << 4);
+    else
+        fb[faddr] = (fb[faddr] & 0xf0) | mapped;
+}
+
 void p8_circfill(p8_machine *m, int cx, int cy, int r, int c) {
     if (r < 0) return;
-    if (r == 0) { pset_world(m, cx, cy, c); return; }
 
     int camx = p8_camera_x(m), camy = p8_camera_y(m);
     int clip_x0 = m->mem[P8_DS_CLIP_X0], clip_y0 = m->mem[P8_DS_CLIP_Y0];
     int clip_x1 = m->mem[P8_DS_CLIP_X1], clip_y1 = m->mem[P8_DS_CLIP_Y1];
+
+    /* Inverted-circle mode: when poke(0x5f34, 2) is set AND color has
+     * the 0x1800 flag bits, fill OUTSIDE the circle instead of inside.
+     * Used by carts as a "peephole" mask effect. */
+    int inverted = (m->mem[0x5f34] & 0x02) && ((c & 0x1800) == 0x1800);
+
+    if (r == 0 && !inverted) { pset_world(m, cx, cy, c); return; }
 
     /* Check for fill pattern */
     uint16_t pat = (uint16_t)m->mem[P8_DS_FILLPAT_LO]
@@ -374,6 +401,31 @@ void p8_circfill(p8_machine *m, int cx, int cy, int r, int c) {
     uint8_t col1 = m->mem[P8_DS_DRAW_PAL + ((c >> 4) & 0x0f)] & 0x0f;
     int transp = m->mem[P8_DS_FILLPAT_T] & 1;
     uint8_t *fb = &m->mem[P8_FB_BASE];
+
+    if (inverted) {
+        /* Fill the entire clip region except the inside of the circle. */
+        for (int sy = clip_y0; sy < clip_y1 && sy < P8_SCREEN_H; sy++) {
+            int wy = sy + camy;
+            int dy = wy - cy;
+            int rr = r * r - dy * dy;
+            int dx = 0;
+            if (rr >= 0) {
+                while ((dx + 1) * (dx + 1) <= rr) dx++;
+            } else {
+                dx = -1;  /* row outside circle entirely */
+            }
+            int hole_x0 = (cx - dx) - camx;
+            int hole_x1 = (cx + dx) - camx;
+            int fb_row = sy << 6;
+            int xlo = clip_x0 < 0 ? 0 : clip_x0;
+            int xhi = clip_x1 > P8_SCREEN_W ? P8_SCREEN_W : clip_x1;
+            for (int sx = xlo; sx < xhi; sx++) {
+                if (dx >= 0 && sx >= hole_x0 && sx <= hole_x1) continue;
+                circ_pix(fb, sx, sy, pat, transp, col0, col1, fb_row);
+            }
+        }
+        return;
+    }
 
     for (int dy = -r; dy <= r; dy++) {
         int sy = (cy + dy) - camy;
@@ -392,23 +444,7 @@ void p8_circfill(p8_machine *m, int cx, int cy, int r, int c) {
 
         int fb_row = sy << 6;
         for (int sx = x0; sx <= x1; sx++) {
-            uint8_t mapped;
-            if (pat != 0) {
-                int bit = 15 - ((sx & 3) + 4 * (sy & 3));
-                if ((pat >> bit) & 1) {
-                    if (transp) continue;
-                    mapped = col1;
-                } else {
-                    mapped = col0;
-                }
-            } else {
-                mapped = col0;
-            }
-            int faddr = fb_row + (sx >> 1);
-            if (sx & 1)
-                fb[faddr] = (fb[faddr] & 0x0f) | (mapped << 4);
-            else
-                fb[faddr] = (fb[faddr] & 0xf0) | mapped;
+            circ_pix(fb, sx, sy, pat, transp, col0, col1, fb_row);
         }
     }
 }
@@ -485,7 +521,12 @@ void p8_sspr(p8_machine *m,
              int sx, int sy, int sw, int sh,
              int dx, int dy, int dw, int dh,
              int flip_x, int flip_y) {
-    if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
+    if (sw <= 0 || sh <= 0) return;
+    /* PICO-8 compat: negative dw/dh means "flip + shift origin".
+     * Convert to positive dw/dh + toggle flip flags. */
+    if (dw < 0) { dw = -dw; dx -= dw; flip_x = !flip_x; }
+    if (dh < 0) { dh = -dh; dy -= dh; flip_y = !flip_y; }
+    if (dw == 0 || dh == 0) return;
     int dx0 = dx - p8_camera_x(m);
     int dy0 = dy - p8_camera_y(m);
 

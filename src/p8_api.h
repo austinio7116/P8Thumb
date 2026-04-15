@@ -35,6 +35,14 @@ int p8_api_get_menuitems(const char **labels, int max);
  * Returns 1 if the callback returned true (keep menu open), 0 otherwise. */
 int p8_api_menuitem_invoke(p8_vm *vm, int idx, int buttons);
 
+/* If the cart called load(cart, _, param), returns 1 and sets out_stem
+ * + out_param to internal static buffers (valid until next load()). */
+int p8_api_load_pending(const char **out_stem, const char **out_param);
+
+/* Set the param string returned by stat(6). Call before launching a
+ * cart that was triggered via load(). Pass NULL to clear. */
+void p8_api_set_stat6(const char *param);
+
 /* Optional binding-call trace hook. If set to non-NULL, every
  * traced binding will call this with its name on entry. The device
  * firmware sets this to p8_log_ring so a hardfault dump shows
