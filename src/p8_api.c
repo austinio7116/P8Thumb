@@ -790,12 +790,10 @@ static int l_poke4(lua_State *L) {
 }
 
 /* fillp(pat) — set the 16-bit fill pattern and transparency flag.
- * The pattern is a float where:
- *   - integer part = 16-bit bitfield (bit 15 = top-left pixel (0,0))
- *   - fractional .5 bit = transparency flag (second color is transparent)
- * PICO-8 uses 16.16 fixed-point internally; we approximate with float:
- * the transparency bit is set when (pat*2) is odd, i.e. when there's
- * a 0.5 component. Passing no args resets the pattern to 0. */
+ * In PICO-8's 16.16 fixed-point:
+ *   - top 16 bits = pattern (bit 15 = top-left pixel (0,0))
+ *   - bit 15 of the fractional part (0x8000) = transparency flag
+ * Passing no args resets the pattern to 0. */
 static int l_p8_fillp(lua_State *L) {
     TRACE("fillp");
     p8_machine *m = get_machine(L);
@@ -1599,163 +1597,6 @@ static int l_p8_pairs(lua_State *L) {
 
 /* --- registration ---------------------------------------------------- */
 
-/* px9_decomp(x0, y0, src, vget, vset) — C implementation of the
- * standard PICO-8 PX9 decompressor. Uses uint32_t for the bit cache
- * to avoid float precision loss (lua_Number is single-precision float,
- * which only has 24 bits of mantissa — not enough for 32-bit bitwise
- * operations that PX9 relies on). */
-static int l_px9_decomp(lua_State *L) {
-    TRACE("px9_decomp");
-    p8_machine *m = get_machine(L);
-    int x0 = argi(L, 1, 0);
-    int y0 = argi(L, 2, 0);
-    int src_addr = argi(L, 3, 0);
-    /* args 4,5 = vget(x,y), vset(x,y,v) Lua callbacks */
-    fprintf(stderr, "[px9] x0=%d y0=%d src=0x%x b=%02x%02x%02x%02x\n",
-            x0, y0, src_addr,
-            m->mem[src_addr & 0xffff], m->mem[(src_addr+1) & 0xffff],
-            m->mem[(src_addr+2) & 0xffff], m->mem[(src_addr+3) & 0xffff]);
-
-    /* --- bit cache (uint32_t for full 32-bit precision) --- */
-    uint32_t cache = 0;
-    int cache_bits = 0;
-
-    /* peek2 from machine memory (little-endian, unsigned) */
-    #define PX9_PEEK2(addr) ((uint32_t)m->mem[(addr) & 0xffff] | \
-                             ((uint32_t)m->mem[((addr)+1) & 0xffff] << 8))
-
-    #define PX9_GETVAL(bits, out) do { \
-        if (cache_bits < 16) { \
-            cache += PX9_PEEK2(src_addr) << cache_bits; \
-            cache_bits += 16; \
-            src_addr += 2; \
-        } \
-        (out) = (cache << (32 - (bits))) >> (32 - (bits)); \
-        cache >>= (bits); \
-        cache_bits -= (bits); \
-    } while(0)
-
-    /* gnp: read gamma-like number, starting from init_n */
-    #define PX9_GNP(init_n, out) do { \
-        uint32_t _n = (init_n), _bits = 0, _vv; \
-        do { \
-            _bits++; \
-            PX9_GETVAL(_bits, _vv); \
-            _n += _vv; \
-        } while (_vv >= (1u << _bits) - 1); \
-        (out) = _n; \
-    } while(0)
-
-    /* --- decode header --- */
-    uint32_t w, h_1, eb, el_count;
-    PX9_GNP(1, w);
-    PX9_GNP(0, h_1);
-    PX9_GNP(1, eb);
-
-    /* element list + prediction lists. Static to avoid blowing
-     * the 16KB device stack. */
-    #define PX9_MAX_CONTEXTS 64
-    #define PX9_MAX_EL 64
-    static uint8_t el8[PX9_MAX_EL];
-    static uint8_t pr_key[PX9_MAX_CONTEXTS];
-    static uint8_t pr_list[PX9_MAX_CONTEXTS][PX9_MAX_EL];
-    static int pr_count;
-
-    PX9_GNP(1, el_count);
-    fprintf(stderr, "[px9] w=%u h_1=%u eb=%u el_count=%u\n", w, h_1, eb, el_count);
-    if (el_count > PX9_MAX_EL) el_count = PX9_MAX_EL;
-    { uint32_t el_tmp;
-      for (uint32_t i = 0; i < el_count; i++) {
-        PX9_GETVAL(eb, el_tmp);
-        el8[i] = (uint8_t)el_tmp;
-    } }
-    pr_count = 0;
-    uint32_t elc = el_count;
-
-    /* vlist_val: move val to front of list of length elc */
-    #define PX9_VLIST_VAL(list, val) do { \
-        for (uint32_t _i = 0; _i < elc; _i++) { \
-            if ((list)[_i] == (uint8_t)(val)) { \
-                for (uint32_t _j = _i; _j > 0; _j--) \
-                    (list)[_j] = (list)[_j-1]; \
-                (list)[0] = (uint8_t)(val); \
-                break; \
-            } \
-        } \
-    } while(0)
-
-    /* --- main decode loop --- */
-    uint32_t splen = 0;
-    int predict = 0;
-    int x = 0, y = 0;
-
-    for (int yy = y0; yy <= y0 + (int)h_1; yy++) {
-        for (int xx = x0; xx < x0 + (int)w; xx++) {
-            if (splen < 1) {
-                PX9_GNP(1, splen);
-                predict = !predict;
-            }
-            splen--;
-
-            /* a = vget(xx, yy-1): read from 0x4300 + x + y*w directly
-             * instead of calling Lua callback — avoids stack pressure
-             * on device from thousands of lua_call invocations. */
-            uint32_t a = 0;
-            if (yy > y0) {
-                int addr = 0x4300 + xx + (yy - 1) * (int)w;
-                if ((unsigned)addr < P8_MEM_SIZE)
-                    a = m->mem[addr];
-            }
-
-            /* find or create prediction list for context 'a' */
-            uint8_t *l = NULL;
-            for (int pi = 0; pi < pr_count; pi++) {
-                if (pr_key[pi] == (uint8_t)a) { l = pr_list[pi]; break; }
-            }
-            if (!l && pr_count < PX9_MAX_CONTEXTS) {
-                pr_key[pr_count] = (uint8_t)a;
-                l = pr_list[pr_count];
-                memcpy(l, el8, elc);
-                pr_count++;
-            }
-            if (!l) l = pr_list[0]; /* fallback if too many contexts */
-
-            /* read value */
-            uint32_t v;
-            if (predict) {
-                v = l[0];
-            } else {
-                uint32_t idx;
-                PX9_GNP(2, idx);
-                /* idx is 1-based (Lua convention); convert to 0-based */
-                v = (idx >= 1 && idx - 1 < elc) ? l[idx - 1] : 0;
-            }
-
-            PX9_VLIST_VAL(l, v);
-            PX9_VLIST_VAL(el8, v);
-
-            /* vset(xx, yy, v): write directly to machine memory */
-            {
-                int addr = 0x4300 + xx + yy * (int)w;
-                if ((unsigned)addr < P8_MEM_SIZE)
-                    m->mem[addr] = (uint8_t)v;
-            }
-
-            /* advance x,y through the grid (Lua version does this
-             * but the for loops already handle it — the Lua version
-             * has a quirk where x,y are modified mid-loop. We skip
-             * this since our for loops handle iteration correctly.) */
-        }
-    }
-
-    #undef PX9_PEEK2
-    #undef PX9_GETVAL
-    #undef PX9_GNP
-    #undef PX9_VLIST_VAL
-    #undef PX9_MAX_CONTEXTS
-    #undef PX9_MAX_EL
-    return 0;
-}
 
 static const luaL_Reg p8_funcs[] = {
     /* draw */
@@ -1872,7 +1713,6 @@ static const luaL_Reg p8_funcs[] = {
     { "reload",   l_p8_reload },
     { "memcpy",   l_p8_memcpy },
     { "memset",   l_p8_memset },
-    { "px9_decomp", l_px9_decomp },
     { NULL, NULL }
 };
 
@@ -2027,12 +1867,11 @@ int p8_api_menuitem_invoke(p8_vm *vm, int idx, int buttons) {
 }
 
 void p8_api_post_load(p8_vm *vm) {
-    lua_State *L = vm->L;
-    /* Override px9_decomp with C version — the Lua version loses
-     * precision due to float lua_Number (24-bit mantissa can't hold
-     * the 32-bit bit cache that PX9 decompression requires). */
-    lua_pushcfunction(L, l_px9_decomp);
-    lua_setglobal(L, "px9_decomp");
+    (void)vm;
+    /* Previously overrode the cart's px9_decomp with a C native to
+     * work around 32-bit bit-cache precision loss through float
+     * lua_Number. With int32 fixed-point lua_Number the cart's own
+     * Lua px9_decomp is bit-exact, so the override is gone. */
 }
 
 int p8_api_call_optional(p8_vm *vm, const char *name) {

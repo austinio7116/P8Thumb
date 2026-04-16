@@ -1386,8 +1386,9 @@ int main(void) {
             p8_log_to_file("load: ok");
         }
 
-        /* Override any Lua-defined functions with C native versions
-         * (e.g. px9_decomp needs uint32_t precision). */
+        /* Hook for any post-load API adjustments (currently a no-op;
+         * previously installed a C px9_decomp to dodge float precision
+         * loss, no longer needed with fixed-point lua_Number). */
         p8_api_post_load(&vm);
 
         /* Restore user memory saved by the previous cart's load() call.
