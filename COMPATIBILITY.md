@@ -43,7 +43,7 @@ Last updated: 2026-04-15
 | pico_arcade-2 | Partial | Multi-cart launcher — requires load() to chain-load sub-carts (not yet implemented) |
 | pico_ball-5 | Playable | Chain-loads pico_ball_match via load() |
 | picohot-0 | Partial | Loads after P8SCII font + _ENV fixes; some in-game errors may remain |
-| picovalley-2 | Playable | Working - not played much |
+| picovalley-2 | Playable | Works correctly with screen-mode-3 (64×64 doubled) support. |
 | poom_0-9 | Partial | Menu works; entering a level exits because poom_1 decompresses only part of the BBS-edition map (71 sectors + 446 sides, 0 verts/lines) and no `_plyr` spawns. Verified against stock Lua 5.2 with identical output — this isn't a ThumbyP8 bug, the BBS edition of POOM appears to rely on PICO-8 memory behaviour we don't fully match. |
 | poom_1 | Partial | Hidden sub-cart for poom_0. |
 | kalikan_stage_1a | Playable | Hidden sub-cart, loaded via picker from kalikan menu |
@@ -80,6 +80,7 @@ Last updated: 2026-04-15
 ## Recent Fixes
 
 ### 2026-04-16
+- **PICO-8 screen mode 3** (`poke(0x5f2c, 3)` → 64×64 doubled to 128×128) implemented in `p8_machine_present`. Fixes picovalley, which draws its title/HUD at 64×64 coords expecting the display to upscale.
 - **`lua_Number` is now int32 16.16 fixed-point** (was single-precision float). Matches PICO-8 exactly: bitwise ops preserve the 32-bit pattern, arithmetic wraps on overflow. Removes the C-native `px9_decomp` workaround — the cart's Lua version is now bit-exact.
 - **`lua_str2number` wraps on overflow instead of saturating** — hex literals like `0xbe74` (48756 > 32767) keep the correct PICO-8 bit pattern `0xbe740000` for use as addresses or bitmasks.
 - **`argaddr` helper masks memory addresses to 16 bits unsigned** — `peek(0xbe74)` etc. now index the machine correctly. Applied to peek/poke/peek2/poke2/peek4/poke4/memcpy/memset/reload.
