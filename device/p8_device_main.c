@@ -696,8 +696,10 @@ static int convert_one_cart(const char *stem, p8_machine *m,
  * History:
  *   1: original float lua_Number (unversioned, treated as no stamp)
  *   2: int32 16.16 fixed-point lua_Number
+ *   3: lua_str2number wraps on overflow instead of saturating — hex
+ *      literals > 0x7fff get different bit patterns baked in.
  */
-#define P8_LUAC_FMT_VERSION 2
+#define P8_LUAC_FMT_VERSION 3
 #define P8_LUAC_VER_PATH "/.luac_version"
 
 static void invalidate_luac_cache_if_stale(void) {
