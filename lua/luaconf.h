@@ -507,14 +507,18 @@ static inline int lua_number2str(char *s, int32_t n) {
 @@ lua_str2number converts a decimal numeric string to a fixed-point
 ** number. Uses strtod internally to handle hex float literals
 ** ("0x1.8p0"), decimal fractions, and scientific notation uniformly,
-** then scales by 65536 with overflow saturation.
+** then scales by 65536 and wraps on overflow — matching PICO-8's
+** two's-complement behaviour so hex literals like 0xbe74 (which in
+** 16.16 produce the 32-bit pattern 0xbe740000, a negative int32) keep
+** the correct bit pattern for use as an address or bitmask.
 */
 static inline int32_t p8_str2fix(const char *s, char **endp) {
     double d = strtod(s, endp);
     double scaled = d * 65536.0;
-    if (scaled >= 2147483647.0) return (int32_t)0x7fffffff;
-    if (scaled <= -2147483648.0) return (int32_t)0x80000000;
-    return (int32_t)scaled;
+    /* Reduce to a 64-bit integer first (well-defined for finite doubles
+     * in range), then mask to 32 bits — that gives modular wrap. */
+    int64_t i64 = (int64_t)scaled;
+    return (int32_t)((uint64_t)i64 & 0xffffffffu);
 }
 #define lua_str2number(s,p)	p8_str2fix((s), (p))
 /* C99 strtod already handles "0x1.8p0"-style hex floats, so route

@@ -88,7 +88,10 @@ int main(int argc, char **argv) {
 
     /* --- VM + machine + input + cart -------------------------------- */
     p8_vm vm;
-    if (p8_vm_init(&vm, 0) != 0) {
+    /* Host is 64-bit: TValues/pointers double in size, so carts near
+     * the device's 280KB cap overflow here. Bump to 2MB for host so
+     * we can exercise the full cart catalog. */
+    if (p8_vm_init(&vm, 8 * 1024 * 1024) != 0) {
         fprintf(stderr, "vm init failed\n");
         return 1;
     }
@@ -111,13 +114,56 @@ int main(int argc, char **argv) {
             FILE *df = fopen(getenv("P8_DUMP_LUA"), "w");
             if (df) { fwrite(cart.lua_source, 1, cart.lua_size, df); fclose(df); }
         }
-        if (p8_vm_do_string(&vm, cart.lua_source, "=cart") != LUA_OK) {
+        /* P8_LOAD_LUA: replace the cart's Lua source with a file on
+         * disk — lets you hot-patch with debug prints. */
+        const char *override = getenv("P8_LOAD_LUA");
+        const char *src = cart.lua_source;
+        size_t src_len = cart.lua_size;
+        char *override_buf = NULL;
+        if (override) {
+            FILE *of = fopen(override, "rb");
+            if (of) {
+                fseek(of, 0, SEEK_END);
+                long sz = ftell(of);
+                fseek(of, 0, SEEK_SET);
+                override_buf = (char *)malloc(sz + 1);
+                if (override_buf) {
+                    fread(override_buf, 1, sz, of);
+                    override_buf[sz] = 0;
+                    src = override_buf;
+                    src_len = sz;
+                    fprintf(stderr, "[host] loaded %ld bytes from %s\n", sz, override);
+                }
+                fclose(of);
+            }
+        }
+        if (p8_vm_do_string(&vm, src, "=cart") != LUA_OK) {
             fprintf(stderr, "cart load error: %s\n",
                     p8_vm_last_error_msg(&vm));
             return 1;
         }
+        free(override_buf);
     }
     p8_api_post_load(&vm);
+
+    /* P8_LOAD_MEM: load user memory (0x4300..0xffff) from a file
+     * produced by an earlier run with P8_DUMP_MEM. Lets us reproduce
+     * sub-cart scenarios (e.g. poom_1 needs state poom_0 wrote). */
+    {
+        const char *load = getenv("P8_LOAD_MEM");
+        if (load) {
+            FILE *mf = fopen(load, "rb");
+            if (mf) {
+                size_t n = fread(&machine.mem[0x4300], 1,
+                                 0x10000 - 0x4300, mf);
+                fclose(mf);
+                fprintf(stderr, "[host] loaded %zu bytes of user mem from %s\n",
+                        n, load);
+            } else {
+                fprintf(stderr, "[host] P8_LOAD_MEM: %s not found\n", load);
+            }
+        }
+    }
 
     /* --- SDL window + audio ----------------------------------------- */
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
@@ -232,12 +278,26 @@ int main(int argc, char **argv) {
         if (p8_api_call_optional(&vm, update_fn) != 0) running = 0;
         if (p8_api_call_optional(&vm, "_draw")    != 0) running = 0;
 
-        /* Cart called load() — log and stop (host doesn't chain-load). */
+        /* Cart called load() — log and stop (host doesn't chain-load).
+         * If P8_DUMP_MEM is set, dump user memory 0x4300..0xffff to
+         * that file so we can reproduce sub-cart scenarios without
+         * full chain-load machinery. */
         {
             const char *lstem = NULL, *lparam = NULL;
             if (p8_api_load_pending(&lstem, &lparam)) {
                 fprintf(stderr, "[host] load(\"%s\", _, \"%s\") — host stops here\n",
                         lstem, lparam ? lparam : "");
+                const char *dump = getenv("P8_DUMP_MEM");
+                if (dump) {
+                    FILE *mf = fopen(dump, "wb");
+                    if (mf) {
+                        fwrite(&machine.mem[0x4300], 1,
+                               0x10000 - 0x4300, mf);
+                        fclose(mf);
+                        fprintf(stderr, "[host] dumped %d bytes of user mem to %s\n",
+                                0x10000 - 0x4300, dump);
+                    }
+                }
                 running = 0;
             }
         }

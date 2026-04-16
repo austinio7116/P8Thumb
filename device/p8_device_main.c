@@ -1654,10 +1654,66 @@ int main(void) {
 
             /* Cart called load() — write pending marker and reboot.
              * The target's visibility in the picker is decided by the
-             * claim graph at picker startup (see .claims files). */
+             * claim graph at picker startup (see .claims files).
+             *
+             * If the target cart isn't on disk, some carts call load()
+             * as a no-op (e.g. fafomajoje's debug load("rogue.pi")) —
+             * before we supported multi-cart chain-load that silently
+             * did nothing and the cart kept running. Preserve that
+             * behaviour: swallow the load() and continue the cart. */
             {
                 const char *lstem = NULL, *lparam = NULL;
                 if (p8_api_load_pending(&lstem, &lparam)) {
+                    /* Does the target exist on disk? Try exact + BBS
+                     * revision-suffix (foo matches foo-5.luac). */
+                    int target_exists = 0;
+                    char want[96];
+                    snprintf(want, sizeof(want), "/carts/%s.luac", lstem);
+                    FILINFO fi;
+                    if (f_stat(want, &fi) == FR_OK) target_exists = 1;
+                    if (!target_exists) {
+                        DIR dir;
+                        FILINFO info;
+                        size_t target_len = strlen(lstem);
+                        if (f_opendir(&dir, "/carts") == FR_OK) {
+                            while (f_readdir(&dir, &info) == FR_OK &&
+                                   info.fname[0]) {
+                                size_t nl = strlen(info.fname);
+                                if (nl < 5 + target_len) continue;
+                                if (strcasecmp(info.fname + nl - 5, ".luac")
+                                    != 0) continue;
+                                size_t stem_len = nl - 5;
+                                const char *dash = NULL;
+                                for (size_t k = stem_len; k > 0; k--) {
+                                    if (info.fname[k-1] == '-') {
+                                        dash = info.fname + k - 1;
+                                        break;
+                                    }
+                                    if (info.fname[k-1] < '0' ||
+                                        info.fname[k-1] > '9') break;
+                                }
+                                if (!dash) continue;
+                                size_t base_len = dash - info.fname;
+                                if (base_len != target_len) continue;
+                                if (strncasecmp(info.fname, lstem,
+                                                base_len) == 0) {
+                                    target_exists = 1;
+                                    break;
+                                }
+                            }
+                            f_closedir(&dir);
+                        }
+                    }
+                    if (!target_exists) {
+                        char msg[96];
+                        snprintf(msg, sizeof(msg),
+                                 "load: target '%s' not found — swallowed",
+                                 lstem);
+                        p8_log_to_file(msg);
+                        p8_api_clear_load_pending();
+                        /* fall through: no reboot, cart keeps running */
+                        goto load_pending_done;
+                    }
                     FIL f;
                     if (f_open(&f, "/.pending_load",
                                FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
@@ -1706,6 +1762,7 @@ int main(void) {
                     while (1) tight_loop_contents();
                 }
             }
+            load_pending_done:;
 
             /* Audio: fill in 512-sample chunks to keep BSS small. */
             {

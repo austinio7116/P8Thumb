@@ -39,6 +39,12 @@ int p8_api_menuitem_invoke(p8_vm *vm, int idx, int buttons);
  * + out_param to internal static buffers (valid until next load()). */
 int p8_api_load_pending(const char **out_stem, const char **out_param);
 
+/* Clear any pending load() so the cart keeps running normally. Used
+ * when a load() target doesn't exist on disk — some carts call
+ * load("foo") as debug cruft expecting it to silently no-op (the
+ * behaviour from before we added real multi-cart support). */
+void p8_api_clear_load_pending(void);
+
 /* Set the param string returned by stat(6). Call before launching a
  * cart that was triggered via load(). Pass NULL to clear. */
 void p8_api_set_stat6(const char *param);

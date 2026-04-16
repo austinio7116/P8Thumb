@@ -36,10 +36,12 @@
 /* Each cart's /carts/<stem>.claims file lists stems it references via
  * load(), one per line. A cart C is hidden iff some OTHER cart P
  * claims C and either:
- *   (a) C does not claim P back (C is a pure sub-cart of P), OR
- *   (b) both claim each other (return-to-menu) but P's .luac is
- *       larger — the larger cart is treated as the main. Ties leave
- *       both visible.
+ *   (a) C does not claim P back — C is a pure sub-cart of P, OR
+ *   (b) both claim each other (return-to-menu cycle) but P has the
+ *       higher out-degree — a launcher claims many sub-carts, a sub
+ *       claims at most one cart back (the menu). If out-degrees tie
+ *       (e.g. pico_ball ↔ match, POOM_0 ↔ POOM_1), fall back to
+ *       .luac file size: the larger cart is treated as the main.
  * Computed once per picker run into a 64-bit bitmask.
  *
  * Implementation note: the legacy /.hidden file is unlinked at
@@ -111,7 +113,7 @@ static uint64_t load_claims_mask(const p8_cart_entry *entries, int n, int i) {
     return mask;
 }
 
-/* .luac size is the tiebreaker for mutual claims — bigger = main. */
+/* .luac size is the final tiebreaker when out-degrees match. */
 static uint32_t luac_size(const p8_cart_entry *entries, int i) {
     char path[80];
     snprintf(path, sizeof(path), "/carts/%s", entries[i].name);
@@ -126,19 +128,36 @@ static void compute_hidden_mask(const p8_cart_entry *entries, int n) {
     static uint64_t claims[64];
     for (int i = 0; i < nn; i++) claims[i] = load_claims_mask(entries, nn, i);
 
+    /* Out-degree per cart: how many distinct carts it claims via load().
+     * A launcher (kalikan menu, pico_arcade) has a high out-degree; a
+     * sub-cart claims at most one (the menu it returns to). */
+    int out_deg[64];
+    for (int i = 0; i < nn; i++) {
+        int d = 0;
+        uint64_t m = claims[i];
+        for (int j = 0; j < nn; j++) if (m & ((uint64_t)1 << j)) d++;
+        out_deg[i] = d;
+    }
+
     for (int i = 0; i < nn; i++) {
         uint64_t bit_i = (uint64_t)1 << i;
         for (int j = 0; j < nn; j++) {
             if (j == i) continue;
             if (!(claims[j] & bit_i)) continue;   /* j doesn't claim i */
-            if (claims[i] & ((uint64_t)1 << j)) {
-                /* mutual: larger .luac wins */
-                if (luac_size(entries, j) > luac_size(entries, i)) {
-                    g_hidden_mask |= bit_i;
-                    break;
-                }
-            } else {
-                /* non-mutual: i is a pure sub-cart of j */
+            int mutual = (claims[i] & ((uint64_t)1 << j)) != 0;
+            if (!mutual) {
+                /* j claims i, i doesn't claim j: i is a pure sub-cart. */
+                g_hidden_mask |= bit_i;
+                break;
+            }
+            /* Mutual: launcher has higher out-degree. Fall back to
+             * .luac size when out-degrees match. */
+            if (out_deg[j] > out_deg[i]) {
+                g_hidden_mask |= bit_i;
+                break;
+            }
+            if (out_deg[j] == out_deg[i] &&
+                luac_size(entries, j) > luac_size(entries, i)) {
                 g_hidden_mask |= bit_i;
                 break;
             }

@@ -70,6 +70,18 @@ static int argi(lua_State *L, int idx, int dflt) {
     if (!isnum) return dflt;
     return (int)(n >> 16);
 }
+/* PICO-8 addresses are 16-bit. Users often write them as hex literals
+ * larger than fixed-point's signed range (e.g. 0xbe74 = 48756 > 32767),
+ * which overflow to negative integer values. PICO-8's peek/poke/memcpy
+ * treat the low 16 bits of the integer part as the address — so 0xbe74
+ * and -16780 resolve to the same memory location. argaddr mirrors that. */
+static int argaddr(lua_State *L, int idx, int dflt) {
+    if (lua_isnoneornil(L, idx)) return dflt;
+    int isnum = 0;
+    lua_Number n = lua_tonumberx(L, idx, &isnum);
+    if (!isnum) return dflt;
+    return (int)((uint32_t)(n >> 16) & 0xffff);
+}
 static lua_Number argn0(lua_State *L, int idx) {
     if (lua_isnoneornil(L, idx)) return 0;
     int isnum = 0;
@@ -707,7 +719,7 @@ static int l_p8_chr(lua_State *L) {
 static int l_peek(lua_State *L) {
     TRACE("peek");
     p8_machine *m = get_machine(L);
-    int addr = argi(L, 1, 0);
+    int addr = argaddr(L, 1, 0);
     int n = argi(L, 2, 1);
     if (n < 1) n = 1;
     for (int i = 0; i < n; i++) {
@@ -723,7 +735,7 @@ static int l_peek(lua_State *L) {
 static int l_poke(lua_State *L) {
     TRACE("poke");
     p8_machine *m = get_machine(L);
-    int addr = argi(L, 1, 0);
+    int addr = argaddr(L, 1, 0);
     int nargs = lua_gettop(L);
     for (int i = 2; i <= nargs; i++) {
         int a = addr + (i - 2);
@@ -737,7 +749,7 @@ static int l_poke(lua_State *L) {
 static int l_peek2(lua_State *L) {
     TRACE("peek2");
     p8_machine *m = get_machine(L);
-    int addr = argi(L, 1, 0);
+    int addr = argaddr(L, 1, 0);
     if (addr < 0 || addr + 1 >= P8_MEM_SIZE) {
         lua_pushinteger(L, 0); return 1;
     }
@@ -750,7 +762,7 @@ static int l_peek2(lua_State *L) {
 static int l_poke2(lua_State *L) {
     TRACE("poke2");
     p8_machine *m = get_machine(L);
-    int addr = argi(L, 1, 0);
+    int addr = argaddr(L, 1, 0);
     int val  = argi(L, 2, 0);
     if (addr < 0 || addr + 1 >= P8_MEM_SIZE) return 0;
     m->mem[addr]     = (uint8_t)(val & 0xff);
@@ -764,7 +776,7 @@ static int l_poke2(lua_State *L) {
 static int l_peek4(lua_State *L) {
     TRACE("peek4");
     p8_machine *m = get_machine(L);
-    int addr = argi(L, 1, 0);
+    int addr = argaddr(L, 1, 0);
     if (addr < 0 || addr + 3 >= P8_MEM_SIZE) {
         lua_pushnumber(L, 0); return 1;
     }
@@ -778,7 +790,7 @@ static int l_peek4(lua_State *L) {
 static int l_poke4(lua_State *L) {
     TRACE("poke4");
     p8_machine *m = get_machine(L);
-    int addr = argi(L, 1, 0);
+    int addr = argaddr(L, 1, 0);
     int32_t fixed = lua_isnoneornil(L, 2) ? 0 : (int32_t)lua_tonumber(L, 2);
     if (addr < 0 || addr + 3 >= P8_MEM_SIZE) return 0;
     uint32_t u = (uint32_t)fixed;
@@ -948,6 +960,12 @@ int p8_api_load_pending(const char **out_stem, const char **out_param) {
     if (out_stem)  *out_stem  = g_load_stem;
     if (out_param) *out_param = g_load_param;
     return 1;
+}
+
+void p8_api_clear_load_pending(void) {
+    g_load_pending = 0;
+    g_load_stem[0] = 0;
+    g_load_param[0] = 0;
 }
 
 void p8_api_set_stat6(const char *param) {
@@ -1341,8 +1359,8 @@ static int l_p8_reload(lua_State *L) {
         memcpy(m->mem, m->rom, rom_max);
         return 0;
     }
-    int dst = argi(L, 1, 0);
-    int src = argi(L, 2, 0);
+    int dst = argaddr(L, 1, 0);
+    int src = argaddr(L, 2, 0);
     int len = argi(L, 3, 0);
     if (len <= 0) return 0;
     if (dst < 0 || src < 0) return 0;
@@ -1363,8 +1381,8 @@ static int l_p8_reload(lua_State *L) {
 static int l_p8_memcpy(lua_State *L) {
     TRACE("memcpy");
     p8_machine *m = get_machine(L);
-    int dest = argi(L, 1, 0);
-    int src  = argi(L, 2, 0);
+    int dest = argaddr(L, 1, 0);
+    int src  = argaddr(L, 2, 0);
     int len  = argi(L, 3, 0);
     if (len <= 0) return 0;
     if (dest < 0 || src < 0) return 0;
@@ -1379,7 +1397,7 @@ static int l_p8_memcpy(lua_State *L) {
 static int l_p8_memset(lua_State *L) {
     TRACE("memset");
     p8_machine *m = get_machine(L);
-    int dest = argi(L, 1, 0);
+    int dest = argaddr(L, 1, 0);
     int val  = argi(L, 2, 0);
     int len  = argi(L, 3, 0);
     if (len <= 0 || dest < 0) return 0;
