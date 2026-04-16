@@ -31,27 +31,21 @@
 #include "p8_flash_disk.h"
 #include "ff.h"
 
-/* --- hidden-carts store --------------------------------------------- */
+/* --- sub-cart hide via claim graph ---------------------------------- */
 
-/* /.hidden lists cart stems that should NOT appear in the picker.
- * Populated automatically when a cart calls load() — the target cart
- * is usually a sub-cart of a multi-cart game. */
-#define HIDDEN_PATH      "/.hidden"
-#define HIDDEN_BUF_SIZE  1024
-
-static char   hidden_buf[HIDDEN_BUF_SIZE];
-static size_t hidden_len = 0;
-
-static void hidden_load(void) {
-    hidden_len = 0;
-    FIL f;
-    if (f_open(&f, HIDDEN_PATH, FA_READ) != FR_OK) return;
-    UINT br = 0;
-    f_read(&f, hidden_buf, HIDDEN_BUF_SIZE - 1, &br);
-    f_close(&f);
-    hidden_len = br;
-    hidden_buf[hidden_len] = 0;
-}
+/* Each cart's /carts/<stem>.claims file lists stems it references via
+ * load(), one per line. A cart C is hidden iff some OTHER cart P
+ * claims C and either:
+ *   (a) C does not claim P back (C is a pure sub-cart of P), OR
+ *   (b) both claim each other (return-to-menu) but P's .luac is
+ *       larger — the larger cart is treated as the main. Ties leave
+ *       both visible.
+ * Computed once per picker run into a 64-bit bitmask.
+ *
+ * Implementation note: the legacy /.hidden file is unlinked at
+ * startup — it held a flat "everyone ever referenced" list that
+ * wrongly hid main carts in cycles. */
+static uint64_t g_hidden_mask;
 
 /* Strip trailing "-N" BBS revision suffix from a stem in-place. */
 static void strip_bbs_suffix(char *stem) {
@@ -62,30 +56,98 @@ static void strip_bbs_suffix(char *stem) {
     if (k > 0 && k < L && stem[k-1] == '-') stem[k-1] = 0;
 }
 
-static int is_hidden(const char *stem) {
-    /* Check both the full stem and its BBS-stripped variant. */
-    char stripped[P8_PICKER_NAME_MAX];
-    strncpy(stripped, stem, sizeof(stripped) - 1);
-    stripped[sizeof(stripped) - 1] = 0;
-    strip_bbs_suffix(stripped);
+/* True if entry i's stem matches `target` (BBS-suffix-aware). */
+static int entry_matches(const p8_cart_entry *entries, int i,
+                         const char *target) {
+    char stem[P8_PICKER_NAME_MAX];
+    size_t L = strlen(entries[i].name);
+    strncpy(stem, entries[i].name, sizeof(stem) - 1);
+    stem[sizeof(stem) - 1] = 0;
+    if (L >= 5 && strcasecmp(stem + L - 5, ".luac") == 0) stem[L - 5] = 0;
+    if (strcasecmp(stem, target) == 0) return 1;
+    strip_bbs_suffix(stem);
+    return strcasecmp(stem, target) == 0;
+}
 
-    const char *keys[2] = { stem, stripped };
-    int key_count = (strcmp(stem, stripped) == 0) ? 1 : 2;
+/* Read claims for entry i into a bitmask of claimed entry indices. */
+static uint64_t load_claims_mask(const p8_cart_entry *entries, int n, int i) {
+    char stem[P8_PICKER_NAME_MAX];
+    size_t L = strlen(entries[i].name);
+    strncpy(stem, entries[i].name, sizeof(stem) - 1);
+    stem[sizeof(stem) - 1] = 0;
+    if (L >= 5 && strcasecmp(stem + L - 5, ".luac") == 0) stem[L - 5] = 0;
 
-    for (int ki = 0; ki < key_count; ki++) {
-        const char *k = keys[ki];
-        size_t name_len = strlen(k);
-        size_t i = 0;
-        while (i < hidden_len) {
-            size_t j = i;
-            while (j < hidden_len && hidden_buf[j] != '\n') j++;
-            size_t line_len = j - i;
-            if (line_len == name_len && memcmp(&hidden_buf[i], k, name_len) == 0)
-                return 1;
-            i = j + 1;
+    char path[80];
+    snprintf(path, sizeof(path), "/carts/%s.claims", stem);
+    FIL f;
+    if (f_open(&f, path, FA_READ) != FR_OK) return 0;
+    char buf[768];
+    UINT br = 0;
+    f_read(&f, buf, sizeof(buf) - 1, &br);
+    f_close(&f);
+    buf[br] = 0;
+
+    uint64_t mask = 0;
+    size_t p = 0;
+    while (p < br) {
+        size_t q = p;
+        while (q < br && buf[q] != '\n' && buf[q] != '\r') q++;
+        if (q > p) {
+            char target[P8_PICKER_NAME_MAX];
+            size_t tl = q - p;
+            if (tl >= sizeof(target)) tl = sizeof(target) - 1;
+            memcpy(target, buf + p, tl);
+            target[tl] = 0;
+            strip_bbs_suffix(target);
+            for (int j = 0; j < n && j < 64; j++) {
+                if (j == i) continue;
+                if (entry_matches(entries, j, target))
+                    mask |= (uint64_t)1 << j;
+            }
+        }
+        p = q + 1;
+        if (p < br && buf[p] == '\n') p++;
+    }
+    return mask;
+}
+
+/* .luac size is the tiebreaker for mutual claims — bigger = main. */
+static uint32_t luac_size(const p8_cart_entry *entries, int i) {
+    char path[80];
+    snprintf(path, sizeof(path), "/carts/%s", entries[i].name);
+    FILINFO info;
+    if (f_stat(path, &info) == FR_OK) return (uint32_t)info.fsize;
+    return 0;
+}
+
+static void compute_hidden_mask(const p8_cart_entry *entries, int n) {
+    g_hidden_mask = 0;
+    int nn = n > 64 ? 64 : n;
+    static uint64_t claims[64];
+    for (int i = 0; i < nn; i++) claims[i] = load_claims_mask(entries, nn, i);
+
+    for (int i = 0; i < nn; i++) {
+        uint64_t bit_i = (uint64_t)1 << i;
+        for (int j = 0; j < nn; j++) {
+            if (j == i) continue;
+            if (!(claims[j] & bit_i)) continue;   /* j doesn't claim i */
+            if (claims[i] & ((uint64_t)1 << j)) {
+                /* mutual: larger .luac wins */
+                if (luac_size(entries, j) > luac_size(entries, i)) {
+                    g_hidden_mask |= bit_i;
+                    break;
+                }
+            } else {
+                /* non-mutual: i is a pure sub-cart of j */
+                g_hidden_mask |= bit_i;
+                break;
+            }
         }
     }
-    return 0;
+}
+
+static int is_hidden_idx(int i) {
+    return (int)((g_hidden_mask >> i) & 1);
 }
 
 /* --- favorites store ------------------------------------------------ */
@@ -421,9 +483,9 @@ static int build_view(const p8_cart_entry *entries, int n_entries,
     g_sort_entries = entries;
     int n = 0;
     for (int i = 0; i < n_entries; i++) {
+        if (is_hidden_idx(i)) continue;
         char stem[P8_PICKER_NAME_MAX];
         stem_of(stem, sizeof(stem), entries[i].name);
-        if (is_hidden(stem)) continue;
         if (show_favs_only && !is_favorite(stem)) continue;
         view[n++] = i;
     }
@@ -440,11 +502,12 @@ static void delete_cart_and_sidecars(const char *fname) {
     stem_of(stem, sizeof(stem), fname);
 
     char path[80];
-    snprintf(path, sizeof(path), "/carts/%s.luac", stem); f_unlink(path);
-    snprintf(path, sizeof(path), "/carts/%s.rom",  stem); f_unlink(path);
-    snprintf(path, sizeof(path), "/carts/%s.bmp",  stem); f_unlink(path);
-    snprintf(path, sizeof(path), "/carts/%s.meta", stem); f_unlink(path);
-    snprintf(path, sizeof(path), "/carts/%s.sav",  stem); f_unlink(path);
+    snprintf(path, sizeof(path), "/carts/%s.luac",   stem); f_unlink(path);
+    snprintf(path, sizeof(path), "/carts/%s.rom",    stem); f_unlink(path);
+    snprintf(path, sizeof(path), "/carts/%s.bmp",    stem); f_unlink(path);
+    snprintf(path, sizeof(path), "/carts/%s.meta",   stem); f_unlink(path);
+    snprintf(path, sizeof(path), "/carts/%s.sav",    stem); f_unlink(path);
+    snprintf(path, sizeof(path), "/carts/%s.claims", stem); f_unlink(path);
     /* Don't delete the source .p8.png — the user can re-add if they
      * want to keep it. Actually, delete it too so the game disappears
      * completely. */
@@ -498,11 +561,14 @@ int p8_picker_run(p8_machine *m, p8_input *in, uint16_t *scanline,
                    int *volume_ptr, int *show_fps_ptr) {
     if (n_entries <= 0) return -1;
 
-    /* Load favorites, play counts, hidden list, and preferences. */
+    /* Load favorites, play counts, and preferences. Compute the
+     * hidden-cart mask from the .claims graph. Drop any stale
+     * /.hidden file from the pre-graph scheme. */
     favs_load();
     plays_load();
-    hidden_load();
     pref_load();
+    f_unlink("/.hidden");
+    compute_hidden_mask(entries, n_entries);
 
     /* Build the filtered + sorted view. If favs-only filter yields no
      * results, fall back to showing all carts. */

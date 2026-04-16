@@ -543,16 +543,25 @@ static int convert_one_cart(const char *stem, p8_machine *m,
         screen_log(m, sl, info);
     }
 
-    /* Scan for load("#name") calls and mark each target as hidden so
-     * the sub-cart doesn't appear in the picker. */
+    /* Scan for load("#name") calls and record the claim graph.
+     * Each cart's load() targets are written to /carts/<stem>.claims,
+     * one target stem per line. The picker uses this graph to decide
+     * which carts are sub-carts (hidden) vs main (visible). Mutual
+     * references — e.g. child loads back to menu — don't wrongly
+     * hide the main cart because the picker compares both directions. */
     {
+        char claims_path[80];
+        snprintf(claims_path, sizeof(claims_path),
+                 "/carts/%s.claims", stem);
+        /* Collect unique targets in a local buffer; write once at end. */
+        char cbuf[1024];
+        size_t cbuf_len = 0;
         const char *src = translated;
         size_t slen = translated_len;
         for (size_t i = 0; i + 6 < slen; i++) {
             if (memcmp(src + i, "load", 4) != 0) continue;
             if (i > 0 && (isalnum((unsigned char)src[i-1]) || src[i-1] == '_'))
                 continue;
-            /* Advance past "load" + optional whitespace + opener */
             size_t j = i + 4;
             while (j < slen && (src[j] == ' ' || src[j] == '\t')) j++;
             if (j >= slen) continue;
@@ -573,48 +582,46 @@ static int convert_one_cart(const char *stem, p8_machine *m,
                 continue;
             }
             str_start = j;
-            /* Find closing quote */
             while (j < slen && src[j] != quote && src[j] != '\n') j++;
             if (j >= slen || src[j] != quote) continue;
             size_t str_end = j;
-            /* Skip leading '#' */
             const char *name = src + str_start;
             size_t name_len = str_end - str_start;
             if (name_len > 0 && name[0] == '#') { name++; name_len--; }
             if (name_len == 0 || name_len > 40) continue;
 
-            /* Append to /.hidden if not already there */
-            char hbuf[1024] = {0};
-            UINT br = 0;
-            FIL hf;
-            if (f_open(&hf, "/.hidden", FA_READ) == FR_OK) {
-                f_read(&hf, hbuf, sizeof(hbuf) - 1, &br);
-                f_close(&hf);
-            }
-            int found = 0;
-            size_t hi = 0;
-            while (hi < br) {
-                size_t hj = hi;
-                while (hj < br && hbuf[hj] != '\n') hj++;
-                if (hj - hi == name_len &&
-                    memcmp(&hbuf[hi], name, name_len) == 0) {
-                    found = 1; break;
+            /* Dedupe: skip if already recorded this target. */
+            int dup = 0;
+            size_t ci = 0;
+            while (ci < cbuf_len) {
+                size_t cj = ci;
+                while (cj < cbuf_len && cbuf[cj] != '\n') cj++;
+                if (cj - ci == name_len &&
+                    memcmp(&cbuf[ci], name, name_len) == 0) {
+                    dup = 1; break;
                 }
-                hi = hj + 1;
+                ci = cj + 1;
             }
-            if (!found && br + name_len + 2 < sizeof(hbuf)) {
-                if (f_open(&hf, "/.hidden",
-                           FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-                    UINT bw;
-                    if (br > 0) f_write(&hf, hbuf, br, &bw);
-                    f_write(&hf, name, name_len, &bw);
-                    f_write(&hf, "\n", 1, &bw);
-                    f_close(&hf);
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "hidden: %.*s",
-                             (int)name_len, name);
-                    p8_log_to_file(msg);
-                }
+            if (!dup && cbuf_len + name_len + 2 < sizeof(cbuf)) {
+                memcpy(cbuf + cbuf_len, name, name_len);
+                cbuf_len += name_len;
+                cbuf[cbuf_len++] = '\n';
+            }
+        }
+
+        /* Write (or overwrite) the .claims file. Always create —
+         * even an empty file signals "no claims", which helps the
+         * picker distinguish "not yet scanned" from "genuinely none". */
+        FIL cf;
+        if (f_open(&cf, claims_path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+            UINT bw;
+            if (cbuf_len > 0) f_write(&cf, cbuf, cbuf_len, &bw);
+            f_close(&cf);
+            if (cbuf_len > 0) {
+                char msg[64];
+                snprintf(msg, sizeof(msg), "claims: %d bytes",
+                         (int)cbuf_len);
+                p8_log_to_file(msg);
             }
         }
     }
@@ -1581,8 +1588,9 @@ int main(void) {
                 }
             }
 
-            /* Cart called load() — write pending marker, append target
-             * to hidden list so it doesn't clutter the picker, reboot. */
+            /* Cart called load() — write pending marker and reboot.
+             * The target's visibility in the picker is decided by the
+             * claim graph at picker startup (see .claims files). */
             {
                 const char *lstem = NULL, *lparam = NULL;
                 if (p8_api_load_pending(&lstem, &lparam)) {
@@ -1597,8 +1605,8 @@ int main(void) {
                         }
                         f_close(&f);
                     }
-                    /* Note: target was already added to /.hidden at
-                     * conversion time by the load() scanner. */
+                    /* Note: target's hide/show is decided by the claim
+                     * graph at picker startup (see .claims files). */
 
                     /* Save user memory (0x4300..0xffff = 48KB) so the
                      * next cart can read data stashed there by this
