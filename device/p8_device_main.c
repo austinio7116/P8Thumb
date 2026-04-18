@@ -880,6 +880,53 @@ static volatile uint64_t g_msc_last_op_us = 0;
  * Windows workload heavier than "sit there doing nothing". */
 enum { LOBBY_MOUNTED, LOBBY_FLUSHING, LOBBY_READY };
 
+#ifdef THUMBYONE_SLOT_MODE
+/* Slot-mode wait_for_carts: under ThumbyOne the top-level lobby
+ * owns USB, so the standalone "sit on a USB drive animation until
+ * the host drops a cart" makes no sense here — users can only add
+ * carts by returning to the lobby first. Skip the welcome screen
+ * entirely when /carts/ is populated; when it isn't, show a
+ * minimal "no carts, return to lobby" splash and wait for a MENU
+ * long-hold to trigger the handoff. */
+static void wait_for_carts(void) {
+    int n_carts = p8_picker_scan(cart_entries, P8_PICKER_MAX_CARTS);
+    if (n_carts > 0) return;
+
+    /* No carts — render a one-shot splash on the PICO-8 screen so
+     * it matches the rest of the slot's look. p8_machine_reset +
+     * p8_cls give us a black screen to draw on with the palette
+     * the rest of the lobby code assumes. */
+    p8_machine_reset(&machine);
+    p8_camera(&machine, 0, 0);
+    p8_cls(&machine, 0);
+    font_draw_2x(&machine, "ThumbyP8", 16, 6, 9);
+    p8_line(&machine, 0, 18, 127, 18, 9);
+    p8_font_draw(&machine, "no carts in", 28, 42, 7);
+    p8_font_draw(&machine, "/carts/",     44, 52, 11);
+    p8_font_draw(&machine, "hold MENU to",  22, 80, 5);
+    p8_font_draw(&machine, "return to lobby", 14, 90, 5);
+    p8_font_draw(&machine, "USB transfer", 24, 110, 10);
+    p8_font_draw(&machine, "happens there", 22, 120, 10);
+    p8_machine_present(&machine, scanline);
+    p8_lcd_present(scanline);
+
+    /* Block on MENU long-hold. p8_buttons_read() only covers the
+     * PICO-8 6-bit mask; MENU has its own helper. */
+    while (1) {
+        if (p8_buttons_menu_pressed()) {
+            absolute_time_t d = make_timeout_time_ms(800);
+            while (p8_buttons_menu_pressed()) {
+                if (time_reached(d)) break;
+                sleep_ms(10);
+            }
+            if (time_reached(d)) thumbyone_handoff_request_lobby();
+            while (p8_buttons_menu_pressed()) sleep_ms(10);
+        }
+        sleep_ms(30);
+    }
+}
+
+#else   /* !THUMBYONE_SLOT_MODE — standalone lobby */
 static void wait_for_carts(void) {
     int state  = LOBBY_MOUNTED;
     int n_carts = 0;
@@ -1050,6 +1097,7 @@ static void wait_for_carts(void) {
         }
     }
 }
+#endif  /* !THUMBYONE_SLOT_MODE */
 
 int main(void) {
     /* Overclock to 250 MHz BEFORE stdio_init_all so the USB PLL
